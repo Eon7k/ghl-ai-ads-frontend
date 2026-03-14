@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type Experiment = {
   id: string;
@@ -47,7 +48,15 @@ export default function ExperimentsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Experiments</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Experiments</h1>
+        <Link
+          href="/experiments/new"
+          className="inline-block bg-blue-600 text-white px-4 py-2 rounded font-medium hover:bg-blue-700"
+        >
+          New Experiment
+        </Link>
+      </div>
       {experiments.length === 0 ? (
         <p>No experiments yet.</p>
       ) : (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -51,6 +52,9 @@ export default function NewExperimentPage() {
 
   return (
     <div className="p-6 max-w-xl mx-auto space-y-4">
+      <Link href="/experiments" className="text-blue-600 hover:underline text-sm block mb-2">
+        ← Back to Experiments
+      </Link>
       <h1 className="text-2xl font-bold">New Experiment</h1>
 
       {error && <div className="text-red-600 text-sm">{error}</div>}
