@@ -52,11 +52,16 @@ export default function ExperimentsPage() {
         <h1 className="text-2xl font-bold">Experiments</h1>
         <Link
           href="/experiments/new"
-          className="inline-block bg-blue-600 text-white px-4 py-2 rounded font-medium hover:bg-blue-700"
+          className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-blue-700 border-2 border-blue-700"
         >
-          New Experiment
+          + New Experiment
         </Link>
       </div>
+      <p className="text-gray-600">
+        <Link href="/experiments/new" className="text-blue-600 underline hover:no-underline">
+          Create a new experiment
+        </Link>
+      </p>
       {experiments.length === 0 ? (
         <p>No experiments yet.</p>
       ) : (
