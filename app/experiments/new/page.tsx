@@ -136,7 +136,10 @@ export default function NewExperimentPage() {
             max={20}
             className="border border-zinc-300 rounded px-3 py-2 w-full"
             value={variantCount}
-            onChange={(e) => setVariantCount(e.target.value)}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isNaN(n)) setVariantCount(Math.min(20, Math.max(1, n)));
+            }}
           />
           <p className="text-xs text-zinc-500">Between 1 and 20. You can edit each one before launching.</p>
         </div>
