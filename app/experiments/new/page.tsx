@@ -11,7 +11,7 @@ export default function NewExperimentPage() {
   const [platform, setPlatform] = useState("meta");
   const [budget, setBudget] = useState("30");
   const [prompt, setPrompt] = useState("");
-  const [variantCount, setVariantCount] = useState(5);
+  const [variantCount, setVariantCount] = useState(10);
   const [creativesSource, setCreativesSource] = useState<"ai" | "own">("ai");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +123,7 @@ export default function NewExperimentPage() {
           />
           <p className="text-xs text-zinc-500">
             {creativesSource === "ai"
-              ? "We’ll use this to generate several different ad versions."
+              ? "We’ll generate full ad copies from this — you review them and can edit or regenerate any variant."
               : "Optional: describe the campaign for your reference; you’ll paste your own copy per variant."}
           </p>
         </div>
@@ -141,7 +141,7 @@ export default function NewExperimentPage() {
               if (!Number.isNaN(n)) setVariantCount(Math.min(20, Math.max(1, n)));
             }}
           />
-          <p className="text-xs text-zinc-500">Between 1 and 20. You can edit each one before launching.</p>
+          <p className="text-xs text-zinc-500">Between 1 and 20. AI will create this many full ad copies for you to review.</p>
         </div>
 
         <div className="space-y-1">

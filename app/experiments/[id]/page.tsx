@@ -18,6 +18,7 @@ export default function ExperimentDetailPage() {
   // Local copy of variant text so we can edit before saving
   const [variantCopies, setVariantCopies] = useState<Record<string, string>>({});
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
+  const [regeneratingVariantId, setRegeneratingVariantId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
@@ -61,6 +62,26 @@ export default function ExperimentDetailPage() {
       // Could set a per-variant error; for now we don't
     } finally {
       setSavingVariantId(null);
+    }
+  }
+
+  async function regenerateVariant(v: AdVariant) {
+    if (!experiment) return;
+    setRegeneratingVariantId(v.id);
+    try {
+      const { copy } = await api.regenerateVariant(experiment.id, v.id);
+      setVariantCopies((prev) => ({ ...prev, [v.id]: copy }));
+      setExperiment((prev) => {
+        if (!prev?.variants) return prev;
+        return {
+          ...prev,
+          variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, copy } : x)),
+        };
+      });
+    } catch (e) {
+      // Could show per-variant error
+    } finally {
+      setRegeneratingVariantId(null);
     }
   }
 
@@ -153,29 +174,41 @@ export default function ExperimentDetailPage() {
       )}
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">Ad variants — edit copy before launching</h2>
+        <h2 className="text-lg font-semibold mb-3">Ad variants — review and launch</h2>
         <p className="text-zinc-600 text-sm mb-4">
           {experiment.creativesSource === "own"
             ? "Paste your ad copy for each variant below and click Save. When everything looks good, click “Launch experiment” above."
-            : "Change any text below and click Save on that variant. When everything looks good, click “Launch experiment” above."}
+            : "Review the ad copies below. Edit any text yourself, or click “Regenerate with AI” to get a new option for that slot. Click Save to keep your changes, then “Launch experiment” when ready."}
         </p>
 
         {variants.length === 0 ? (
-          <p className="text-zinc-500">No variants yet. Create this experiment again with “Generate variants” from the new experiment flow.</p>
+          <p className="text-zinc-500">No variants yet. Create this experiment again from the new experiment flow.</p>
         ) : (
           <ul className="space-y-4">
             {variants.map((v) => (
               <li key={v.id} className="border border-zinc-200 rounded-lg p-4 bg-white">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
                   <span className="font-medium text-zinc-800">Variant {v.index}</span>
-                  <button
-                    type="button"
-                    onClick={() => saveVariant(v)}
-                    disabled={savingVariantId === v.id || (variantCopies[v.id] ?? v.copy) === v.copy}
-                    className="text-sm bg-zinc-200 hover:bg-zinc-300 text-zinc-800 px-3 py-1 rounded disabled:opacity-50"
-                  >
-                    {savingVariantId === v.id ? "Saving..." : "Save"}
-                  </button>
+                  <div className="flex gap-2">
+                    {experiment.creativesSource === "ai" && (
+                      <button
+                        type="button"
+                        onClick={() => regenerateVariant(v)}
+                        disabled={regeneratingVariantId === v.id}
+                        className="text-sm bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded disabled:opacity-50"
+                      >
+                        {regeneratingVariantId === v.id ? "Generating..." : "Regenerate with AI"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => saveVariant(v)}
+                      disabled={savingVariantId === v.id || (variantCopies[v.id] ?? v.copy) === v.copy}
+                      className="text-sm bg-zinc-200 hover:bg-zinc-300 text-zinc-800 px-3 py-1 rounded disabled:opacity-50"
+                    >
+                      {savingVariantId === v.id ? "Saving..." : "Save"}
+                    </button>
+                  </div>
                 </div>
                 <textarea
                   className="border border-zinc-300 rounded px-3 py-2 w-full min-h-[120px] text-sm"

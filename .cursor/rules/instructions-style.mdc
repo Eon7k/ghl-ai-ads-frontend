@@ -1,0 +1,15 @@
+---
+description: Prefer step-by-step instructions as detailed as possible
+alwaysApply: true
+---
+
+# Instructions style
+
+When giving the user instructions, setup steps, or how-to guidance:
+
+- **Always use step-by-step format.** Number steps (1, 2, 3…) and keep each step to one clear action where possible.
+- **Be as detailed as possible.** Include exact commands to run, where to click (e.g. "Settings → Environment Variables"), and what they should see (e.g. "You should see: Ready").
+- **Assume beginner context.** Don’t skip steps; say which folder to be in, which terminal to use, and what to do if something doesn’t look right.
+- **Use concrete examples.** Prefer real values (e.g. "BACKEND_URL", "https://your-app.onrender.com") over placeholders unless the user must fill them in.
+
+Apply this for: deployment, Git, env setup, debugging, and any "how do I…" or "what do I do next" answers.

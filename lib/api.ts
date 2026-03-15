@@ -45,6 +45,13 @@ export const api = {
       { method: "PATCH", body: { copy } }
     ),
 
+  /** Regenerate one variant's copy with AI (returns new copy; backend also updates stored variant) */
+  regenerateVariant: (experimentId: string, variantId: string) =>
+    request<{ copy: string }>(
+      `experiments/${experimentId}/variants/${variantId}/regenerate`,
+      { method: "POST", body: {} }
+    ),
+
   /** Mark experiment as launched */
   launchExperiment: (id: string) =>
     request<import("./types").Experiment>(`experiments/${id}/launch`, {
