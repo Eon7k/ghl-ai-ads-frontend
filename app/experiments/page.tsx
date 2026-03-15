@@ -25,10 +25,14 @@ export default function ExperimentsPage() {
       const opts: RequestInit = { mode: "cors", credentials: "omit" };
       try {
         let res = await fetch(`${API_URL}/experiments`, opts);
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+          const msg =
+            data && typeof data.error === "string"
+              ? data.error
+              : `HTTP ${res.status}`;
+          throw new Error(msg);
         }
-        const data = await res.json();
         setExperiments(data);
       } catch (err: any) {
         setError(err.message || "Failed to load experiments");
