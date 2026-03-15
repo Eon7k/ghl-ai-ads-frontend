@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// Use same-origin proxy so CORS is not an issue when embedded in GHL iframe
+const API_URL = "/api/proxy";
 
 export default function NewExperimentPage() {
   const router = useRouter();
@@ -24,6 +25,8 @@ export default function NewExperimentPage() {
     try {
       const res = await fetch(`${API_URL}/experiments`, {
         method: "POST",
+        mode: "cors",
+        credentials: "omit",
         headers: {
           "Content-Type": "application/json"
         },

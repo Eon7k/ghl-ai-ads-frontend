@@ -12,7 +12,8 @@ type Experiment = {
   totalDailyBudget: number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// Use same-origin proxy so CORS is not an issue when embedded in GHL iframe
+const API_URL = "/api/proxy";
 
 export default function ExperimentsPage() {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
@@ -21,8 +22,9 @@ export default function ExperimentsPage() {
 
   useEffect(() => {
     async function fetchExperiments() {
+      const opts: RequestInit = { mode: "cors", credentials: "omit" };
       try {
-        const res = await fetch(`${API_URL}/experiments`);
+        let res = await fetch(`${API_URL}/experiments`, opts);
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
