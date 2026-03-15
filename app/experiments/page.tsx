@@ -2,18 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
-type Experiment = {
-  id: string;
-  name: string;
-  platform: string;
-  status: string;
-  phase: string;
-  totalDailyBudget: number;
-};
-
-// Use same-origin proxy so CORS is not an issue when embedded in GHL iframe
-const API_URL = "/api/proxy";
+import { api } from "@/lib/api";
+import type { Experiment } from "@/lib/types";
 
 export default function ExperimentsPage() {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
@@ -22,20 +12,11 @@ export default function ExperimentsPage() {
 
   useEffect(() => {
     async function fetchExperiments() {
-      const opts: RequestInit = { mode: "cors", credentials: "omit" };
       try {
-        let res = await fetch(`${API_URL}/experiments`, opts);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const msg =
-            data && typeof data.error === "string"
-              ? data.error
-              : `HTTP ${res.status}`;
-          throw new Error(msg);
-        }
+        const data = await api.listExperiments();
         setExperiments(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to load experiments");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load experiments");
       } finally {
         setLoading(false);
       }
@@ -63,34 +44,45 @@ export default function ExperimentsPage() {
           + New Experiment
         </Link>
       </div>
-      <p className="text-gray-600">
+      <p className="text-zinc-600">
         <Link href="/experiments/new" className="text-blue-600 underline hover:no-underline">
           Create a new experiment
-        </Link>
+        </Link>{" "}
+        to generate ad variants from a prompt, edit them, and launch.
       </p>
+
       {experiments.length === 0 ? (
-        <p>No experiments yet.</p>
+        <p className="text-zinc-500">No experiments yet. Click “New Experiment” to get started.</p>
       ) : (
         <div className="space-y-2">
           {experiments.map((exp) => (
-            <div
+            <Link
               key={exp.id}
-              className="border rounded p-4 flex flex-col gap-1 bg-white shadow-sm"
+              href={`/experiments/${exp.id}`}
+              className="block border rounded-lg p-4 flex flex-col gap-1 bg-white shadow-sm hover:bg-zinc-50"
             >
-              <div className="flex justify-between">
+              <div className="flex justify-between items-start">
                 <span className="font-semibold">{exp.name}</span>
-                <span className="text-sm text-gray-500">
-                  {exp.platform.toUpperCase()}
+                <span
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    exp.status === "draft" ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"
+                  }`}
+                >
+                  {exp.status === "draft" ? "Draft" : "Launched"}
                 </span>
               </div>
-              <div className="text-sm text-gray-700">
-                Status: <strong>{exp.status}</strong> — Phase:{" "}
-                <strong>{exp.phase}</strong>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-600">
+                <span>{exp.platform.toUpperCase()}</span>
+                <span>${exp.totalDailyBudget}/day</span>
+                {exp.variantCount != null && exp.variantCount > 0 && (
+                  <span>
+                    {exp.variantCount} variant{exp.variantCount === 1 ? "" : "s"} · ~$
+                    {Math.round((exp.totalDailyBudget / exp.variantCount) * 100) / 100}/variant
+                  </span>
+                )}
+                <span>Phase: {exp.phase}</span>
               </div>
-              <div className="text-sm text-gray-700">
-                Daily budget: ${exp.totalDailyBudget}
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
