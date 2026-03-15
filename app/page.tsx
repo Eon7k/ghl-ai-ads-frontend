@@ -13,8 +13,6 @@ export default function Home() {
         <Link
           href="/experiments"
           className="inline-block bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700"
-          target="_top"
-          rel="noopener noreferrer"
         >
           Go to Experiments
         </Link>

@@ -52,12 +52,7 @@ export default function NewExperimentPage() {
 
   return (
     <div className="p-6 max-w-xl mx-auto space-y-4">
-      <Link
-        href="/experiments"
-        className="text-blue-600 hover:underline text-sm block mb-2"
-        target="_top"
-        rel="noopener noreferrer"
-      >
+      <Link href="/experiments" className="text-blue-600 hover:underline text-sm block mb-2">
         ← Back to Experiments
       </Link>
       <h1 className="text-2xl font-bold">New Experiment</h1>
