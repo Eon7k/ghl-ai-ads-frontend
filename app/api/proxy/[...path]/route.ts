@@ -43,7 +43,11 @@ export async function GET(
     const { path } = await params;
     const search = new URL(request.url).search || "";
     const url = buildUrl(path, search);
+    const headers: HeadersInit = {};
+    const auth = request.headers.get("authorization");
+    if (auth) headers["Authorization"] = auth;
     const res = await fetch(url, {
+      headers: Object.keys(headers).length ? headers : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
@@ -86,6 +90,8 @@ export async function POST(
     const headers: HeadersInit = {};
     const contentType = request.headers.get("content-type");
     if (contentType) headers["Content-Type"] = contentType;
+    const auth = request.headers.get("authorization");
+    if (auth) headers["Authorization"] = auth;
     const res = await fetch(url, {
       method: "POST",
       body: body || undefined,
@@ -132,6 +138,8 @@ export async function PATCH(
     const headers: HeadersInit = {};
     const contentType = request.headers.get("content-type");
     if (contentType) headers["Content-Type"] = contentType;
+    const auth = request.headers.get("authorization");
+    if (auth) headers["Authorization"] = auth;
     const res = await fetch(url, {
       method: "PATCH",
       body: body || undefined,

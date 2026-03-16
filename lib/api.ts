@@ -1,19 +1,28 @@
 /**
  * API client for the backend. All requests go through the same-origin proxy
  * so the app works in the GHL iframe without CORS issues.
+ * Sends the auth token when present so experiment routes are user-scoped.
  */
+
+import { getToken } from "./auth";
 
 const API_BASE = "/api/proxy";
 
 async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown } = {}
+  options: { method?: string; body?: unknown; skipAuth?: boolean } = {}
 ): Promise<T> {
-  const { method = "GET", body } = options;
+  const { method = "GET", body, skipAuth } = options;
   const url = `${API_BASE}/${path.replace(/^\//, "")}`;
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (!skipAuth) {
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(url, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     mode: "cors",
     credentials: "omit",
@@ -26,8 +35,21 @@ async function request<T>(
   return data as T;
 }
 
+export type AuthUser = { id: string; email: string };
+export type LoginResponse = { token: string; user: AuthUser };
+export type MeResponse = { user: AuthUser };
+
 export const api = {
-  /** List all experiments */
+  /** Register; returns token and user. Use skipAuth so we don't require a token. */
+  auth: {
+    register: (email: string, password: string) =>
+      request<LoginResponse>("auth/register", { method: "POST", body: { email, password }, skipAuth: true }),
+    login: (email: string, password: string) =>
+      request<LoginResponse>("auth/login", { method: "POST", body: { email, password }, skipAuth: true }),
+    me: () => request<MeResponse>("auth/me"),
+  },
+
+  /** List all experiments (requires auth) */
   listExperiments: () => request<import("./types").Experiment[]>("experiments"),
 
   /** Create experiment with prompt and variant count; returns experiment with variants */

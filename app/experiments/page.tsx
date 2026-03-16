@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Experiment } from "@/lib/types";
 
 export default function ExperimentsPage() {
+  const { user, logout } = useAuth();
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,21 @@ export default function ExperimentsPage() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Experiments</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Experiments</h1>
+          {user && (
+            <p className="text-sm text-zinc-500 mt-0.5">
+              {user.email}
+              <button
+                type="button"
+                onClick={logout}
+                className="ml-2 text-blue-600 hover:underline"
+              >
+                Log out
+              </button>
+            </p>
+          )}
+        </div>
         <Link
           href="/experiments/new"
           className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-blue-700 border-2 border-blue-700"
