@@ -28,6 +28,11 @@ export default function CampaignDetailPage() {
   const [generatingCreativeId, setGeneratingCreativeId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<CampaignMetricsResponse | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [budgetValue, setBudgetValue] = useState<string>("");
+  const [budgetUpdating, setBudgetUpdating] = useState(false);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -72,6 +77,44 @@ export default function CampaignDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [experiment?.id, experiment?.status]);
+
+  // Sync budget input when experiment loads
+  useEffect(() => {
+    if (experiment?.totalDailyBudget != null) {
+      setBudgetValue(String(experiment.totalDailyBudget));
+    }
+  }, [experiment?.id, experiment?.totalDailyBudget]);
+
+  async function handleUpdateStatus(status: "ACTIVE" | "PAUSED") {
+    if (!experiment) return;
+    setStatusError(null);
+    setStatusUpdating(true);
+    try {
+      await api.updateCampaignStatus(experiment.id, status);
+    } catch (e) {
+      setStatusError(e instanceof Error ? e.message : "Failed to update status");
+    } finally {
+      setStatusUpdating(false);
+    }
+  }
+
+  async function handleUpdateBudget() {
+    if (!experiment) return;
+    const num = Number(budgetValue);
+    if (Number.isNaN(num) || num < 1) {
+      setBudgetError("Enter a valid daily budget (min 1)");
+      return;
+    }
+    setBudgetError(null);
+    setBudgetUpdating(true);
+    try {
+      await api.updateCampaignBudget(experiment.id, num);
+    } catch (e) {
+      setBudgetError(e instanceof Error ? e.message : "Failed to update budget");
+    } finally {
+      setBudgetUpdating(false);
+    }
+  }
 
   const creativeUrlsRef = useRef<Record<string, string>>({});
   useEffect(() => {
@@ -258,50 +301,138 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      {/* Campaign metrics: shown when launched */}
+      {/* Campaign Manager: metrics + adjustments — shown when launched */}
       {experiment.status === "launched" && (
-        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-zinc-900">Campaign performance</h2>
-          {metricsLoading ? (
-            <p className="text-sm text-zinc-500">Loading metrics…</p>
-          ) : metrics ? (
-            <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
-                <div className="rounded-lg bg-zinc-50 p-3">
-                  <p className="text-xs font-medium text-zinc-500">Spend</p>
-                  <p className="text-lg font-semibold text-zinc-900">${metrics.spend.toFixed(2)}</p>
+        <>
+          <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Campaign performance</h2>
+            {metricsLoading ? (
+              <p className="text-sm text-zinc-500">Loading metrics…</p>
+            ) : metrics ? (
+              <>
+                <p className="mb-4 text-xs text-zinc-500">
+                  {metrics.source === "meta"
+                    ? `Metrics from Meta${metrics.datePreset ? ` (${metrics.datePreset})` : ""}. All values match what Meta tracks.`
+                    : "Connect Meta and launch to the platform to see live data. Values below are placeholders."}
+                </p>
+                <div className="mb-4">
+                  <h3 className="mb-2 text-sm font-medium text-zinc-700">Spend &amp; reach</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Spend</p>
+                      <p className="text-lg font-semibold text-zinc-900">${metrics.spend.toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Impressions</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.impressions.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Reach</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.reach.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Frequency</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.frequency.toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">CPM</p>
+                      <p className="text-lg font-semibold text-zinc-900">${metrics.cpm.toFixed(2)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-zinc-50 p-3">
-                  <p className="text-xs font-medium text-zinc-500">Impressions</p>
-                  <p className="text-lg font-semibold text-zinc-900">{metrics.impressions.toLocaleString()}</p>
+                <div className="mb-4">
+                  <h3 className="mb-2 text-sm font-medium text-zinc-700">Clicks &amp; engagement</h3>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Clicks</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.clicks.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Link clicks</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.linkClicks.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">CTR</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.ctr.toFixed(2)}%</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">CPC</p>
+                      <p className="text-lg font-semibold text-zinc-900">${metrics.cpc.toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Conversions</p>
+                      <p className="text-lg font-semibold text-zinc-900">{metrics.conversions.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs font-medium text-zinc-500">Cost per conversion</p>
+                      <p className="text-lg font-semibold text-zinc-900">${metrics.costPerConversion.toFixed(2)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-zinc-50 p-3">
-                  <p className="text-xs font-medium text-zinc-500">Clicks</p>
-                  <p className="text-lg font-semibold text-zinc-900">{metrics.clicks.toLocaleString()}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-50 p-3">
-                  <p className="text-xs font-medium text-zinc-500">CTR</p>
-                  <p className="text-lg font-semibold text-zinc-900">{metrics.ctr.toFixed(2)}%</p>
-                </div>
-                <div className="rounded-lg bg-zinc-50 p-3">
-                  <p className="text-xs font-medium text-zinc-500">CPC</p>
-                  <p className="text-lg font-semibold text-zinc-900">${metrics.cpc.toFixed(2)}</p>
-                </div>
-                <div className="rounded-lg bg-zinc-50 p-3">
-                  <p className="text-xs font-medium text-zinc-500">Conversions</p>
-                  <p className="text-lg font-semibold text-zinc-900">{metrics.conversions.toLocaleString()}</p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-zinc-500">
-                {metrics.source === "meta"
-                  ? "Metrics from Meta (last 7 days)."
-                  : "Live metrics will appear here once this campaign is pushed to your connected ad account (e.g. Meta). Connect an integration and launch to the platform to see real data."}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-zinc-500">Metrics unavailable.</p>
-          )}
-        </section>
+              </>
+            ) : (
+              <p className="text-sm text-zinc-500">Metrics unavailable.</p>
+            )}
+          </section>
+
+          {/* Campaign controls: pause/activate and budget when linked to Meta */}
+          <section className="mt-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-zinc-900">Campaign controls</h2>
+            {experiment.metaCampaignId || experiment.metaAdSetId ? (
+              <>
+                <p className="mb-4 text-sm text-zinc-600">Make changes here; they apply on Meta immediately.</p>
+                {experiment.metaCampaignId && (
+                  <div className="mb-4 flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-medium text-zinc-700">Status on Meta</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus("PAUSED")}
+                      disabled={statusUpdating}
+                      className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      {statusUpdating ? "Updating…" : "Pause campaign"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus("ACTIVE")}
+                      disabled={statusUpdating}
+                      className="rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-100 disabled:opacity-50"
+                    >
+                      {statusUpdating ? "Updating…" : "Activate campaign"}
+                    </button>
+                    {statusError && <p className="text-sm text-red-600">{statusError}</p>}
+                  </div>
+                )}
+                {experiment.metaAdSetId && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-sm font-medium text-zinc-700">
+                      Daily budget (Meta): $
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="ml-1 w-20 rounded border border-zinc-300 px-2 py-1 text-zinc-900"
+                        value={budgetValue}
+                        onChange={(e) => setBudgetValue(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleUpdateBudget}
+                      disabled={budgetUpdating}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {budgetUpdating ? "Saving…" : "Update budget"}
+                    </button>
+                    {budgetError && <p className="text-sm text-red-600">{budgetError}</p>}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-zinc-500">Link this campaign to Meta (launch to Meta) to pause, activate, or change budget from here.</p>
+            )}
+          </section>
+        </>
       )}
 
       {experiment.prompt && (

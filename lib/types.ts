@@ -28,6 +28,10 @@ export type Experiment = {
   creativesSource?: CreativesSource;
   aiCreativeCount?: number;
   variants?: AdVariant[];
+  /** Set when campaign is created on Meta; used for metrics and status updates */
+  metaCampaignId?: string;
+  /** Set when ad set is created on Meta; used for budget updates */
+  metaAdSetId?: string;
 };
 
 export type CreateExperimentBody = {

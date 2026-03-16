@@ -100,9 +100,23 @@ export const api = {
       body: options?.aiCreativeCount != null ? { aiCreativeCount: options.aiCreativeCount } : {},
     }),
 
-  /** Get campaign metrics (spend, impressions, clicks, etc.) for a launched campaign. Source is "meta" or "placeholder". */
+  /** Get campaign metrics (full Meta-style) for a launched campaign. Source is "meta" or "placeholder". */
   getCampaignMetrics: (experimentId: string) =>
     request<CampaignMetricsResponse>(`experiments/${experimentId}/metrics`),
+
+  /** Pause or activate campaign on Meta. Requires campaign linked to Meta (metaCampaignId). */
+  updateCampaignStatus: (experimentId: string, status: "ACTIVE" | "PAUSED") =>
+    request<{ ok: boolean; status: string }>(`experiments/${experimentId}/campaign-status`, {
+      method: "PATCH",
+      body: { status },
+    }),
+
+  /** Update daily budget on Meta (ad set level). Requires metaAdSetId. */
+  updateCampaignBudget: (experimentId: string, dailyBudget: number) =>
+    request<{ ok: boolean; dailyBudget: number }>(`experiments/${experimentId}/campaign-budget`, {
+      method: "PATCH",
+      body: { dailyBudget },
+    }),
 
   /** List connected ad accounts (Meta, TikTok, Google) */
   integrations: {
@@ -119,11 +133,17 @@ export const api = {
 export type CampaignMetricsResponse = {
   spend: number;
   impressions: number;
+  reach: number;
+  frequency: number;
+  cpm: number;
   clicks: number;
   ctr: number;
   cpc: number;
+  linkClicks: number;
   conversions: number;
+  costPerConversion: number;
   source: "placeholder" | "meta";
+  datePreset?: string;
 };
 
 export type MetaAdAccount = {
