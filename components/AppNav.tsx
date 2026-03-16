@@ -24,6 +24,16 @@ export default function AppNav() {
           </Link>
           <div className="flex gap-1">
             <Link
+              href="/"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname === "/"
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              }`}
+            >
+              Home
+            </Link>
+            <Link
               href="/campaigns"
               className={`rounded-md px-3 py-2 text-sm font-medium ${
                 pathname?.startsWith("/campaigns")
