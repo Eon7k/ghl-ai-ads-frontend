@@ -23,11 +23,8 @@ export default function ExperimentDetailPage() {
   const [regeneratingVariantId, setRegeneratingVariantId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
-  const [aiCreativePercent, setAiCreativePercent] = useState(0);
   const [creativeUrls, setCreativeUrls] = useState<Record<string, string>>({});
   const [generatingCreativeId, setGeneratingCreativeId] = useState<string | null>(null);
-  const [generatingBulkCreatives, setGeneratingBulkCreatives] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     if (!id) return;
@@ -153,50 +150,13 @@ export default function ExperimentDetailPage() {
     }
   }
 
-  async function generateBulkCreatives() {
-    if (!experiment?.variants?.length) return;
-    const targetCount = Math.round((variants.length * aiCreativePercent) / 100);
-    if (targetCount <= 0) return;
-    const withCreative = variants.filter((v) => v.hasCreative || creativeUrls[v.id]).length;
-    const needCount = Math.max(0, targetCount - withCreative);
-    if (needCount === 0) return;
-    const withoutCreative = variants.filter((v) => !v.hasCreative && !creativeUrls[v.id]);
-    const toGenerate = withoutCreative.slice(0, needCount);
-    if (toGenerate.length === 0) return;
-    setGeneratingBulkCreatives(true);
-    setBulkProgress({ current: 0, total: toGenerate.length });
-    try {
-      for (let i = 0; i < toGenerate.length; i++) {
-        setBulkProgress({ current: i + 1, total: toGenerate.length });
-        const v = toGenerate[i];
-        try {
-          await api.generateVariantCreative(experiment.id, v.id);
-          const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id);
-          setCreativeUrls((prev) => ({ ...prev, [v.id]: url }));
-          setExperiment((prev) => {
-            if (!prev?.variants) return prev;
-            return {
-              ...prev,
-              variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, hasCreative: true } : x)),
-            };
-          });
-        } catch {
-          // continue with next
-        }
-      }
-    } finally {
-      setGeneratingBulkCreatives(false);
-      setBulkProgress({ current: 0, total: 0 });
-    }
-  }
-
   async function launch() {
     if (!experiment || experiment.status === "launched") return;
     setLaunching(true);
     setLaunchError(null);
-    const count = Math.round((variants.length * aiCreativePercent) / 100);
+    const countWithCreatives = variants.filter((v) => v.hasCreative || creativeUrls[v.id]).length;
     try {
-      const updated = await api.launchExperiment(experiment.id, { aiCreativeCount: count });
+      const updated = await api.launchExperiment(experiment.id, { aiCreativeCount: countWithCreatives });
       setExperiment(updated);
     } catch (e) {
       setLaunchError(e instanceof Error ? e.message : "Failed to launch");
@@ -226,7 +186,6 @@ export default function ExperimentDetailPage() {
 
   const variants = experiment.variants || [];
   const isDraft = experiment.status === "draft";
-  const targetCreativeCount = Math.round((variants.length * aiCreativePercent) / 100);
   const budgetPerVariant =
     variants.length > 0
       ? Math.round((experiment.totalDailyBudget / variants.length) * 100) / 100
@@ -258,39 +217,7 @@ export default function ExperimentDetailPage() {
             {experiment.status === "draft" ? "Draft" : "Launched"}
           </span>
           {isDraft && (
-            <div className="flex flex-wrap items-end gap-4">
-              {variants.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <label htmlFor="ai-creatives-pct" className="text-sm font-medium text-zinc-700">
-                    % of variants with AI creative
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="ai-creatives-pct"
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={aiCreativePercent}
-                      onChange={(e) => setAiCreativePercent(Number(e.target.value))}
-                      className="h-2 w-28 rounded-lg accent-blue-600"
-                    />
-                    <span className="text-sm font-semibold tabular-nums text-zinc-900">{aiCreativePercent}%</span>
-                    <span className="text-sm text-zinc-500">
-                      ({targetCreativeCount} of {variants.length})
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={generateBulkCreatives}
-                    disabled={generatingBulkCreatives || targetCreativeCount === 0}
-                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-                  >
-                    {generatingBulkCreatives
-                      ? `Generating ${bulkProgress.current} of ${bulkProgress.total}…`
-                      : `Generate AI creatives for ${targetCreativeCount} variant${targetCreativeCount === 1 ? "" : "s"}`}
-                  </button>
-                </div>
-              )}
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={launch}
@@ -320,8 +247,8 @@ export default function ExperimentDetailPage() {
         <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
         <p className="mb-4 text-sm text-zinc-600">
           {experiment.creativesSource === "own"
-            ? "Paste your ad copy for each variant and click Save. Above, choose how many get AI creatives at launch, then Launch."
-            : "Review and edit copy below. Use “Regenerate with AI” per variant if needed. Above, set how many variants get AI creatives at launch, then Launch."}
+            ? "Paste your ad copy for each variant and click Save. When ready, click Launch experiment."
+            : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. When ready, click Launch experiment."}
         </p>
 
         {variants.length === 0 ? (

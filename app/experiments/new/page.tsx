@@ -13,13 +13,16 @@ export default function NewExperimentPage() {
   const [prompt, setPrompt] = useState("");
   const [variantCount, setVariantCount] = useState(10);
   const [creativesSource, setCreativesSource] = useState<"ai" | "own">("ai");
+  const [aiCreativePercent, setAiCreativePercent] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [createStatus, setCreateStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    setCreateStatus("Creating experiment…");
 
     const totalDailyBudget = Number(budget);
     const count = Number(variantCount);
@@ -27,6 +30,7 @@ export default function NewExperimentPage() {
     if (count < 1 || count > 20) {
       setError("Number of ad variants must be between 1 and 20.");
       setLoading(false);
+      setCreateStatus("");
       return;
     }
 
@@ -40,12 +44,29 @@ export default function NewExperimentPage() {
         creativesSource,
       });
 
-      // Go to the experiment detail page to review and edit variants
+      const variants = experiment.variants || [];
+      const creativeCount = Math.min(
+        Math.round((variants.length * aiCreativePercent) / 100),
+        variants.length
+      );
+
+      if (creativeCount > 0) {
+        for (let i = 0; i < creativeCount; i++) {
+          setCreateStatus(`Generating creatives ${i + 1} of ${creativeCount}…`);
+          try {
+            await api.generateVariantCreative(experiment.id, variants[i].id);
+          } catch {
+            // continue with next
+          }
+        }
+      }
+
       router.push(`/experiments/${experiment.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create experiment");
     } finally {
       setLoading(false);
+      setCreateStatus("");
     }
   }
 
@@ -152,6 +173,25 @@ export default function NewExperimentPage() {
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-zinc-700">
+            AI creatives (images) for % of variants: <span className="font-semibold text-zinc-900">{aiCreativePercent}%</span>
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={aiCreativePercent}
+            onChange={(e) => setAiCreativePercent(Number(e.target.value))}
+            className="h-2 w-full accent-violet-600"
+          />
+          <p className="text-xs text-zinc-500">
+            {aiCreativePercent === 0
+              ? "No AI-generated images. You’ll only have ad copy."
+              : `We’ll generate an AI image for ${Math.round((variantCount * aiCreativePercent) / 100)} of ${variantCount} variants when you create the experiment.`}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-zinc-700">
             Total daily budget: <span className="font-semibold text-zinc-900">${budget}</span>
           </label>
           <input
@@ -171,11 +211,7 @@ export default function NewExperimentPage() {
           disabled={loading}
           className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
         >
-          {loading
-            ? creativesSource === "ai"
-              ? "Creating and generating variants..."
-              : "Creating experiment..."
-            : "Create experiment"}
+          {loading ? (createStatus || "Creating…") : "Create experiment"}
         </button>
       </form>
     </div>
