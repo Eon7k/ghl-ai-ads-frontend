@@ -167,3 +167,47 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  try {
+    const base = getBackendUrl();
+    if (!base || base.startsWith("http://localhost")) {
+      return fail502(
+        "BACKEND_URL_NOT_SET",
+        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
+      );
+    }
+    const { path } = await params;
+    const url = buildUrl(path);
+    const headers: HeadersInit = {};
+    const auth = request.headers.get("authorization");
+    if (auth) headers["Authorization"] = auth;
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers: Object.keys(headers).length ? headers : undefined,
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+    });
+    const data = await res.json().catch(() => ({ error: "Invalid JSON from backend" }));
+    return Response.json(data, { status: res.status });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error
+        ? err.cause instanceof Error
+          ? `${err.message}: ${err.cause.message}`
+          : err.message
+        : "Proxy request failed";
+    console.error("[proxy DELETE]", err);
+    const isTimeout =
+      err instanceof Error && (err.name === "TimeoutError" || err.message?.includes("timeout"));
+    return fail502(
+      "BACKEND_UNREACHABLE",
+      isTimeout
+        ? "Backend took too long to respond. If using Render free tier, the service may be starting — try again in a moment."
+        : `Cannot reach backend: ${message}`
+    );
+  }
+}

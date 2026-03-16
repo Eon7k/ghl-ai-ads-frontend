@@ -1,0 +1,31 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getToken } from "@/lib/auth";
+
+/**
+ * Redirects to /login if there is no auth token. Use for any protected section.
+ */
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    setAllowed(true);
+  }, [router]);
+
+  if (!allowed) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center p-6">
+        <p className="text-zinc-600">Checking login…</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}

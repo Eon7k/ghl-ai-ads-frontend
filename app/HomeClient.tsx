@@ -24,6 +24,12 @@ export function HomeClient() {
         >
           Go to Experiments
         </Link>
+        <Link
+          href="/integrations"
+          className="inline-block border-2 border-zinc-300 bg-white px-8 py-4 rounded-lg font-semibold text-lg text-zinc-700 hover:bg-zinc-50"
+        >
+          Integrations
+        </Link>
         <button
           type="button"
           onClick={logout}

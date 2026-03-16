@@ -53,12 +53,20 @@ export default function ExperimentsPage() {
             </p>
           )}
         </div>
-        <Link
-          href="/experiments/new"
-          className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-blue-700 border-2 border-blue-700"
-        >
-          + New Experiment
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/integrations"
+            className="inline-block rounded-lg border-2 border-zinc-300 bg-white px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50"
+          >
+            Integrations
+          </Link>
+          <Link
+            href="/experiments/new"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-blue-700 border-2 border-blue-700"
+          >
+            + New Experiment
+          </Link>
+        </div>
       </div>
       <p className="text-zinc-600">
         <Link href="/experiments/new" className="text-blue-600 underline hover:no-underline">

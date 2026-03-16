@@ -1,6 +1,6 @@
 import AuthGuard from "@/components/AuthGuard";
 
-export default function ExperimentsLayout({
+export default function IntegrationsLayout({
   children,
 }: {
   children: React.ReactNode;

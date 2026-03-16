@@ -80,4 +80,20 @@ export const api = {
       method: "POST",
       body: {},
     }),
+
+  /** List connected ad accounts (Meta, TikTok, Google) */
+  integrations: {
+    list: () =>
+      request<{ integrations: ConnectedIntegration[] }>("integrations").then((r) => r.integrations),
+    disconnect: (id: string) =>
+      request<{ ok: boolean }>(`integrations/${id}`, { method: "DELETE" }),
+  },
+};
+
+export type ConnectedIntegration = {
+  id: string;
+  platform: "meta" | "tiktok" | "google";
+  platformAccountId?: string;
+  platformAccountName?: string;
+  createdAt: string;
 };
