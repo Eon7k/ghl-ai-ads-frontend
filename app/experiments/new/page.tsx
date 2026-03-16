@@ -150,17 +150,20 @@ export default function NewExperimentPage() {
           <p className="text-xs text-zinc-500">Between 1 and 20. AI will create this many full ad copies for you to review.</p>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">Total daily budget ($)</label>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-zinc-700">
+            Total daily budget: <span className="font-semibold text-zinc-900">${budget}</span>
+          </label>
           <input
-            type="number"
-            min={1}
-            className="border border-zinc-300 rounded px-3 py-2 w-full"
+            type="range"
+            min={5}
+            max={500}
+            step={5}
+            className="h-2 w-full accent-blue-600"
             value={budget}
             onChange={(e) => setBudget(e.target.value)}
-            required
           />
-          <p className="text-xs text-zinc-500">This will be split across all variants. You can change how it’s split later.</p>
+          <p className="text-xs text-zinc-500">$5–$500/day, split across all variants.</p>
         </div>
 
         <button

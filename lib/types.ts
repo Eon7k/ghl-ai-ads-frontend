@@ -25,6 +25,7 @@ export type Experiment = {
   prompt?: string;
   variantCount?: number;
   creativesSource?: CreativesSource;
+  aiCreativeCount?: number;
   variants?: AdVariant[];
 };
 

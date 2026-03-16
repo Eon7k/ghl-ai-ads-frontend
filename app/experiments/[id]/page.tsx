@@ -22,6 +22,7 @@ export default function ExperimentDetailPage() {
   const [regeneratingVariantId, setRegeneratingVariantId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const [aiCreativeCount, setAiCreativeCount] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -94,7 +95,7 @@ export default function ExperimentDetailPage() {
     setLaunching(true);
     setLaunchError(null);
     try {
-      const updated = await api.launchExperiment(experiment.id);
+      const updated = await api.launchExperiment(experiment.id, { aiCreativeCount });
       setExperiment(updated);
     } catch (e) {
       setLaunchError(e instanceof Error ? e.message : "Failed to launch");
@@ -124,6 +125,8 @@ export default function ExperimentDetailPage() {
 
   const variants = experiment.variants || [];
   const isDraft = experiment.status === "draft";
+  const maxAiCreatives = variants.length;
+  const effectiveAiCreativeCount = Math.min(aiCreativeCount, maxAiCreatives);
   const budgetPerVariant =
     variants.length > 0
       ? Math.round((experiment.totalDailyBudget / variants.length) * 100) / 100
@@ -155,21 +158,41 @@ export default function ExperimentDetailPage() {
             {experiment.status === "draft" ? "Draft" : "Launched"}
           </span>
           {isDraft && (
-            <>
+            <div className="flex flex-wrap items-end gap-4">
+              {maxAiCreatives > 0 && (
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="ai-creatives" className="text-sm font-medium text-zinc-700">
+                    Variants with AI-created creative at launch
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="ai-creatives"
+                      type="range"
+                      min={0}
+                      max={maxAiCreatives}
+                      value={effectiveAiCreativeCount}
+                      onChange={(e) => setAiCreativeCount(Number(e.target.value))}
+                      className="h-2 w-24 rounded-lg accent-blue-600"
+                    />
+                    <span className="text-sm font-semibold tabular-nums text-zinc-900">{effectiveAiCreativeCount}</span>
+                    <span className="text-sm text-zinc-500">of {maxAiCreatives}</span>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={launch}
                 disabled={launching || variants.length === 0}
-                className="bg-green-600 text-white px-4 py-2 rounded font-medium hover:bg-green-700 disabled:opacity-50"
+                className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
               >
-                {launching ? "Launching..." : "Launch experiment"}
+                {launching ? "Launching…" : "Launch experiment"}
               </button>
               {launchError && (
                 <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                   {launchError}
                 </p>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -182,56 +205,59 @@ export default function ExperimentDetailPage() {
       )}
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">Ad variants — review and launch</h2>
-        <p className="text-zinc-600 text-sm mb-4">
+        <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
+        <p className="mb-4 text-sm text-zinc-600">
           {experiment.creativesSource === "own"
-            ? "Paste your ad copy for each variant below and click Save. When everything looks good, click “Launch experiment” above."
-            : "Review the ad copies below. Edit any text yourself, or click “Regenerate with AI” to get a new option for that slot. Click Save to keep your changes, then “Launch experiment” when ready."}
+            ? "Paste your ad copy for each variant and click Save. Above, choose how many get AI creatives at launch, then Launch."
+            : "Review and edit copy below. Use “Regenerate with AI” per variant if needed. Above, set how many variants get AI creatives at launch, then Launch."}
         </p>
 
         {variants.length === 0 ? (
           <p className="text-zinc-500">No variants yet. Create this experiment again from the new experiment flow.</p>
         ) : (
-          <ul className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {variants.map((v) => (
-              <li key={v.id} className="border border-zinc-200 rounded-lg p-4 bg-white">
+              <div
+                key={v.id}
+                className="flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
+              >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-zinc-800">Variant {v.index}</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {savedVariantId === v.id && (
-                      <span className="text-sm text-green-600">Saved</span>
+                      <span className="text-xs text-green-600">Saved</span>
                     )}
                     {experiment.creativesSource === "ai" && (
                       <button
                         type="button"
                         onClick={() => regenerateVariant(v)}
                         disabled={regeneratingVariantId === v.id}
-                        className="rounded bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-200 disabled:opacity-50"
+                        className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 hover:bg-blue-200 disabled:opacity-50"
                       >
-                        {regeneratingVariantId === v.id ? "Generating…" : "Regenerate with AI"}
+                        {regeneratingVariantId === v.id ? "…" : "Regenerate"}
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => saveVariant(v)}
                       disabled={savingVariantId === v.id || (variantCopies[v.id] ?? v.copy) === v.copy}
-                      className="rounded bg-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-300 disabled:opacity-50"
+                      className="rounded bg-zinc-200 px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-300 disabled:opacity-50"
                     >
-                      {savingVariantId === v.id ? "Saving…" : "Save"}
+                      {savingVariantId === v.id ? "…" : "Save"}
                     </button>
                   </div>
                 </div>
                 <textarea
-                  className="border border-zinc-300 rounded px-3 py-2 w-full min-h-[120px] text-sm"
+                  className="min-h-[100px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-black placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={variantCopies[v.id] ?? v.copy}
                   onChange={(e) =>
                     setVariantCopies((prev) => ({ ...prev, [v.id]: e.target.value }))
                   }
                   placeholder={experiment.creativesSource === "own" ? "Paste your ad copy here..." : "Ad copy..."}
                 />
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>

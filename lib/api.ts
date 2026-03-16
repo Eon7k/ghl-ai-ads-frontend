@@ -74,11 +74,11 @@ export const api = {
       { method: "POST", body: {} }
     ),
 
-  /** Mark experiment as launched */
-  launchExperiment: (id: string) =>
+  /** Mark experiment as launched; optional aiCreativeCount = how many variants get AI creatives at launch */
+  launchExperiment: (id: string, options?: { aiCreativeCount?: number }) =>
     request<import("./types").Experiment>(`experiments/${id}/launch`, {
       method: "POST",
-      body: {},
+      body: options?.aiCreativeCount != null ? { aiCreativeCount: options.aiCreativeCount } : {},
     }),
 
   /** List connected ad accounts (Meta, TikTok, Google) */
