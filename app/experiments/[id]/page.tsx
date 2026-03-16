@@ -18,6 +18,7 @@ export default function ExperimentDetailPage() {
   // Local copy of variant text so we can edit before saving
   const [variantCopies, setVariantCopies] = useState<Record<string, string>>({});
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
+  const [savedVariantId, setSavedVariantId] = useState<string | null>(null);
   const [regeneratingVariantId, setRegeneratingVariantId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function ExperimentDetailPage() {
     const copy = variantCopies[v.id] ?? v.copy;
     if (copy === v.copy) return;
     setSavingVariantId(v.id);
+    setSavedVariantId(null);
     try {
       await api.updateVariant(experiment!.id, v.id, copy);
       setExperiment((prev) => {
@@ -58,6 +60,8 @@ export default function ExperimentDetailPage() {
           variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, copy } : x)),
         };
       });
+      setSavedVariantId(v.id);
+      setTimeout(() => setSavedVariantId(null), 2000);
     } catch (e) {
       // Could set a per-variant error; for now we don't
     } finally {
@@ -126,10 +130,12 @@ export default function ExperimentDetailPage() {
       : null;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <Link href="/experiments" className="text-blue-600 hover:underline text-sm block mb-2">
-        ← Back to Experiments
-      </Link>
+    <div className="mx-auto max-w-4xl p-6">
+      <div className="mb-4">
+        <Link href="/experiments" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
+          ← Back to Experiments
+        </Link>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -159,7 +165,9 @@ export default function ExperimentDetailPage() {
                 {launching ? "Launching..." : "Launch experiment"}
               </button>
               {launchError && (
-                <p className="text-red-600 text-sm w-full basis-full">{launchError}</p>
+                <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {launchError}
+                </p>
               )}
             </>
           )}
@@ -187,26 +195,29 @@ export default function ExperimentDetailPage() {
           <ul className="space-y-4">
             {variants.map((v) => (
               <li key={v.id} className="border border-zinc-200 rounded-lg p-4 bg-white">
-                <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-zinc-800">Variant {v.index}</span>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    {savedVariantId === v.id && (
+                      <span className="text-sm text-green-600">Saved</span>
+                    )}
                     {experiment.creativesSource === "ai" && (
                       <button
                         type="button"
                         onClick={() => regenerateVariant(v)}
                         disabled={regeneratingVariantId === v.id}
-                        className="text-sm bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded disabled:opacity-50"
+                        className="rounded bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-200 disabled:opacity-50"
                       >
-                        {regeneratingVariantId === v.id ? "Generating..." : "Regenerate with AI"}
+                        {regeneratingVariantId === v.id ? "Generating…" : "Regenerate with AI"}
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => saveVariant(v)}
                       disabled={savingVariantId === v.id || (variantCopies[v.id] ?? v.copy) === v.copy}
-                      className="text-sm bg-zinc-200 hover:bg-zinc-300 text-zinc-800 px-3 py-1 rounded disabled:opacity-50"
+                      className="rounded bg-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-300 disabled:opacity-50"
                     >
-                      {savingVariantId === v.id ? "Saving..." : "Save"}
+                      {savingVariantId === v.id ? "Saving…" : "Save"}
                     </button>
                   </div>
                 </div>

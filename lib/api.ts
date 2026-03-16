@@ -87,7 +87,17 @@ export const api = {
       request<{ integrations: ConnectedIntegration[] }>("integrations").then((r) => r.integrations),
     disconnect: (id: string) =>
       request<{ ok: boolean }>(`integrations/${id}`, { method: "DELETE" }),
+    /** Meta ad accounts (requires Meta connected) */
+    getMetaAdAccounts: () =>
+      request<{ adAccounts: MetaAdAccount[] }>("integrations/meta/ad-accounts").then((r) => r.adAccounts),
   },
+};
+
+export type MetaAdAccount = {
+  id: string;
+  name: string;
+  accountId: string;
+  accountStatus?: number;
 };
 
 export type ConnectedIntegration = {

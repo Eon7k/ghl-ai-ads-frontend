@@ -51,7 +51,13 @@ export async function GET(
       cache: "no-store",
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
-    const data = await res.json().catch(() => ({ error: "Invalid JSON from backend" }));
+    const contentType = res.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+    const data = isJson
+      ? await res.json().catch(() => ({ error: "Invalid JSON from backend" }))
+      : res.status >= 400
+        ? { error: `Backend returned ${res.status}. If using Render, the service may be starting—try again in a moment.` }
+        : { error: "Backend did not return JSON." };
     return Response.json(data, { status: res.status });
   } catch (err: unknown) {
     const message =

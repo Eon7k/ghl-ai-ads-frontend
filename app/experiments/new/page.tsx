@@ -50,22 +50,28 @@ export default function NewExperimentPage() {
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto space-y-4">
-      <Link href="/experiments" className="text-blue-600 hover:underline text-sm block mb-2">
-        ← Back to Experiments
-      </Link>
-      <h1 className="text-2xl font-bold">New Experiment</h1>
-      <p className="text-zinc-600 text-sm">
-        Enter your idea below. We’ll generate several ad variants for you to edit before launching.
+    <div className="mx-auto max-w-2xl p-6">
+      <div className="mb-4">
+        <Link href="/experiments" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
+          ← Back to Experiments
+        </Link>
+      </div>
+      <h1 className="text-2xl font-bold text-zinc-900">New Experiment</h1>
+      <p className="mt-1 text-sm text-zinc-600">
+        Enter your idea below. We’ll generate ad variants for you to edit before launching.
       </p>
 
-      {error && <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
+      {error && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
         <div className="space-y-1">
-          <label className="block text-sm font-medium">Experiment name</label>
+          <label className="block text-sm font-medium text-zinc-700">Experiment name</label>
           <input
-            className="border border-zinc-300 rounded px-3 py-2 w-full"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Dental Implant Offer Test"
@@ -160,7 +166,7 @@ export default function NewExperimentPage() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60"
+          className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
         >
           {loading
             ? creativesSource === "ai"

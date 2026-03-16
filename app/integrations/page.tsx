@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getToken } from "@/lib/auth";
-import { api, type ConnectedIntegration } from "@/lib/api";
+import { api, type ConnectedIntegration, type MetaAdAccount } from "@/lib/api";
+import AppNav from "@/components/AppNav";
 
 const BACKEND_URL =
   typeof process !== "undefined"
@@ -13,15 +14,18 @@ const BACKEND_URL =
     : "";
 
 export default function IntegrationsPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
+  const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   const connectedParam = searchParams.get("connected");
   const errorParam = searchParams.get("error");
+  const hasMeta = integrations.some((i) => i.platform === "meta");
 
   useEffect(() => {
     async function fetchIntegrations() {
@@ -36,6 +40,40 @@ export default function IntegrationsPage() {
     }
     fetchIntegrations();
   }, [connectedParam]);
+
+  async function loadMetaAdAccounts() {
+    setLoadingAdAccounts(true);
+    setError(null);
+    try {
+      const list = await api.integrations.getMetaAdAccounts();
+      setMetaAdAccounts(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load ad accounts");
+      setMetaAdAccounts([]);
+    } finally {
+      setLoadingAdAccounts(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!hasMeta) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingAdAccounts(true);
+      try {
+        const list = await api.integrations.getMetaAdAccounts();
+        if (!cancelled) setMetaAdAccounts(list);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load ad accounts");
+          setMetaAdAccounts([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingAdAccounts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hasMeta]);
 
   async function handleDisconnect(id: string) {
     setDisconnecting(id);
@@ -63,33 +101,14 @@ export default function IntegrationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-6">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-900">Connected accounts</h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              Link your ad accounts so you can launch and manage campaigns from here.
-            </p>
-            {user && (
-              <p className="mt-1 text-sm text-zinc-500">
-                {user.email}
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="ml-2 text-blue-600 hover:underline"
-                >
-                  Log out
-                </button>
-              </p>
-            )}
-          </div>
-          <Link
-            href="/experiments"
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-          >
-            ← Experiments
-          </Link>
+    <div className="min-h-screen bg-zinc-50">
+      <AppNav />
+      <div className="mx-auto max-w-2xl p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-zinc-900">Integrations</h1>
+          <p className="mt-1 text-sm text-zinc-600">
+            Link your ad accounts so you can launch and manage campaigns from here.
+          </p>
         </div>
 
         {connectedParam === "meta" && (
@@ -142,6 +161,41 @@ export default function IntegrationsPage() {
                 </ul>
               )}
             </div>
+
+            {hasMeta && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-zinc-900">Meta ad accounts</h2>
+                <p className="mt-1 text-sm text-zinc-600">
+                  Ad accounts you can use when launching experiments to Meta.
+                </p>
+                {loadingAdAccounts ? (
+                  <p className="mt-3 text-sm text-zinc-500">Loading ad accounts…</p>
+                ) : metaAdAccounts !== null ? (
+                  metaAdAccounts.length === 0 ? (
+                    <p className="mt-3 text-sm text-zinc-500">
+                      No ad accounts found, or token may need re-authorization.{" "}
+                      <button type="button" onClick={loadMetaAdAccounts} className="text-blue-600 hover:underline">
+                        Try again
+                      </button>
+                    </p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {metaAdAccounts.map((a) => (
+                        <li
+                          key={a.id}
+                          className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3"
+                        >
+                          <div>
+                            <span className="font-medium text-zinc-900">{a.name}</span>
+                            <span className="ml-2 text-sm text-zinc-500">({a.accountId})</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : null}
+              </div>
+            )}
 
             <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-zinc-900">Connect an account</h2>
