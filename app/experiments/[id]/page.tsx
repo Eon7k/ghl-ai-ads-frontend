@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import AdPreview from "@/components/AdPreview";
 import type { Experiment, AdVariant } from "@/lib/types";
 
 export default function ExperimentDetailPage() {
@@ -247,8 +248,15 @@ export default function ExperimentDetailPage() {
                     </button>
                   </div>
                 </div>
+                <div className="mb-3">
+                  <p className="mb-1.5 text-xs font-medium text-zinc-500">Ad preview</p>
+                  <AdPreview
+                    copy={variantCopies[v.id] ?? v.copy}
+                    platform={experiment.platform}
+                  />
+                </div>
                 <textarea
-                  className="min-h-[100px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-black placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="min-h-[80px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-black placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={variantCopies[v.id] ?? v.copy}
                   onChange={(e) =>
                     setVariantCopies((prev) => ({ ...prev, [v.id]: e.target.value }))
