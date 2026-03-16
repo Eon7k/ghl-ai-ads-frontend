@@ -3,13 +3,16 @@
 /**
  * Renders ad copy the way it would look as a feed ad (Meta/Instagram style).
  * Copy is split into headline (first line or first 60 chars) and body (rest).
+ * If imageUrl is provided (AI-generated creative), it is shown in the image area.
  */
 export default function AdPreview({
   copy,
   platform = "meta",
+  imageUrl,
 }: {
   copy: string;
   platform?: string;
+  imageUrl?: string | null;
 }) {
   const text = (copy || "").trim() || "Your ad copy will appear here.";
   const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
@@ -28,9 +31,17 @@ export default function AdPreview({
         )}
       </div>
 
-      {/* Image placeholder */}
-      <div className="aspect-[1.91/1] bg-zinc-100 flex items-center justify-center">
-        <span className="text-xs text-zinc-400">Image / creative</span>
+      {/* Image: AI-generated creative or placeholder */}
+      <div className="relative aspect-[1.91/1] bg-zinc-100 flex items-center justify-center overflow-hidden">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt="Ad creative"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-xs text-zinc-400">Image / creative</span>
+        )}
       </div>
 
       {/* Copy: headline + body (like feed ad) */}

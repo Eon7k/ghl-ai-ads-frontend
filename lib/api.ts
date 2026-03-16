@@ -74,6 +74,25 @@ export const api = {
       { method: "POST", body: {} }
     ),
 
+  /** Generate AI creative (image) for a variant. Returns { hasCreative: true } on success. */
+  generateVariantCreative: (experimentId: string, variantId: string) =>
+    request<{ hasCreative: boolean }>(
+      `experiments/${experimentId}/variants/${variantId}/generate-creative`,
+      { method: "POST", body: {} }
+    ),
+
+  /** Get blob URL for variant creative image (for use in <img src>. Caller should revoke the URL when done.) */
+  getVariantCreativeBlobUrl: async (experimentId: string, variantId: string): Promise<string> => {
+    const token = getToken();
+    const url = `${API_BASE}/experiments/${experimentId}/variants/${variantId}/creative`;
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("Failed to load creative");
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
+
   /** Mark experiment as launched; optional aiCreativeCount = how many variants get AI creatives at launch */
   launchExperiment: (id: string, options?: { aiCreativeCount?: number }) =>
     request<import("./types").Experiment>(`experiments/${id}/launch`, {

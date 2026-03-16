@@ -11,6 +11,7 @@ export type AdVariant = {
   index: number;
   copy: string;
   status: string;
+  hasCreative?: boolean;
 };
 
 export type CreativesSource = "ai" | "own";

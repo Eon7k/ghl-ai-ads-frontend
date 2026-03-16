@@ -52,6 +52,13 @@ export async function GET(
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
     const contentType = res.headers.get("content-type") || "";
+    if (contentType.startsWith("image/")) {
+      const blob = await res.arrayBuffer();
+      return new Response(blob, {
+        status: res.status,
+        headers: { "Content-Type": contentType },
+      });
+    }
     const isJson = contentType.includes("application/json");
     const data = isJson
       ? await res.json().catch(() => ({ error: "Invalid JSON from backend" }))

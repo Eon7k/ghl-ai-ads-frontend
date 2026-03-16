@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -24,6 +24,8 @@ export default function ExperimentDetailPage() {
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [aiCreativeCount, setAiCreativeCount] = useState(0);
+  const [creativeUrls, setCreativeUrls] = useState<Record<string, string>>({});
+  const [generatingCreativeId, setGeneratingCreativeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -47,6 +49,43 @@ export default function ExperimentDetailPage() {
     load();
     return () => { cancelled = true; };
   }, [id]);
+
+  // Load creative blob URLs for variants that have hasCreative
+  const creativeUrlsRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!experiment?.variants?.length) return;
+    let cancelled = false;
+    (async () => {
+      const urls: Record<string, string> = {};
+      for (const v of experiment.variants!) {
+        if (!v.hasCreative) continue;
+        try {
+          const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id);
+          if (!cancelled) urls[v.id] = url;
+        } catch {
+          // ignore
+        }
+      }
+      if (!cancelled) {
+        creativeUrlsRef.current = urls;
+        setCreativeUrls((prev) => ({ ...prev, ...urls }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+      Object.values(creativeUrlsRef.current).forEach(URL.revokeObjectURL);
+      creativeUrlsRef.current = {};
+    };
+  }, [experiment?.id, experiment?.variants?.filter((v) => v.hasCreative).length]);
+
+  // Revoke all creative URLs on unmount
+  const creativeUrlsToRevoke = useRef(creativeUrls);
+  creativeUrlsToRevoke.current = creativeUrls;
+  useEffect(() => {
+    return () => {
+      Object.values(creativeUrlsToRevoke.current).forEach(URL.revokeObjectURL);
+    };
+  }, []);
 
   async function saveVariant(v: AdVariant) {
     const copy = variantCopies[v.id] ?? v.copy;
@@ -88,6 +127,27 @@ export default function ExperimentDetailPage() {
       // Could show per-variant error
     } finally {
       setRegeneratingVariantId(null);
+    }
+  }
+
+  async function generateCreative(v: AdVariant) {
+    if (!experiment) return;
+    setGeneratingCreativeId(v.id);
+    try {
+      await api.generateVariantCreative(experiment.id, v.id);
+      const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id);
+      setCreativeUrls((prev) => ({ ...prev, [v.id]: url }));
+      setExperiment((prev) => {
+        if (!prev?.variants) return prev;
+        return {
+          ...prev,
+          variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, hasCreative: true } : x)),
+        };
+      });
+    } catch (e) {
+      // could set per-variant error
+    } finally {
+      setGeneratingCreativeId(null);
     }
   }
 
@@ -249,10 +309,21 @@ export default function ExperimentDetailPage() {
                   </div>
                 </div>
                 <div className="mb-3">
-                  <p className="mb-1.5 text-xs font-medium text-zinc-500">Ad preview</p>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-xs font-medium text-zinc-500">Ad preview</p>
+                    <button
+                      type="button"
+                      onClick={() => generateCreative(v)}
+                      disabled={generatingCreativeId === v.id}
+                      className="rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-200 disabled:opacity-50"
+                    >
+                      {generatingCreativeId === v.id ? "Generating…" : v.hasCreative ? "Regenerate creative" : "Generate creative"}
+                    </button>
+                  </div>
                   <AdPreview
                     copy={variantCopies[v.id] ?? v.copy}
                     platform={experiment.platform}
+                    imageUrl={creativeUrls[v.id] ?? null}
                   />
                 </div>
                 <textarea
