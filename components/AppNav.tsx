@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
- * Top nav for Experiments and Integrations so testing is easy: jump between sections without hunting for links.
+ * Top nav for Campaigns and Integrations so testing is easy: jump between sections without hunting for links.
  */
 export default function AppNav() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const base = "/experiments";
+  const base = "/campaigns";
 
   return (
     <nav className="border-b border-zinc-200 bg-white">
@@ -24,14 +24,14 @@ export default function AppNav() {
           </Link>
           <div className="flex gap-1">
             <Link
-              href="/experiments"
+              href="/campaigns"
               className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname?.startsWith("/experiments")
+                pathname?.startsWith("/campaigns")
                   ? "bg-zinc-100 text-zinc-900"
                   : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
               }`}
             >
-              Experiments
+              Campaigns
             </Link>
             <Link
               href="/integrations"

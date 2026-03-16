@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-export default function NewExperimentPage() {
+export default function NewCampaignPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState("meta");
@@ -22,7 +22,7 @@ export default function NewExperimentPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    setCreateStatus("Creating experiment…");
+    setCreateStatus("Creating campaign…");
 
     const totalDailyBudget = Number(budget);
     const count = Number(variantCount);
@@ -61,9 +61,9 @@ export default function NewExperimentPage() {
         }
       }
 
-      router.push(`/experiments/${experiment.id}`);
+      router.push(`/campaigns/${experiment.id}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create experiment");
+      setError(err instanceof Error ? err.message : "Failed to create campaign");
     } finally {
       setLoading(false);
       setCreateStatus("");
@@ -73,11 +73,11 @@ export default function NewExperimentPage() {
   return (
     <div className="mx-auto max-w-2xl p-6">
       <div className="mb-4">
-        <Link href="/experiments" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
-          ← Back to Experiments
+        <Link href="/campaigns" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
+          ← Back to Campaigns
         </Link>
       </div>
-      <h1 className="text-2xl font-bold text-zinc-900">New Experiment</h1>
+      <h1 className="text-2xl font-bold text-zinc-900">New Campaign</h1>
       <p className="mt-1 text-sm text-zinc-600">
         Enter your idea below. We’ll generate ad variants for you to edit before launching.
       </p>
@@ -90,7 +90,7 @@ export default function NewExperimentPage() {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-5">
         <div className="space-y-1">
-          <label className="block text-sm font-medium text-zinc-700">Experiment name</label>
+          <label className="block text-sm font-medium text-zinc-700">Campaign name</label>
           <input
             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={name}
@@ -186,7 +186,7 @@ export default function NewExperimentPage() {
           <p className="text-xs text-zinc-500">
             {aiCreativePercent === 0
               ? "No AI-generated images. You’ll only have ad copy."
-              : `We’ll generate an AI image for ${Math.round((variantCount * aiCreativePercent) / 100)} of ${variantCount} variants when you create the experiment.`}
+              : `We’ll generate an AI image for ${Math.round((variantCount * aiCreativePercent) / 100)} of ${variantCount} variants when you create the campaign.`}
           </p>
         </div>
 
@@ -211,7 +211,7 @@ export default function NewExperimentPage() {
           disabled={loading}
           className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
         >
-          {loading ? (createStatus || "Creating…") : "Create experiment"}
+          {loading ? (createStatus || "Creating…") : "Create campaign"}
         </button>
       </form>
     </div>

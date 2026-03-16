@@ -9,7 +9,7 @@ export default function Home() {
           AI Ad Manager
         </h1>
         <p className="max-w-md text-lg text-zinc-600">
-          Create and manage experiments, generate ad copy with AI, and optimize budgets.
+          Create and manage campaigns, generate ad copy with AI, and optimize budgets.
         </p>
         <HomeClient />
         <Link

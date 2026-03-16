@@ -1,7 +1,7 @@
 import AuthGuard from "@/components/AuthGuard";
 import AppNav from "@/components/AppNav";
 
-export default function ExperimentsLayout({
+export default function CampaignsLayout({
   children,
 }: {
   children: React.ReactNode;

@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { token, user: u } = await api.auth.login(email, password);
       setToken(token);
       setUser(u);
-      router.push("/experiments");
+      router.push("/campaigns");
     },
     [router]
   );
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { token, user: u } = await api.auth.register(email, password);
       setToken(token);
       setUser(u);
-      router.push("/experiments");
+      router.push("/campaigns");
     },
     [router]
   );

@@ -113,7 +113,7 @@ export default function IntegrationsPage() {
 
         {connectedParam === "meta" && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-            Meta account connected. You can now launch Meta campaigns from an experiment.
+            Meta account connected. You can now launch Meta campaigns from here.
           </div>
         )}
         {errorParam && (
@@ -166,7 +166,7 @@ export default function IntegrationsPage() {
               <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-zinc-900">Meta ad accounts</h2>
                 <p className="mt-1 text-sm text-zinc-600">
-                  Ad accounts you can use when launching experiments to Meta.
+                  Ad accounts you can use when launching campaigns to Meta.
                 </p>
                 {loadingAdAccounts ? (
                   <p className="mt-3 text-sm text-zinc-500">Loading ad accounts…</p>

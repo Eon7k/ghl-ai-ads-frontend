@@ -100,6 +100,10 @@ export const api = {
       body: options?.aiCreativeCount != null ? { aiCreativeCount: options.aiCreativeCount } : {},
     }),
 
+  /** Get campaign metrics (spend, impressions, clicks, etc.) for a launched campaign. Source is "meta" or "placeholder". */
+  getCampaignMetrics: (experimentId: string) =>
+    request<CampaignMetricsResponse>(`experiments/${experimentId}/metrics`),
+
   /** List connected ad accounts (Meta, TikTok, Google) */
   integrations: {
     list: () =>
@@ -110,6 +114,16 @@ export const api = {
     getMetaAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/meta/ad-accounts").then((r) => r.adAccounts),
   },
+};
+
+export type CampaignMetricsResponse = {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  conversions: number;
+  source: "placeholder" | "meta";
 };
 
 export type MetaAdAccount = {

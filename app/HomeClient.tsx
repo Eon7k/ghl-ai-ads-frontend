@@ -19,10 +19,10 @@ export function HomeClient() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
         <span className="text-sm text-zinc-600">Signed in as {user.email}</span>
         <Link
-          href="/experiments"
+          href="/campaigns"
           className="inline-block bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700"
         >
-          Go to Experiments
+          Go to Campaigns
         </Link>
         <Link
           href="/integrations"

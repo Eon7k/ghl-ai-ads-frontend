@@ -100,9 +100,9 @@ npm run dev
 
 1. On the home page, click **Sign up**.
 2. Enter any email and a password (at least 8 characters). Click **Sign up**.
-3. You should be taken to the **Experiments** page. If you see that, sign up works.
-4. Click **Log out** (on the page or in the Experiments list).
-5. Click **Log in** and enter the same email and password. You should be back on Experiments with your data. If that works, login works too.
+3. You should be taken to the **Campaigns** page. If you see that, sign up works.
+4. Click **Log out** (on the page or in the Campaigns list).
+5. Click **Log in** and enter the same email and password. You should be back on Campaigns with your data. If that works, login works too.
 
 ---
 

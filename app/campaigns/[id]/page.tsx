@@ -7,7 +7,9 @@ import { api } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
 import type { Experiment, AdVariant } from "@/lib/types";
 
-export default function ExperimentDetailPage() {
+import type { CampaignMetricsResponse } from "@/lib/api";
+
+export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = typeof params.id === "string" ? params.id : "";
@@ -16,7 +18,6 @@ export default function ExperimentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Local copy of variant text so we can edit before saving
   const [variantCopies, setVariantCopies] = useState<Record<string, string>>({});
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
   const [savedVariantId, setSavedVariantId] = useState<string | null>(null);
@@ -25,6 +26,8 @@ export default function ExperimentDetailPage() {
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [creativeUrls, setCreativeUrls] = useState<Record<string, string>>({});
   const [generatingCreativeId, setGeneratingCreativeId] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<CampaignMetricsResponse | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -40,7 +43,7 @@ export default function ExperimentDetailPage() {
         });
         setVariantCopies(copies);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load experiment");
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load campaign");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -49,7 +52,27 @@ export default function ExperimentDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Load creative blob URLs for variants that have hasCreative
+  // When launched, load metrics from backend (Meta when we have metaCampaignId, else placeholder)
+  useEffect(() => {
+    if (!experiment || experiment.status !== "launched") {
+      setMetrics(null);
+      return;
+    }
+    let cancelled = false;
+    setMetricsLoading(true);
+    (async () => {
+      try {
+        const data = await api.getCampaignMetrics(experiment.id);
+        if (!cancelled) setMetrics(data);
+      } catch {
+        if (!cancelled) setMetrics(null);
+      } finally {
+        if (!cancelled) setMetricsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [experiment?.id, experiment?.status]);
+
   const creativeUrlsRef = useRef<Record<string, string>>({});
   useEffect(() => {
     if (!experiment?.variants?.length) return;
@@ -77,7 +100,6 @@ export default function ExperimentDetailPage() {
     };
   }, [experiment?.id, experiment?.variants?.filter((v) => v.hasCreative).length]);
 
-  // Revoke all creative URLs on unmount
   const creativeUrlsToRevoke = useRef(creativeUrls);
   creativeUrlsToRevoke.current = creativeUrls;
   useEffect(() => {
@@ -168,7 +190,7 @@ export default function ExperimentDetailPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <p className="text-zinc-600">Loading experiment...</p>
+        <p className="text-zinc-600">Loading campaign...</p>
       </div>
     );
   }
@@ -176,10 +198,10 @@ export default function ExperimentDetailPage() {
   if (error || !experiment) {
     return (
       <div className="p-6">
-        <Link href="/experiments" className="text-blue-600 hover:underline text-sm block mb-2">
-          ← Back to Experiments
+        <Link href="/campaigns" className="text-blue-600 hover:underline text-sm block mb-2">
+          ← Back to Campaigns
         </Link>
-        <p className="text-red-600">{error || "Experiment not found."}</p>
+        <p className="text-red-600">{error || "Campaign not found."}</p>
       </div>
     );
   }
@@ -194,8 +216,8 @@ export default function ExperimentDetailPage() {
   return (
     <div className="mx-auto max-w-4xl p-6">
       <div className="mb-4">
-        <Link href="/experiments" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
-          ← Back to Experiments
+        <Link href="/campaigns" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
+          ← Back to Campaigns
         </Link>
       </div>
 
@@ -224,7 +246,7 @@ export default function ExperimentDetailPage() {
                 disabled={launching || variants.length === 0}
                 className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
               >
-                {launching ? "Launching…" : "Launch experiment"}
+                {launching ? "Launching…" : "Launch campaign"}
               </button>
               {launchError && (
                 <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -236,23 +258,69 @@ export default function ExperimentDetailPage() {
         </div>
       </div>
 
+      {/* Campaign metrics: shown when launched */}
+      {experiment.status === "launched" && (
+        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900">Campaign performance</h2>
+          {metricsLoading ? (
+            <p className="text-sm text-zinc-500">Loading metrics…</p>
+          ) : metrics ? (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <p className="text-xs font-medium text-zinc-500">Spend</p>
+                  <p className="text-lg font-semibold text-zinc-900">${metrics.spend.toFixed(2)}</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <p className="text-xs font-medium text-zinc-500">Impressions</p>
+                  <p className="text-lg font-semibold text-zinc-900">{metrics.impressions.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <p className="text-xs font-medium text-zinc-500">Clicks</p>
+                  <p className="text-lg font-semibold text-zinc-900">{metrics.clicks.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <p className="text-xs font-medium text-zinc-500">CTR</p>
+                  <p className="text-lg font-semibold text-zinc-900">{metrics.ctr.toFixed(2)}%</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <p className="text-xs font-medium text-zinc-500">CPC</p>
+                  <p className="text-lg font-semibold text-zinc-900">${metrics.cpc.toFixed(2)}</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <p className="text-xs font-medium text-zinc-500">Conversions</p>
+                  <p className="text-lg font-semibold text-zinc-900">{metrics.conversions.toLocaleString()}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-zinc-500">
+                {metrics.source === "meta"
+                  ? "Metrics from Meta (last 7 days)."
+                  : "Live metrics will appear here once this campaign is pushed to your connected ad account (e.g. Meta). Connect an integration and launch to the platform to see real data."}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-zinc-500">Metrics unavailable.</p>
+          )}
+        </section>
+      )}
+
       {experiment.prompt && (
-        <div className="rounded-lg bg-zinc-100 p-4">
+        <div className="mt-6 rounded-lg bg-zinc-100 p-4">
           <p className="text-sm font-medium text-zinc-700">Ad idea / prompt</p>
           <p className="text-zinc-600 text-sm mt-1">{experiment.prompt}</p>
         </div>
       )}
 
-      <div>
+      <div className="mt-6">
         <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
         <p className="mb-4 text-sm text-zinc-600">
           {experiment.creativesSource === "own"
-            ? "Paste your ad copy for each variant and click Save. When ready, click Launch experiment."
-            : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. When ready, click Launch experiment."}
+            ? "Paste your ad copy for each variant and click Save. When ready, click Launch campaign."
+            : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. When ready, click Launch campaign."}
         </p>
 
         {variants.length === 0 ? (
-          <p className="text-zinc-500">No variants yet. Create this experiment again from the new experiment flow.</p>
+          <p className="text-zinc-500">No variants yet. Create this campaign again from the new campaign flow.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {variants.map((v) => (

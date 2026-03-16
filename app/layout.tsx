@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AI Ad Manager",
-  description: "Create and manage ad experiments with AI-generated copy.",
+  description: "Create and manage ad campaigns with AI-generated copy.",
 };
 
 export default function RootLayout({
