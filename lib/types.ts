@@ -16,7 +16,7 @@ export type AdVariant = {
   aiSource?: "openai" | "anthropic";
 };
 
-export type CreativesSource = "ai" | "own";
+export type CreativesSource = "ai" | "mix" | "own";
 
 export type Experiment = {
   id: string;
@@ -44,7 +44,7 @@ export type Creative = {
   id: string;
   name: string;
   createdAt: string;
-};;
+};
 
 export type CreateExperimentBody = {
   name: string;

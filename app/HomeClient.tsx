@@ -52,8 +52,8 @@ export function HomeClient() {
   const [budget, setBudget] = useState("30");
   const [prompt, setPrompt] = useState("");
   const [variantCount, setVariantCount] = useState(10);
-  const [creativesSource, setCreativesSource] = useState<"ai" | "own">("ai");
-  const [aiCreativePercent, setAiCreativePercent] = useState(0);
+  const [creativesSource, setCreativesSource] = useState<"ai" | "mix" | "own">("ai");
+  const [aiCreativePercent, setAiCreativePercent] = useState(50);
   const [creativePrompt, setCreativePrompt] = useState("");
   const [aiProvider, setAiProvider] = useState<"openai" | "anthropic" | "split">("split");
   const [createLoading, setCreateLoading] = useState(false);
@@ -191,7 +191,7 @@ export function HomeClient() {
       return;
     }
 
-    const attachCreatives = (creativesSource === "own" || aiCreativePercent < 100) && selectedCreativeIds.length > 0;
+    const attachCreatives = (creativesSource === "own" || creativesSource === "mix") && selectedCreativeIds.length > 0;
 
     try {
       const experiment = await api.createExperiment({
@@ -202,14 +202,16 @@ export function HomeClient() {
         prompt: prompt.trim() || "Generate varied ad copy for this campaign.",
         variantCount: count,
         creativesSource,
-        aiProvider: creativesSource === "ai" ? aiProvider : undefined,
+        aiProvider: (creativesSource === "ai" || creativesSource === "mix") ? aiProvider : undefined,
         creativePrompt: creativePrompt.trim() || undefined,
         ...(attachCreatives && { attachedCreativeIds: selectedCreativeIds }),
       });
 
       const variants = experiment.variants || [];
       const createdIds = (experiment as Experiment & { createdExperimentIds?: string[] }).createdExperimentIds || [experiment.id];
-      const creativeCount = Math.min(Math.round((variants.length * aiCreativePercent) / 100), variants.length);
+      const creativeCount = creativesSource === "mix"
+        ? Math.min(Math.round((variants.length * aiCreativePercent) / 100), variants.length)
+        : creativesSource === "ai" ? variants.length : 0;
 
       if (creativeCount > 0) {
         for (let i = 0; i < creativeCount; i++) {
@@ -245,7 +247,7 @@ export function HomeClient() {
     setPrompt("");
     setVariantCount(10);
     setCreativesSource("ai");
-    setAiCreativePercent(0);
+    setAiCreativePercent(50);
     setCreativePrompt("");
     setAiProvider("split");
     setSelectedCreativeIds([]);
@@ -503,18 +505,28 @@ export function HomeClient() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Creatives</label>
-                    <div className="mt-1 flex gap-4">
+                    <div className="mt-1 flex flex-wrap gap-4">
                       <label className="flex cursor-pointer items-center gap-2">
                         <input type="radio" name="creativesSource" checked={creativesSource === "ai"} onChange={() => setCreativesSource("ai")} className="rounded" />
-                        <span className="text-sm">AI-generated</span>
+                        <span className="text-sm">All AI-generated</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input type="radio" name="creativesSource" checked={creativesSource === "mix"} onChange={() => setCreativesSource("mix")} className="rounded" />
+                        <span className="text-sm">Mix of AI and uploaded</span>
                       </label>
                       <label className="flex cursor-pointer items-center gap-2">
                         <input type="radio" name="creativesSource" checked={creativesSource === "own"} onChange={() => setCreativesSource("own")} className="rounded" />
-                        <span className="text-sm">My own copy</span>
+                        <span className="text-sm">Just uploaded creatives</span>
                       </label>
                     </div>
+                    {creativesSource === "mix" && (
+                      <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-3 py-2">
+                        <label className="block text-sm font-medium text-zinc-700">AI images % of variants: {aiCreativePercent}%</label>
+                        <input type="range" min={0} max={100} value={aiCreativePercent} onChange={(e) => setAiCreativePercent(Number(e.target.value))} className="mt-1 h-2 w-full accent-violet-600" />
+                      </div>
+                    )}
                   </div>
-                  {creativesSource === "ai" && (
+                  {(creativesSource === "ai" || creativesSource === "mix") && (
                     <div>
                       <label className="block text-sm font-medium text-zinc-700">Ad copy AI</label>
                       <select className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as "openai" | "anthropic" | "split")}>
@@ -526,24 +538,22 @@ export function HomeClient() {
                   )}
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Ad idea / prompt</label>
-                    <textarea className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-300 px-3 py-2" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai"} />
+                    <textarea className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-300 px-3 py-2" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai" || creativesSource === "mix"} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Variants</label>
                     <input type="number" min={1} max={20} className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={variantCount} onChange={(e) => setVariantCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">AI images % of variants: {aiCreativePercent}%</label>
-                    <input type="range" min={0} max={100} value={aiCreativePercent} onChange={(e) => setAiCreativePercent(Number(e.target.value))} className="mt-1 h-2 w-full accent-violet-600" />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium text-zinc-700">Creative description (optional)</label>
                     <textarea className="mt-1 min-h-[60px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
                   </div>
-                  {(creativesSource === "own" || aiCreativePercent < 100) && (
+                  {(creativesSource === "own" || creativesSource === "mix") && (
                     <div>
                       <label className="block text-sm font-medium text-zinc-700">Attach creatives from library</label>
-                      <p className="mt-0.5 text-xs text-zinc-500">Select which stored creatives to use for this campaign.</p>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        {creativesSource === "mix" ? "Selected creatives fill the remaining variants (after AI-generated %)." : "Select which stored creatives to use for this campaign."}
+                      </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {creatives.length === 0 ? (
                           <p className="text-sm text-zinc-500">Upload images in the Creative library above first.</p>
