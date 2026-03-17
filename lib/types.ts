@@ -12,6 +12,8 @@ export type AdVariant = {
   copy: string;
   status: string;
   hasCreative?: boolean;
+  /** Which AI generated this variant (admin-only in UI). */
+  aiSource?: "openai" | "anthropic";
 };
 
 export type CreativesSource = "ai" | "own";

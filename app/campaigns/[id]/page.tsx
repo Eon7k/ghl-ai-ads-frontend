@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Experiment, AdVariant } from "@/lib/types";
 
 import type { CampaignMetricsResponse } from "@/lib/api";
@@ -12,6 +13,7 @@ import type { CampaignMetricsResponse } from "@/lib/api";
 export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { isAdmin } = useAuth();
   const id = typeof params.id === "string" ? params.id : "";
 
   const [experiment, setExperiment] = useState<Experiment | null>(null);
@@ -204,7 +206,9 @@ export default function CampaignDetailPage() {
         if (!prev?.variants) return prev;
         return {
           ...prev,
-          variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, copy } : x)),
+          variants: prev.variants!.map((x) =>
+            x.id === v.id ? { ...x, copy, aiSource: "openai" as const } : x
+          ),
         };
       });
     } catch (e) {
@@ -480,7 +484,17 @@ export default function CampaignDetailPage() {
                 className="flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
               >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium text-zinc-800">Variant {v.index}</span>
+                  <span className="font-medium text-zinc-800">
+                    Variant {v.index}
+                    {isAdmin && v.aiSource && (
+                      <span
+                        className="ml-2 rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600"
+                        title="Which AI generated this variant"
+                      >
+                        {v.aiSource === "openai" ? "OpenAI" : "Anthropic"}
+                      </span>
+                    )}
+                  </span>
                   <div className="flex items-center gap-1.5">
                     {savedVariantId === v.id && (
                       <span className="text-xs text-green-600">Saved</span>
