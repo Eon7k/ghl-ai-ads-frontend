@@ -148,6 +148,30 @@ export const api = {
       body: { dailyBudget },
     }),
 
+  /** Creatives library: list, create (upload), delete, get image URL */
+  creatives: {
+    list: () =>
+      request<{ creatives: import("./types").Creative[] }>("creatives").then((r) => r.creatives),
+    create: (name: string, imageData: string) =>
+      request<{ id: string; name: string; createdAt: string }>("creatives", {
+        method: "POST",
+        body: { name, imageData },
+      }),
+    delete: (id: string) =>
+      request<{ ok: boolean }>(`creatives/${id}`, { method: "DELETE" }),
+    /** Returns a URL that loads the creative image (via proxy). Call revokeObjectURL when done if you created one. */
+    /** Fetch creative image with auth; returns object URL. Call URL.revokeObjectURL when done. */
+    getAssetBlobUrl: async (id: string): Promise<string> => {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/creatives/${id}/asset`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load creative");
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+  },
+
   /** List connected ad accounts (Meta, TikTok, Google) */
   integrations: {
     list: () =>

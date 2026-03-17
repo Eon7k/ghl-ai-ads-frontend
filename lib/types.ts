@@ -34,9 +34,17 @@ export type Experiment = {
   /** Optional: how the user wants the ad image/creative to look (used when generating AI creatives). */
   creativePrompt?: string;
   variants?: AdVariant[];
+  /** IDs of creatives from the library attached to this campaign. */
+  attachedCreativeIds?: string[];
   metaCampaignId?: string;
   metaAdSetId?: string;
-};
+}
+
+export type Creative = {
+  id: string;
+  name: string;
+  createdAt: string;
+};;
 
 export type CreateExperimentBody = {
   name: string;
@@ -50,6 +58,8 @@ export type CreateExperimentBody = {
   creativesSource?: CreativesSource;
   aiProvider?: "openai" | "anthropic" | "split";
   creativePrompt?: string;
+  /** IDs of creatives from library to attach to this campaign (when using own or mixed). */
+  attachedCreativeIds?: string[];
 };
 
 export type UpdateVariantBody = {

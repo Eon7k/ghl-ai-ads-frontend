@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,7 @@ import { getToken } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type { MetaAdAccount } from "@/lib/api";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
-import type { Experiment } from "@/lib/types";
+import type { Experiment, Creative } from "@/lib/types";
 import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 
@@ -23,9 +23,25 @@ const PLATFORMS: { id: "meta" | "google" | "tiktok"; name: string }[] = [
   { id: "tiktok", name: "TikTok Ads" },
 ];
 
+function CreativeThumbnail({ creativeId, className }: { creativeId: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const ref = useRef<string | null>(null);
+  useEffect(() => {
+    api.creatives.getAssetBlobUrl(creativeId).then((url) => {
+      ref.current = url;
+      setSrc(url);
+    });
+    return () => {
+      if (ref.current) URL.revokeObjectURL(ref.current);
+    };
+  }, [creativeId]);
+  if (!src) return <div className={className} style={{ minHeight: 48 }} />;
+  return <img src={src} alt="" className={className} />;
+}
+
 export function HomeClient() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
@@ -48,6 +64,10 @@ export function HomeClient() {
   const [googleAdAccounts, setGoogleAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<"meta" | "google" | "tiktok" | null>(null);
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [creativesLoading, setCreativesLoading] = useState(false);
+  const [selectedCreativeIds, setSelectedCreativeIds] = useState<string[]>([]);
+  const [uploadingCreative, setUploadingCreative] = useState(false);
 
   const searchParams = useSearchParams();
   const connectedParam = searchParams.get("connected");
@@ -83,6 +103,12 @@ export function HomeClient() {
     if (searchParams.get("open") === "create") setCreateOpen(true);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!user) return;
+    setCreativesLoading(true);
+    api.creatives.list().then(setCreatives).catch(() => setCreatives([])).finally(() => setCreativesLoading(false));
+  }, [user]);
+
   async function handleDisconnect(id: string) {
     setDisconnecting(id);
     try {
@@ -104,7 +130,7 @@ export function HomeClient() {
 
   function togglePlatform(p: "meta" | "google" | "tiktok") {
     const connected = integrations.some((i) => i.platform === p);
-    if (!connected) return;
+    if (!connected && !isAdmin) return;
     setSelectedPlatforms((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
     );
@@ -115,6 +141,33 @@ export function HomeClient() {
     if (!token) return;
     const path = `/integrations/${platform}/connect?token=${encodeURIComponent(token)}`;
     window.location.href = `${BACKEND_URL.replace(/\/$/, "")}${path}`;
+  }
+
+  async function handleUploadCreative(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    setUploadingCreative(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => {
+          const data = r.result as string;
+          resolve(data);
+        };
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      const created = await api.creatives.create(file.name.replace(/\.[^.]+$/, "") || "Creative", base64);
+      setCreatives((prev) => [...prev, { id: created.id, name: created.name, createdAt: created.createdAt }]);
+      setSelectedCreativeIds((prev) => [...prev, created.id]);
+    } catch {
+      // ignore
+    } finally {
+      setUploadingCreative(false);
+    }
+  }
+
+  function toggleCreativeSelection(id: string) {
+    setSelectedCreativeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   async function handleCreateSubmit(e: React.FormEvent) {
@@ -138,6 +191,8 @@ export function HomeClient() {
       return;
     }
 
+    const attachCreatives = (creativesSource === "own" || aiCreativePercent < 100) && selectedCreativeIds.length > 0;
+
     try {
       const experiment = await api.createExperiment({
         name,
@@ -149,6 +204,7 @@ export function HomeClient() {
         creativesSource,
         aiProvider: creativesSource === "ai" ? aiProvider : undefined,
         creativePrompt: creativePrompt.trim() || undefined,
+        ...(attachCreatives && { attachedCreativeIds: selectedCreativeIds }),
       });
 
       const variants = experiment.variants || [];
@@ -192,7 +248,9 @@ export function HomeClient() {
     setAiCreativePercent(0);
     setCreativePrompt("");
     setAiProvider("split");
-    setSelectedPlatforms(connectedPlatforms.length ? [connectedPlatforms[0].id] : []);
+    setSelectedCreativeIds([]);
+    if (isAdmin && connectedPlatforms.length === 0) setSelectedPlatforms(["meta"]);
+    else setSelectedPlatforms(connectedPlatforms.length ? [connectedPlatforms[0].id] : []);
     setCreateError(null);
   }
 
@@ -324,6 +382,56 @@ export function HomeClient() {
           )}
         </section>
 
+        {/* Creative library */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-zinc-900">Creative library</h2>
+          <p className="mt-0.5 text-sm text-zinc-500">
+            Store images here and attach them to campaigns when using your own creatives or a mix of AI and own.
+          </p>
+          <div className="mt-3 flex flex-wrap items-start gap-3">
+            <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingCreative}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUploadCreative(f);
+                  e.target.value = "";
+                }}
+              />
+              {uploadingCreative ? "Uploading…" : "+ Upload creative"}
+            </label>
+            {creativesLoading ? (
+              <div className="h-20 w-20 animate-pulse rounded-lg bg-zinc-100" />
+            ) : creatives.length === 0 ? (
+              <p className="text-sm text-zinc-500">No creatives yet. Upload an image to get started.</p>
+            ) : (
+              creatives.map((c) => (
+                <div key={c.id} className="flex flex-col items-center gap-1 rounded-xl border border-zinc-200 bg-white p-2 shadow-sm">
+                  <div className="h-16 w-16 overflow-hidden rounded-lg bg-zinc-100">
+                    <CreativeThumbnail creativeId={c.id} className="h-full w-full object-cover" />
+                  </div>
+                  <span className="max-w-[100px] truncate text-xs text-zinc-700">{c.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      api.creatives.delete(c.id).then(() => {
+                        setCreatives((prev) => prev.filter((x) => x.id !== c.id));
+                        setSelectedCreativeIds((prev) => prev.filter((id) => id !== c.id));
+                      });
+                    }}
+                    className="text-xs text-red-600 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
         {/* Launch a campaign */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-zinc-900">Launch a campaign</h2>
@@ -335,15 +443,16 @@ export function HomeClient() {
           <div className="mt-3 flex flex-wrap gap-3">
             {PLATFORMS.map((p) => {
               const connected = integrations.some((i) => i.platform === p.id);
+              const selectable = connected || isAdmin;
               const selected = selectedPlatforms.includes(p.id);
               return (
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => connected && togglePlatform(p.id)}
-                  disabled={!connected}
+                  onClick={() => selectable && togglePlatform(p.id)}
+                  disabled={!selectable}
                   className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 transition ${
-                    connected
+                    selectable
                       ? selected
                         ? "border-blue-500 bg-blue-50"
                         : "border-zinc-200 bg-white hover:border-zinc-300"
@@ -358,8 +467,11 @@ export function HomeClient() {
             })}
           </div>
 
-          {connectedPlatforms.length === 0 && (
+          {connectedPlatforms.length === 0 && !isAdmin && (
             <p className="mt-3 text-sm text-amber-700">Connect at least one platform above to create a campaign.</p>
+          )}
+          {connectedPlatforms.length === 0 && isAdmin && (
+            <p className="mt-3 text-sm text-zinc-500">Admin: you can create campaigns without connecting a platform.</p>
           )}
 
           {/* Create form (expandable) */}
@@ -370,7 +482,7 @@ export function HomeClient() {
                 setCreateOpen((o) => !o);
                 if (!createOpen) resetCreateForm();
               }}
-              disabled={connectedPlatforms.length === 0}
+              disabled={connectedPlatforms.length === 0 && !isAdmin}
               className="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4 text-left shadow-sm hover:border-zinc-300 hover:shadow-md disabled:opacity-60"
             >
               <span className="font-semibold text-zinc-900">New campaign</span>
@@ -428,6 +540,34 @@ export function HomeClient() {
                     <label className="block text-sm font-medium text-zinc-700">Creative description (optional)</label>
                     <textarea className="mt-1 min-h-[60px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
                   </div>
+                  {(creativesSource === "own" || aiCreativePercent < 100) && (
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700">Attach creatives from library</label>
+                      <p className="mt-0.5 text-xs text-zinc-500">Select which stored creatives to use for this campaign.</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {creatives.length === 0 ? (
+                          <p className="text-sm text-zinc-500">Upload images in the Creative library above first.</p>
+                        ) : (
+                          creatives.map((c) => (
+                            <label
+                              key={c.id}
+                              className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm ${
+                                selectedCreativeIds.includes(c.id) ? "border-blue-500 bg-blue-50" : "border-zinc-200 bg-white"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedCreativeIds.includes(c.id)}
+                                onChange={() => toggleCreativeSelection(c.id)}
+                                className="rounded"
+                              />
+                              <span className="font-medium text-zinc-800">{c.name}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Daily budget: ${budget}</label>
                     <input type="range" min={5} max={500} step={5} value={budget} onChange={(e) => setBudget(e.target.value)} className="mt-1 h-2 w-full accent-blue-600" />
