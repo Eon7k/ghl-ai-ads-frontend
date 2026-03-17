@@ -160,6 +160,9 @@ export const api = {
     /** TikTok ad accounts / advertisers (requires TikTok connected) */
     getTiktokAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/tiktok/ad-accounts").then((r) => r.adAccounts),
+    /** Google Ads customer accounts (requires Google connected and GOOGLE_ADS_DEVELOPER_TOKEN on server) */
+    getGoogleAdAccounts: () =>
+      request<{ adAccounts: MetaAdAccount[] }>("integrations/google/ad-accounts").then((r) => r.adAccounts),
   },
 };
 

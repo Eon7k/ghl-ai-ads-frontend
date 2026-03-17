@@ -26,8 +26,10 @@ export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [tiktokAdAccounts, setTiktokAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [googleAdAccounts, setGoogleAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
   const [loadingTiktokAdAccounts, setLoadingTiktokAdAccounts] = useState(false);
+  const [loadingGoogleAdAccounts, setLoadingGoogleAdAccounts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export default function IntegrationsPage() {
   const errorParam = searchParams.get("error");
   const hasMeta = integrations.some((i) => i.platform === "meta");
   const hasTiktok = integrations.some((i) => i.platform === "tiktok");
+  const hasGoogle = integrations.some((i) => i.platform === "google");
 
   useEffect(() => {
     async function fetchIntegrations() {
@@ -119,6 +122,40 @@ export default function IntegrationsPage() {
     return () => { cancelled = true; };
   }, [hasTiktok]);
 
+  async function loadGoogleAdAccounts() {
+    setLoadingGoogleAdAccounts(true);
+    setError(null);
+    try {
+      const list = await api.integrations.getGoogleAdAccounts();
+      setGoogleAdAccounts(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load Google ad accounts");
+      setGoogleAdAccounts([]);
+    } finally {
+      setLoadingGoogleAdAccounts(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!hasGoogle) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingGoogleAdAccounts(true);
+      try {
+        const list = await api.integrations.getGoogleAdAccounts();
+        if (!cancelled) setGoogleAdAccounts(list);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load Google ad accounts");
+          setGoogleAdAccounts([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingGoogleAdAccounts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hasGoogle]);
+
   async function handleDisconnect(id: string) {
     setDisconnecting(id);
     try {
@@ -145,6 +182,13 @@ export default function IntegrationsPage() {
     window.location.href = url;
   }
 
+  function connectGoogle() {
+    const token = getToken();
+    if (!token) return;
+    const url = `${BACKEND_URL.replace(/\/$/, "")}/integrations/google/connect?token=${encodeURIComponent(token)}`;
+    window.location.href = url;
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
@@ -164,6 +208,11 @@ export default function IntegrationsPage() {
         {connectedParam === "tiktok" && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
             TikTok account connected. You can now launch TikTok campaigns from here.
+          </div>
+        )}
+        {connectedParam === "google" && (
+          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            Google account connected. You can now use Google Ads when launching campaigns.
           </div>
         )}
         {errorParam && (
@@ -187,7 +236,7 @@ export default function IntegrationsPage() {
               const connected = integrations.find((i) => i.platform === integration.id);
               const isMeta = integration.id === "meta";
               const isTiktok = integration.id === "tiktok";
-              const isComingSoon = integration.id === "google";
+              const isGoogle = integration.id === "google";
 
               return (
                 <div
@@ -204,11 +253,6 @@ export default function IntegrationsPage() {
                     {connected && (
                       <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800">
                         Connected
-                      </span>
-                    )}
-                    {isComingSoon && !connected && (
-                      <span className="rounded-full bg-zinc-200 px-3 py-1 text-xs font-medium text-zinc-600">
-                        Coming soon
                       </span>
                     )}
                   </div>
@@ -373,10 +417,83 @@ export default function IntegrationsPage() {
                       </>
                     )}
 
-                    {isComingSoon && (
-                      <p className="text-sm text-zinc-500">
-                        This integration is not available yet. We’ll add it soon.
-                      </p>
+                    {isGoogle && (
+                      <>
+                        {connected ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-zinc-600">
+                                {connected.platformAccountName
+                                  ? `Connected as ${connected.platformAccountName}`
+                                  : "Google account connected"}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleDisconnect(connected.id)}
+                                disabled={disconnecting === connected.id}
+                                className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                              >
+                                {disconnecting === connected.id ? "Disconnecting…" : "Disconnect"}
+                              </button>
+                            </div>
+                            {hasGoogle && (
+                              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4">
+                                <h3 className="text-sm font-medium text-zinc-700">Google Ads customer accounts</h3>
+                                <p className="mt-1 text-xs text-zinc-500">
+                                  Accounts you can use when launching campaigns to Google Ads.
+                                </p>
+                                {loadingGoogleAdAccounts ? (
+                                  <p className="mt-3 text-sm text-zinc-500">Loading ad accounts…</p>
+                                ) : googleAdAccounts !== null ? (
+                                  googleAdAccounts.length === 0 ? (
+                                    <p className="mt-3 text-sm text-zinc-500">
+                                      No accounts found, or developer token may not be configured on the server.{" "}
+                                      <button
+                                        type="button"
+                                        onClick={loadGoogleAdAccounts}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        Try again
+                                      </button>
+                                    </p>
+                                  ) : (
+                                    <ul className="mt-3 space-y-2">
+                                      {googleAdAccounts.map((a) => (
+                                        <li
+                                          key={a.id}
+                                          className="flex items-center justify-between rounded-md border border-zinc-100 bg-white px-3 py-2 text-sm"
+                                        >
+                                          <span className="font-medium text-zinc-900">{a.name}</span>
+                                          <span className="text-zinc-500">({a.accountId})</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <p className="text-sm text-zinc-600">
+                              Sign in with Google to connect your Google Ads account. We only use this to run and manage your Google Ads.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={connectGoogle}
+                              disabled={!BACKEND_URL}
+                              className="rounded-lg bg-[#4285F4] px-5 py-2.5 font-medium text-white hover:bg-[#3367D6] disabled:opacity-50"
+                            >
+                              Connect Google
+                            </button>
+                          </div>
+                        )}
+                        {!BACKEND_URL && !connected && (
+                          <p className="mt-3 text-sm text-amber-700">
+                            Set NEXT_PUBLIC_BACKEND_URL (or NEXT_PUBLIC_API_URL) in Vercel to your Render backend URL to enable Connect.
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

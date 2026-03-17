@@ -43,7 +43,27 @@ https://ghl-ai-backend.onrender.com/integrations/tiktok/callback
 
 ---
 
-## 3. Render (backend) — Environment variables
+## 3. Google (Google Ads / OAuth) — Redirect URI
+
+**Where:** [Google Cloud Console](https://console.cloud.google.com) → Your project → **APIs & Services** → **Credentials** → your **OAuth 2.0 Client ID** (Web application) → **Authorized redirect URIs**
+
+**Add this exact line:**
+
+```
+https://YOUR-BACKEND/integrations/google/callback
+```
+
+**Example:**
+
+```
+https://ghl-ai-backend.onrender.com/integrations/google/callback
+```
+
+You need a **Web application** OAuth client (not Desktop). Enable the **Google Ads API** (or at least request the scope `https://www.googleapis.com/auth/adwords`) when users sign in. To list ad accounts you also need a **Google Ads API developer token** (apply in Google Ads → Tools → API Center).
+
+---
+
+## 4. Render (backend) — Environment variables
 
 **Where:** [Render](https://render.com) → Your **backend** service → **Environment**
 
@@ -55,6 +75,9 @@ https://ghl-ai-backend.onrender.com/integrations/tiktok/callback
 | `META_APP_SECRET` | (your Meta app secret) |
 | `TIKTOK_APP_ID` | (your TikTok app ID) |
 | `TIKTOK_APP_SECRET` | (your TikTok app secret) |
+| `GOOGLE_CLIENT_ID` | (Google OAuth 2.0 Web client ID) |
+| `GOOGLE_CLIENT_SECRET` | (Google OAuth 2.0 client secret) |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | (optional; needed to list Google Ads customer accounts) |
 | `JWT_SECRET` | (your secret; you already have this) |
 | `PORT` | `4000` (or leave unset) |
 | `OPENAI_API_KEY` | (if you use OpenAI) |
@@ -66,14 +89,14 @@ https://ghl-ai-backend.onrender.com/integrations/tiktok/callback
 
 ---
 
-## 4. Vercel (frontend) — Environment variables
+## 5. Vercel (frontend) — Environment variables
 
 **Where:** [Vercel](https://vercel.com) → Your **frontend** project → **Settings** → **Environment Variables**
 
 | Key | Value |
 |-----|--------|
 | `BACKEND_URL` | `https://YOUR-BACKEND` (no slash at end) — used by the API proxy |
-| `NEXT_PUBLIC_BACKEND_URL` or `NEXT_PUBLIC_API_URL` | `https://YOUR-BACKEND` (same) — used by Integrations “Connect Meta” / “Connect TikTok” in the browser |
+| `NEXT_PUBLIC_BACKEND_URL` or `NEXT_PUBLIC_API_URL` | `https://YOUR-BACKEND` (same) — used by Integrations “Connect Meta” / “Connect Google” / “Connect TikTok” in the browser |
 
 **Example:**
 
