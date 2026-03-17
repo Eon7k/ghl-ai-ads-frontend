@@ -270,7 +270,7 @@ export default function CampaignsPage() {
                           <button
                             key={p.id}
                             type="button"
-                            onClick={() => connected && (selectedPlatforms.includes(p.id) ? setSelectedPlatforms((prev) => prev.filter((x) => x !== p.id)) : setSelectedPlatforms((prev) => [...prev, p].sort()))}
+                            onClick={() => connected && (selectedPlatforms.includes(p.id) ? setSelectedPlatforms((prev) => prev.filter((x) => x !== p.id)) : setSelectedPlatforms((prev) => [...prev, p.id].sort()))}
                             disabled={!connected}
                             className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm ${connected ? (selected ? "border-blue-500 bg-blue-50 text-blue-800" : "border-zinc-200 hover:border-zinc-300") : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400"}`}
                           >
