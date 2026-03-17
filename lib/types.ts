@@ -41,6 +41,8 @@ export type CreateExperimentBody = {
   prompt: string;
   variantCount: number;
   creativesSource?: CreativesSource;
+  /** "openai" | "anthropic" | "split" — split = half OpenAI, half Anthropic */
+  aiProvider?: "openai" | "anthropic" | "split";
 };
 
 export type UpdateVariantBody = {

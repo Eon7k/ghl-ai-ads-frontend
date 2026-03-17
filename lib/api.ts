@@ -127,6 +127,9 @@ export const api = {
     /** Meta ad accounts (requires Meta connected) */
     getMetaAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/meta/ad-accounts").then((r) => r.adAccounts),
+    /** TikTok ad accounts / advertisers (requires TikTok connected) */
+    getTiktokAdAccounts: () =>
+      request<{ adAccounts: MetaAdAccount[] }>("integrations/tiktok/ad-accounts").then((r) => r.adAccounts),
   },
 };
 

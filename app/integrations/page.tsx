@@ -25,7 +25,9 @@ export default function IntegrationsPage() {
   const searchParams = useSearchParams();
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [tiktokAdAccounts, setTiktokAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [loadingAdAccounts, setLoadingAdAccounts] = useState(false);
+  const [loadingTiktokAdAccounts, setLoadingTiktokAdAccounts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export default function IntegrationsPage() {
   const connectedParam = searchParams.get("connected");
   const errorParam = searchParams.get("error");
   const hasMeta = integrations.some((i) => i.platform === "meta");
+  const hasTiktok = integrations.some((i) => i.platform === "tiktok");
 
   useEffect(() => {
     async function fetchIntegrations() {
@@ -82,6 +85,40 @@ export default function IntegrationsPage() {
     return () => { cancelled = true; };
   }, [hasMeta]);
 
+  async function loadTiktokAdAccounts() {
+    setLoadingTiktokAdAccounts(true);
+    setError(null);
+    try {
+      const list = await api.integrations.getTiktokAdAccounts();
+      setTiktokAdAccounts(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load ad accounts");
+      setTiktokAdAccounts([]);
+    } finally {
+      setLoadingTiktokAdAccounts(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!hasTiktok) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingTiktokAdAccounts(true);
+      try {
+        const list = await api.integrations.getTiktokAdAccounts();
+        if (!cancelled) setTiktokAdAccounts(list);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load TikTok ad accounts");
+          setTiktokAdAccounts([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingTiktokAdAccounts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hasTiktok]);
+
   async function handleDisconnect(id: string) {
     setDisconnecting(id);
     try {
@@ -101,6 +138,13 @@ export default function IntegrationsPage() {
     window.location.href = url;
   }
 
+  function connectTiktok() {
+    const token = getToken();
+    if (!token) return;
+    const url = `${BACKEND_URL.replace(/\/$/, "")}/integrations/tiktok/connect?token=${encodeURIComponent(token)}`;
+    window.location.href = url;
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
@@ -115,6 +159,11 @@ export default function IntegrationsPage() {
         {connectedParam === "meta" && (
           <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
             Meta account connected. You can now launch Meta campaigns from here.
+          </div>
+        )}
+        {connectedParam === "tiktok" && (
+          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            TikTok account connected. You can now launch TikTok campaigns from here.
           </div>
         )}
         {errorParam && (
@@ -137,7 +186,8 @@ export default function IntegrationsPage() {
             {INTEGRATIONS.map((integration) => {
               const connected = integrations.find((i) => i.platform === integration.id);
               const isMeta = integration.id === "meta";
-              const isComingSoon = integration.id === "google" || integration.id === "tiktok";
+              const isTiktok = integration.id === "tiktok";
+              const isComingSoon = integration.id === "google";
 
               return (
                 <div
@@ -156,7 +206,7 @@ export default function IntegrationsPage() {
                         Connected
                       </span>
                     )}
-                    {isComingSoon && (
+                    {isComingSoon && !connected && (
                       <span className="rounded-full bg-zinc-200 px-3 py-1 text-xs font-medium text-zinc-600">
                         Coming soon
                       </span>
@@ -233,6 +283,85 @@ export default function IntegrationsPage() {
                               className="rounded-lg bg-[#1877F2] px-5 py-2.5 font-medium text-white hover:bg-[#166FE5] disabled:opacity-50"
                             >
                               Connect Meta
+                            </button>
+                          </div>
+                        )}
+                        {!BACKEND_URL && !connected && (
+                          <p className="mt-3 text-sm text-amber-700">
+                            Set NEXT_PUBLIC_BACKEND_URL (or NEXT_PUBLIC_API_URL) in Vercel to your Render backend URL to enable Connect.
+                          </p>
+                        )}
+                      </>
+                    )}
+
+                    {isTiktok && (
+                      <>
+                        {connected ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-zinc-600">
+                                {connected.platformAccountName
+                                  ? `Connected as ${connected.platformAccountName}`
+                                  : "TikTok account connected"}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleDisconnect(connected.id)}
+                                disabled={disconnecting === connected.id}
+                                className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                              >
+                                {disconnecting === connected.id ? "Disconnecting…" : "Disconnect"}
+                              </button>
+                            </div>
+                            {hasTiktok && (
+                              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4">
+                                <h3 className="text-sm font-medium text-zinc-700">TikTok ad accounts</h3>
+                                <p className="mt-1 text-xs text-zinc-500">
+                                  Advertiser accounts you can use when launching campaigns to TikTok.
+                                </p>
+                                {loadingTiktokAdAccounts ? (
+                                  <p className="mt-3 text-sm text-zinc-500">Loading ad accounts…</p>
+                                ) : tiktokAdAccounts !== null ? (
+                                  tiktokAdAccounts.length === 0 ? (
+                                    <p className="mt-3 text-sm text-zinc-500">
+                                      No ad accounts found, or token may need re-authorization.{" "}
+                                      <button
+                                        type="button"
+                                        onClick={loadTiktokAdAccounts}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        Try again
+                                      </button>
+                                    </p>
+                                  ) : (
+                                    <ul className="mt-3 space-y-2">
+                                      {tiktokAdAccounts.map((a) => (
+                                        <li
+                                          key={a.id}
+                                          className="flex items-center justify-between rounded-md border border-zinc-100 bg-white px-3 py-2 text-sm"
+                                        >
+                                          <span className="font-medium text-zinc-900">{a.name}</span>
+                                          <span className="text-zinc-500">({a.accountId})</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <p className="text-sm text-zinc-600">
+                              Sign in with TikTok to connect your ad account. We only use this to run and manage your TikTok ads.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={connectTiktok}
+                              disabled={!BACKEND_URL}
+                              className="rounded-lg bg-black px-5 py-2.5 font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                            >
+                              Connect TikTok
                             </button>
                           </div>
                         )}
