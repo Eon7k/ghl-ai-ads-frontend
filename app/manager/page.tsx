@@ -46,7 +46,7 @@ export default function ManagerPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
       </div>
     );
@@ -54,61 +54,75 @@ export default function ManagerPage() {
 
   if (!user) {
     return (
-      <>
+      <div className="min-h-screen bg-zinc-50 font-sans">
         <AppNav />
-        <main className="mx-auto max-w-4xl px-4 py-8">
+        <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <p className="text-zinc-600">Sign in to view Campaign Manager.</p>
           <Link href="/login" className="mt-4 inline-block text-blue-600 hover:underline">Log in</Link>
         </main>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-zinc-50 font-sans">
       <AppNav />
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-        <h1 className="text-xl font-semibold text-zinc-900">Campaign Manager</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          View your active and past campaigns. Create new campaigns from <Link href="/" className="text-blue-600 hover:underline">Home</Link>.
-        </p>
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-zinc-900">Campaign Manager</h2>
+          <p className="mt-0.5 text-sm text-zinc-500">
+            View your active and past campaigns. Create new campaigns from <Link href="/" className="text-blue-600 hover:underline">Home</Link>.
+          </p>
+        </section>
 
-        {loadingList ? (
-          <div className="mt-8 flex justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
-          </div>
-        ) : groups.length === 0 ? (
-          <p className="mt-8 text-sm text-zinc-500">No campaigns yet. Create one from the Home page.</p>
-        ) : (
-          <ul className="mt-6 space-y-3">
-            {groups.map((g) => (
-              <li key={g.groupId}>
-                <Link
-                  href={`/manager/${g.groupId}`}
-                  className="block rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-zinc-900">{g.name}</p>
-                      <p className="mt-0.5 flex items-center gap-2 text-sm text-zinc-500">
-                        {g.platforms.map((p) => (
-                          <span key={p} className="flex items-center gap-1">
-                            <IntegrationLogo platform={p as "meta" | "google" | "tiktok"} size={16} className="rounded" />
-                            {PLATFORM_NAMES[p] ?? p}
-                          </span>
-                        ))}
-                      </p>
+        <section id="campaigns">
+          <h2 className="text-lg font-semibold text-zinc-900">Your campaigns</h2>
+          {loadingList ? (
+            <div className="mt-4 flex justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
+            </div>
+          ) : groups.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">No campaigns yet. Use “New campaign” on the Home page to create one.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {groups.map((g) => (
+                <li key={g.groupId}>
+                  <Link
+                    href={`/manager/${g.groupId}`}
+                    className="block rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-zinc-900">{g.name}</p>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+                          {g.platforms.map((p) => (
+                            <span key={p} className="flex items-center gap-1">
+                              <IntegrationLogo platform={p as "meta" | "google" | "tiktok"} size={16} className="rounded" />
+                              {PLATFORM_NAMES[p] ?? p}
+                            </span>
+                          ))}
+                          {g.experiments[0] && (
+                            <>
+                              <span>·</span>
+                              <span>${g.experiments[0].totalDailyBudget}/day</span>
+                              {g.experiments[0].variantCount != null && (
+                                <span>· {g.experiments[0].variantCount} variant{g.experiments[0].variantCount === 1 ? "" : "s"}</span>
+                              )}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${g.status === "Active" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                        {g.status === "Active" ? "Launched" : "Draft"}
+                      </span>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${g.status === "Active" ? "bg-green-100 text-green-800" : "bg-zinc-100 text-zinc-700"}`}>
-                      {g.status}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
-    </>
+    </div>
   );
 }
