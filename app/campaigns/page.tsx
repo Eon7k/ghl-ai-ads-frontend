@@ -32,6 +32,7 @@ export default function CampaignsPage() {
   const [variantCount, setVariantCount] = useState(10);
   const [creativesSource, setCreativesSource] = useState<"ai" | "own">("ai");
   const [aiCreativePercent, setAiCreativePercent] = useState(0);
+  const [creativePrompt, setCreativePrompt] = useState("");
   const [aiProvider, setAiProvider] = useState<"openai" | "anthropic" | "split">("split");
   const [createLoading, setCreateLoading] = useState(false);
   const [createStatus, setCreateStatus] = useState("");
@@ -91,6 +92,7 @@ export default function CampaignsPage() {
         variantCount: count,
         creativesSource,
         aiProvider: creativesSource === "ai" ? aiProvider : undefined,
+        creativePrompt: creativePrompt.trim() || undefined,
       });
 
       const variants = experiment.variants || [];
@@ -131,6 +133,7 @@ export default function CampaignsPage() {
     setVariantCount(10);
     setCreativesSource("ai");
     setAiCreativePercent(0);
+    setCreativePrompt("");
     setAiProvider("split");
     setCreateError(null);
   }
@@ -356,6 +359,21 @@ export default function CampaignsPage() {
                         {aiCreativePercent === 0
                           ? "No AI-generated images."
                           : `${Math.round((variantCount * aiCreativePercent) / 100)} of ${variantCount} variants will get an AI image.`}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-zinc-700">
+                        Creative / image description <span className="font-normal text-zinc-500">(optional)</span>
+                      </label>
+                      <textarea
+                        className="min-h-[72px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        value={creativePrompt}
+                        onChange={(e) => setCreativePrompt(e.target.value)}
+                        placeholder="e.g. Bright, minimal product shot on white. Or: Warm lifestyle photo, family at dinner, cozy lighting."
+                      />
+                      <p className="text-xs text-zinc-500">
+                        Describe how you want the ad image to look. Used when generating AI creatives; ad copy theme is still included.
                       </p>
                     </div>
 
