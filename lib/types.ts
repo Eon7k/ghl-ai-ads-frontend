@@ -36,6 +36,8 @@ export type Experiment = {
   variants?: AdVariant[];
   /** IDs of creatives from the library attached to this campaign. */
   attachedCreativeIds?: string[];
+  /** Shared id when same campaign runs on multiple platforms; used to group in Campaign Manager. */
+  campaignGroupId?: string;
   metaCampaignId?: string;
   metaAdSetId?: string;
 }
