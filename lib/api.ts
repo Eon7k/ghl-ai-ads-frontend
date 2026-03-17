@@ -37,7 +37,31 @@ async function request<T>(
 
 export type AuthUser = { id: string; email: string };
 export type LoginResponse = { token: string; user: AuthUser };
-export type MeResponse = { user: AuthUser };
+export type MeResponse = { user: AuthUser; isAdmin?: boolean };
+
+export type AdminOverview = {
+  totalUsers: number;
+  totalCampaigns: number;
+  launchedCampaigns: number;
+  byPlatform: Record<string, number>;
+  byStatus: Record<string, number>;
+  funnel: { created: number; launched: number };
+};
+
+export type AdminAiPerformance = {
+  byProvider: Record<
+    string,
+    {
+      campaigns: number;
+      spend: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      avgCtr: number;
+      avgCpc: number;
+    }
+  >;
+};
 
 export const api = {
   /** Register; returns token and user. Use skipAuth so we don't require a token. */
@@ -47,6 +71,12 @@ export const api = {
     login: (email: string, password: string) =>
       request<LoginResponse>("auth/login", { method: "POST", body: { email, password }, skipAuth: true }),
     me: () => request<MeResponse>("auth/me"),
+  },
+
+  /** Admin-only: overview and AI performance. Requires admin email in backend ADMIN_EMAILS. */
+  admin: {
+    overview: () => request<AdminOverview>("admin/overview"),
+    aiPerformance: () => request<AdminAiPerformance>("admin/ai-performance"),
   },
 
   /** List all experiments (requires auth) */

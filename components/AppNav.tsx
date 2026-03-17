@@ -9,8 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
  */
 export default function AppNav() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const base = "/campaigns";
+  const { user, isAdmin, logout } = useAuth();
 
   return (
     <nav className="border-b border-zinc-200 bg-white">
@@ -53,6 +52,18 @@ export default function AppNav() {
             >
               Integrations
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname?.startsWith("/admin")
+                    ? "bg-amber-100 text-amber-900"
+                    : "text-amber-700 hover:bg-amber-50 hover:text-amber-900"
+                }`}
+              >
+                Admin
+              </Link>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
