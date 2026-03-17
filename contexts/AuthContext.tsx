@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       const { isAdmin: admin } = await api.auth.me();
       setIsAdmin(!!admin);
-      router.push("/campaigns");
+      router.push("/");
     },
     [router]
   );
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       const { isAdmin: admin } = await api.auth.me();
       setIsAdmin(!!admin);
-      router.push("/campaigns");
+      router.push("/");
     },
     [router]
   );

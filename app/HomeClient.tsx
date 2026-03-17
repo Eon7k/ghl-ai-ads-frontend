@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getToken } from "@/lib/auth";
 import { api } from "@/lib/api";
+import type { MetaAdAccount } from "@/lib/api";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment } from "@/lib/types";
 import type { ConnectedIntegration } from "@/lib/api";
@@ -42,7 +43,15 @@ export function HomeClient() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createStatus, setCreateStatus] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [tiktokAdAccounts, setTiktokAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [googleAdAccounts, setGoogleAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [expandedPlatform, setExpandedPlatform] = useState<"meta" | "google" | "tiktok" | null>(null);
 
+  const searchParams = useSearchParams();
+  const connectedParam = searchParams.get("connected");
+  const errorParam = searchParams.get("error");
   const connectedPlatforms = PLATFORMS.filter((p) => integrations.some((i) => i.platform === p.id));
 
   useEffect(() => {
@@ -55,7 +64,43 @@ export function HomeClient() {
     if (!user) return;
     setIntegrationsLoading(true);
     api.integrations.list().then(setIntegrations).catch(() => setIntegrations([])).finally(() => setIntegrationsLoading(false));
-  }, [user]);
+  }, [user, connectedParam]);
+
+  useEffect(() => {
+    if (!integrations.some((i) => i.platform === "meta")) return;
+    api.integrations.getMetaAdAccounts().then(setMetaAdAccounts).catch(() => setMetaAdAccounts([]));
+  }, [integrations]);
+  useEffect(() => {
+    if (!integrations.some((i) => i.platform === "tiktok")) return;
+    api.integrations.getTiktokAdAccounts().then(setTiktokAdAccounts).catch(() => setTiktokAdAccounts([]));
+  }, [integrations]);
+  useEffect(() => {
+    if (!integrations.some((i) => i.platform === "google")) return;
+    api.integrations.getGoogleAdAccounts().then(setGoogleAdAccounts).catch(() => setGoogleAdAccounts([]));
+  }, [integrations]);
+
+  useEffect(() => {
+    if (searchParams.get("open") === "create") setCreateOpen(true);
+  }, [searchParams]);
+
+  async function handleDisconnect(id: string) {
+    setDisconnecting(id);
+    try {
+      await api.integrations.disconnect(id);
+      setIntegrations((prev) => prev.filter((i) => i.id !== id));
+      setExpandedPlatform(null);
+    } catch {
+      // ignore
+    } finally {
+      setDisconnecting(null);
+    }
+  }
+
+  function getAdAccounts(platform: "meta" | "google" | "tiktok"): MetaAdAccount[] | null {
+    if (platform === "meta") return metaAdAccounts;
+    if (platform === "tiktok") return tiktokAdAccounts;
+    return googleAdAccounts;
+  }
 
   function togglePlatform(p: "meta" | "google" | "tiktok") {
     const connected = integrations.some((i) => i.platform === p);
@@ -190,40 +235,92 @@ export function HomeClient() {
     <>
       <AppNav />
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* OAuth callback banners */}
+        {connectedParam === "meta" && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Meta connected. You can launch Meta campaigns below.</div>
+        )}
+        {connectedParam === "tiktok" && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">TikTok connected. You can launch TikTok campaigns below.</div>
+        )}
+        {connectedParam === "google" && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Google connected. You can launch Google Ads campaigns below.</div>
+        )}
+        {errorParam && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{decodeURIComponent(errorParam)}</div>
+        )}
+
         {/* Integration bar — cards in a row at top */}
         <section className="mb-8">
-          <div className="flex flex-wrap items-stretch gap-3">
+          <div className="flex flex-wrap gap-3">
             {PLATFORMS.map((p) => {
               const connected = integrations.some((i) => i.platform === p.id);
+              const conn = connected ? integrations.find((i) => i.platform === p.id) : null;
+              const expanded = expandedPlatform === p.id;
+              const adAccounts = getAdAccounts(p.id);
               return (
-                <div
-                  key={p.id}
-                  className="flex min-w-[140px] flex-1 basis-0 items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
-                >
-                  <IntegrationLogo platform={p.id} size={40} className="shrink-0 rounded-lg" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-zinc-900">{p.name}</p>
-                    {connected ? (
-                      <span className="text-xs text-green-600">Connected</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => connectTo(p.id)}
-                        disabled={!BACKEND_URL}
-                        className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
-                      >
-                        Connect
-                      </button>
+                <div key={p.id} className="min-w-[160px] flex-1 basis-0 rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+                  <div
+                    className="flex cursor-pointer items-center gap-3 p-4"
+                    onClick={() => connected && setExpandedPlatform(expanded ? null : p.id)}
+                  >
+                    <IntegrationLogo platform={p.id} size={40} className="shrink-0 rounded-lg" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-zinc-900">{p.name}</p>
+                      {connected ? (
+                        <span className="text-xs text-green-600">Connected</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); connectTo(p.id); }}
+                          disabled={!BACKEND_URL}
+                          className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                    {connected && (
+                      <svg className={`h-5 w-5 text-zinc-400 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     )}
                   </div>
+                  {connected && expanded && conn && (
+                    <div className="border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-600">{conn.platformAccountName || "Account connected"}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDisconnect(conn.id)}
+                          disabled={disconnecting === conn.id}
+                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          {disconnecting === conn.id ? "Disconnecting…" : "Disconnect"}
+                        </button>
+                      </div>
+                      {adAccounts && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-zinc-600">Ad accounts</p>
+                          {adAccounts.length === 0 ? (
+                            <p className="mt-1 text-xs text-zinc-500">None found</p>
+                          ) : (
+                            <ul className="mt-1 space-y-1">
+                              {adAccounts.slice(0, 3).map((a) => (
+                                <li key={a.id} className="text-xs text-zinc-700 truncate">{a.name}</li>
+                              ))}
+                              {adAccounts.length > 3 && <li className="text-xs text-zinc-500">+{adAccounts.length - 3} more</li>}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
           {!BACKEND_URL && (
-            <p className="mt-2 text-sm text-amber-700">
-              Set NEXT_PUBLIC_BACKEND_URL to enable Connect. <Link href="/integrations" className="underline">Manage in Integrations</Link>
-            </p>
+            <p className="mt-2 text-sm text-amber-700">Set NEXT_PUBLIC_BACKEND_URL to enable Connect.</p>
           )}
         </section>
 
@@ -262,9 +359,7 @@ export function HomeClient() {
           </div>
 
           {connectedPlatforms.length === 0 && (
-            <p className="mt-3 text-sm text-amber-700">
-              Connect at least one platform above to create a campaign. <Link href="/integrations" className="font-medium text-amber-900 underline">Go to Integrations</Link>
-            </p>
+            <p className="mt-3 text-sm text-amber-700">Connect at least one platform above to create a campaign.</p>
           )}
 
           {/* Create form (expandable) */}
@@ -352,7 +447,7 @@ export function HomeClient() {
         </section>
 
         {/* Campaign list */}
-        <section>
+        <section id="campaigns">
           <h2 className="text-lg font-semibold text-zinc-900">Your campaigns</h2>
           {campaignsLoading ? (
             <div className="mt-4 flex justify-center py-8">
@@ -382,11 +477,6 @@ export function HomeClient() {
               ))}
             </ul>
           )}
-          <p className="mt-4">
-            <Link href="/campaigns" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-              View all campaigns →
-            </Link>
-          </p>
         </section>
       </main>
     </>

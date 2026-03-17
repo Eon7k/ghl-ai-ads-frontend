@@ -32,26 +32,14 @@ export default function AppNav() {
             >
               Home
             </Link>
-            <Link
-              href="/campaigns"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname?.startsWith("/campaigns")
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-              }`}
-            >
-              Campaigns
-            </Link>
-            <Link
-              href="/integrations"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname?.startsWith("/integrations")
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-              }`}
-            >
-              Integrations
-            </Link>
+            {pathname?.startsWith("/campaigns/") && (
+              <Link
+                href="/"
+                className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                Back to Home
+              </Link>
+            )}
             {isAdmin && (
               <Link
                 href="/admin"

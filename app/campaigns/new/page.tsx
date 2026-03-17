@@ -4,13 +4,13 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Redirect to campaigns list with create panel open.
- * New campaign form now lives in the dropdown on the campaigns page.
+ * Redirect to home with create panel open.
+ * New campaign form lives on the home page.
  */
 export default function NewCampaignRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/campaigns?open=create");
+    router.replace("/?open=create");
   }, [router]);
   return (
     <div className="flex min-h-[200px] items-center justify-center bg-zinc-50">

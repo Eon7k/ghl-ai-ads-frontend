@@ -265,7 +265,7 @@ export default function CampaignDetailPage() {
   if (error || !experiment) {
     return (
       <div className="p-6">
-        <Link href="/campaigns" className="text-blue-600 hover:underline text-sm block mb-2">
+        <Link href="/" className="text-blue-600 hover:underline text-sm block mb-2">
           ← Back to Campaigns
         </Link>
         <p className="text-red-600">{error || "Campaign not found."}</p>
@@ -283,7 +283,7 @@ export default function CampaignDetailPage() {
   return (
     <div className="mx-auto max-w-4xl p-6">
       <div className="mb-4">
-        <Link href="/campaigns" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
+        <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
           ← Back to Campaigns
         </Link>
       </div>

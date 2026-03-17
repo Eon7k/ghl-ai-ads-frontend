@@ -121,10 +121,10 @@ export default function BackendCheckPage() {
             </div>
 
         <Link
-          href="/campaigns"
+          href="/"
           className="inline-block mt-4 text-blue-600 underline hover:no-underline"
         >
-          Go to Campaigns
+          Go to Home
         </Link>
           </div>
         )}
