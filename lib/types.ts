@@ -40,14 +40,15 @@ export type Experiment = {
 
 export type CreateExperimentBody = {
   name: string;
+  /** Single platform (used if platforms not provided). */
   platform: string;
+  /** Optional: run same campaign on multiple platforms; one experiment created per platform. */
+  platforms?: ("meta" | "google" | "tiktok")[];
   totalDailyBudget: number;
   prompt: string;
   variantCount: number;
   creativesSource?: CreativesSource;
-  /** "openai" | "anthropic" | "split" — split = half OpenAI, half Anthropic */
   aiProvider?: "openai" | "anthropic" | "split";
-  /** Optional: describe how you want the ad image/creative to look (used for AI-generated creatives). */
   creativePrompt?: string;
 };
 

@@ -2,25 +2,154 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { getToken } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment } from "@/lib/types";
+import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 
+const BACKEND_URL =
+  typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || ""
+    : "";
+
+const PLATFORMS: { id: "meta" | "google" | "tiktok"; name: string }[] = [
+  { id: "meta", name: "Meta (Facebook & Instagram)" },
+  { id: "google", name: "Google Ads" },
+  { id: "tiktok", name: "TikTok Ads" },
+];
+
 export function HomeClient() {
-  const { user, loading, logout } = useAuth();
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
+  const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [integrationsLoading, setIntegrationsLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<("meta" | "google" | "tiktok")[]>(["meta"]);
+  const [name, setName] = useState("");
+  const [budget, setBudget] = useState("30");
+  const [prompt, setPrompt] = useState("");
+  const [variantCount, setVariantCount] = useState(10);
+  const [creativesSource, setCreativesSource] = useState<"ai" | "own">("ai");
+  const [aiCreativePercent, setAiCreativePercent] = useState(0);
+  const [creativePrompt, setCreativePrompt] = useState("");
+  const [aiProvider, setAiProvider] = useState<"openai" | "anthropic" | "split">("split");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createStatus, setCreateStatus] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const connectedPlatforms = PLATFORMS.filter((p) => integrations.some((i) => i.platform === p.id));
 
   useEffect(() => {
     if (!user) return;
     setCampaignsLoading(true);
-    api
-      .listExperiments()
-      .then(setCampaigns)
-      .catch(() => setCampaigns([]))
-      .finally(() => setCampaignsLoading(false));
+    api.listExperiments().then(setCampaigns).catch(() => setCampaigns([])).finally(() => setCampaignsLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    setIntegrationsLoading(true);
+    api.integrations.list().then(setIntegrations).catch(() => setIntegrations([])).finally(() => setIntegrationsLoading(false));
+  }, [user]);
+
+  function togglePlatform(p: "meta" | "google" | "tiktok") {
+    const connected = integrations.some((i) => i.platform === p);
+    if (!connected) return;
+    setSelectedPlatforms((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    );
+  }
+
+  function connectTo(platform: "meta" | "google" | "tiktok") {
+    const token = getToken();
+    if (!token) return;
+    const path = `/integrations/${platform}/connect?token=${encodeURIComponent(token)}`;
+    window.location.href = `${BACKEND_URL.replace(/\/$/, "")}${path}`;
+  }
+
+  async function handleCreateSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    setCreateLoading(true);
+    setCreateStatus("Creating campaign…");
+    const totalDailyBudget = Number(budget);
+    const count = Number(variantCount);
+    if (count < 1 || count > 20) {
+      setCreateError("Number of ad variants must be between 1 and 20.");
+      setCreateLoading(false);
+      setCreateStatus("");
+      return;
+    }
+    const platformsToUse = selectedPlatforms.length > 0 ? selectedPlatforms : (connectedPlatforms[0] ? [connectedPlatforms[0].id] : []);
+    if (platformsToUse.length === 0) {
+      setCreateError("Select at least one platform (or connect one in the bar above).");
+      setCreateLoading(false);
+      setCreateStatus("");
+      return;
+    }
+
+    try {
+      const experiment = await api.createExperiment({
+        name,
+        platform: platformsToUse[0],
+        platforms: platformsToUse.length > 1 ? platformsToUse : undefined,
+        totalDailyBudget,
+        prompt: prompt.trim() || "Generate varied ad copy for this campaign.",
+        variantCount: count,
+        creativesSource,
+        aiProvider: creativesSource === "ai" ? aiProvider : undefined,
+        creativePrompt: creativePrompt.trim() || undefined,
+      });
+
+      const variants = experiment.variants || [];
+      const createdIds = (experiment as Experiment & { createdExperimentIds?: string[] }).createdExperimentIds || [experiment.id];
+      const creativeCount = Math.min(Math.round((variants.length * aiCreativePercent) / 100), variants.length);
+
+      if (creativeCount > 0) {
+        for (let i = 0; i < creativeCount; i++) {
+          setCreateStatus(`Generating creatives ${i + 1} of ${creativeCount}…`);
+          try {
+            await api.generateVariantCreative(experiment.id, variants[i].id);
+          } catch {
+            // continue
+          }
+        }
+      }
+
+      setCreateOpen(false);
+      setCreateLoading(false);
+      setCreateStatus("");
+      setCampaigns((prev) => [...prev, experiment]);
+      if (createdIds.length > 1) {
+        setCampaignsLoading(true);
+        api.listExperiments().then(setCampaigns).finally(() => setCampaignsLoading(false));
+      }
+      router.push(`/campaigns/${experiment.id}`);
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create campaign");
+    } finally {
+      setCreateLoading(false);
+      setCreateStatus("");
+    }
+  }
+
+  function resetCreateForm() {
+    setName("");
+    setBudget("30");
+    setPrompt("");
+    setVariantCount(10);
+    setCreativesSource("ai");
+    setAiCreativePercent(0);
+    setCreativePrompt("");
+    setAiProvider("split");
+    setSelectedPlatforms(connectedPlatforms.length ? [connectedPlatforms[0].id] : []);
+    setCreateError(null);
+  }
 
   if (loading) {
     return (
@@ -30,134 +159,236 @@ export function HomeClient() {
     );
   }
 
-  if (user) {
-    const launchedCount = campaigns.filter((c) => c.status === "launched").length;
+  if (!user) {
     return (
-      <>
-        <AppNav />
-        <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
-              Welcome back
-            </h1>
-            <p className="mt-1 text-zinc-500">
-              Manage your campaigns and ad accounts from one place.
-            </p>
-          </div>
-
-          {/* Quick stats */}
-          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-zinc-500">Total campaigns</p>
-              <p className="mt-1 text-2xl font-semibold text-zinc-900">
-                {campaignsLoading ? "—" : campaigns.length}
-              </p>
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-zinc-500">Launched</p>
-              <p className="mt-1 text-2xl font-semibold text-zinc-900">
-                {campaignsLoading ? "—" : launchedCount}
-              </p>
-            </div>
-          </div>
-
-          {/* Primary actions */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
+        <main className="w-full max-w-md text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">AI Ad Manager</h1>
+          <p className="mt-3 text-zinc-600">
+            Create and manage campaigns, generate ad copy with AI, and optimize budgets.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
             <Link
-              href="/campaigns"
-              className="group relative overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:border-zinc-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              href="/login"
+              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-8 py-3.5 font-semibold text-white shadow-sm hover:bg-blue-700"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-zinc-900">Campaigns</h2>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    Create, edit, and launch campaigns. View performance and adjust budgets.
-                  </p>
-                  <span className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 group-hover:text-blue-700">
-                    Open Campaigns
-                    <svg className="ml-1 h-4 w-4 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
-                </div>
-                <div className="rounded-lg bg-blue-50 p-3 text-blue-600">
-                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </div>
-              </div>
+              Log in
             </Link>
-
             <Link
-              href="/integrations"
-              className="group relative overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:border-zinc-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              href="/signup"
+              className="inline-flex items-center justify-center rounded-xl border-2 border-zinc-300 bg-white px-8 py-3.5 font-semibold text-zinc-700 hover:bg-zinc-50"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-zinc-900">Integrations</h2>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    Connect Meta, Google, or TikTok to run and track campaigns.
-                  </p>
-                  <span className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 group-hover:text-blue-700">
-                    Manage connections
-                    <svg className="ml-1 h-4 w-4 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
-                </div>
-                <div className="rounded-lg bg-zinc-100 p-3 text-zinc-600">
-                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.172-1.172a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.172 1.172a4 4 0 01-5.656 0L11.29 7.29a4 4 0 010-5.656z" />
-                  </svg>
-                </div>
-              </div>
-            </Link>
-          </div>
-
-          {/* Secondary */}
-          <div className="mt-8 border-t border-zinc-200 pt-8">
-            <Link
-              href="/backend-check"
-              className="text-sm text-zinc-500 hover:text-zinc-700 hover:underline"
-            >
-              Check backend connection
+              Sign up
             </Link>
           </div>
         </main>
-      </>
+      </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
-      <main className="w-full max-w-md text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
-          AI Ad Manager
-        </h1>
-        <p className="mt-3 text-zinc-600">
-          Create and manage campaigns, generate ad copy with AI, and optimize budgets.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-8 py-3.5 font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Log in
-          </Link>
-          <Link
-            href="/signup"
-            className="inline-flex items-center justify-center rounded-xl border-2 border-zinc-300 bg-white px-8 py-3.5 font-semibold text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2"
-          >
-            Sign up
-          </Link>
-        </div>
-        <Link
-          href="/backend-check"
-          className="mt-6 inline-block text-sm text-zinc-500 hover:text-zinc-700 hover:underline"
-        >
-          Check backend connection
-        </Link>
+    <>
+      <AppNav />
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* Integration bar — cards in a row at top */}
+        <section className="mb-8">
+          <div className="flex flex-wrap items-stretch gap-3">
+            {PLATFORMS.map((p) => {
+              const connected = integrations.some((i) => i.platform === p.id);
+              return (
+                <div
+                  key={p.id}
+                  className="flex min-w-[140px] flex-1 basis-0 items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
+                >
+                  <IntegrationLogo platform={p.id} size={40} className="shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-zinc-900">{p.name}</p>
+                    {connected ? (
+                      <span className="text-xs text-green-600">Connected</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => connectTo(p.id)}
+                        disabled={!BACKEND_URL}
+                        className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!BACKEND_URL && (
+            <p className="mt-2 text-sm text-amber-700">
+              Set NEXT_PUBLIC_BACKEND_URL to enable Connect. <Link href="/integrations" className="underline">Manage in Integrations</Link>
+            </p>
+          )}
+        </section>
+
+        {/* Launch a campaign */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-zinc-900">Launch a campaign</h2>
+          <p className="mt-0.5 text-sm text-zinc-500">
+            Choose one or more platforms to run the same campaign on.
+          </p>
+
+          {/* Platform multi-select */}
+          <div className="mt-3 flex flex-wrap gap-3">
+            {PLATFORMS.map((p) => {
+              const connected = integrations.some((i) => i.platform === p.id);
+              const selected = selectedPlatforms.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => connected && togglePlatform(p.id)}
+                  disabled={!connected}
+                  className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 transition ${
+                    connected
+                      ? selected
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-zinc-200 bg-white hover:border-zinc-300"
+                      : "cursor-not-allowed border-zinc-100 bg-zinc-50 opacity-60"
+                  }`}
+                >
+                  <IntegrationLogo platform={p.id} size={28} />
+                  <span className="font-medium text-zinc-900">{p.name}</span>
+                  {selected && <span className="text-blue-600">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {connectedPlatforms.length === 0 && (
+            <p className="mt-3 text-sm text-amber-700">
+              Connect at least one platform above to create a campaign. <Link href="/integrations" className="font-medium text-amber-900 underline">Go to Integrations</Link>
+            </p>
+          )}
+
+          {/* Create form (expandable) */}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setCreateOpen((o) => !o);
+                if (!createOpen) resetCreateForm();
+              }}
+              disabled={connectedPlatforms.length === 0}
+              className="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4 text-left shadow-sm hover:border-zinc-300 hover:shadow-md disabled:opacity-60"
+            >
+              <span className="font-semibold text-zinc-900">New campaign</span>
+              <svg className={`h-5 w-5 text-zinc-500 ${createOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {createOpen && (
+              <div className="mt-2 overflow-hidden rounded-b-xl border border-t-0 border-zinc-200 bg-white p-5 shadow-sm">
+                <form onSubmit={handleCreateSubmit} className="space-y-4">
+                  {createError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{createError}</div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Campaign name</label>
+                    <input className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Sale" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Creatives</label>
+                    <div className="mt-1 flex gap-4">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input type="radio" name="creativesSource" checked={creativesSource === "ai"} onChange={() => setCreativesSource("ai")} className="rounded" />
+                        <span className="text-sm">AI-generated</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input type="radio" name="creativesSource" checked={creativesSource === "own"} onChange={() => setCreativesSource("own")} className="rounded" />
+                        <span className="text-sm">My own copy</span>
+                      </label>
+                    </div>
+                  </div>
+                  {creativesSource === "ai" && (
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700">Ad copy AI</label>
+                      <select className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as "openai" | "anthropic" | "split")}>
+                        <option value="openai">OpenAI only</option>
+                        <option value="anthropic">Anthropic only</option>
+                        <option value="split">Split (half each)</option>
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Ad idea / prompt</label>
+                    <textarea className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-300 px-3 py-2" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai"} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Variants</label>
+                    <input type="number" min={1} max={20} className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={variantCount} onChange={(e) => setVariantCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">AI images % of variants: {aiCreativePercent}%</label>
+                    <input type="range" min={0} max={100} value={aiCreativePercent} onChange={(e) => setAiCreativePercent(Number(e.target.value))} className="mt-1 h-2 w-full accent-violet-600" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Creative description (optional)</label>
+                    <textarea className="mt-1 min-h-[60px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700">Daily budget: ${budget}</label>
+                    <input type="range" min={5} max={500} step={5} value={budget} onChange={(e) => setBudget(e.target.value)} className="mt-1 h-2 w-full accent-blue-600" />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button type="submit" disabled={createLoading || selectedPlatforms.length === 0} className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                      {createLoading ? createStatus || "Creating…" : selectedPlatforms.length > 1 ? `Create on ${selectedPlatforms.length} platforms` : "Create campaign"}
+                    </button>
+                    <button type="button" onClick={() => setCreateOpen(false)} disabled={createLoading} className="rounded-lg border border-zinc-300 bg-white px-5 py-2.5 font-medium text-zinc-700 hover:bg-zinc-50">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Campaign list */}
+        <section>
+          <h2 className="text-lg font-semibold text-zinc-900">Your campaigns</h2>
+          {campaignsLoading ? (
+            <div className="mt-4 flex justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
+            </div>
+          ) : campaigns.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">No campaigns yet. Use “New campaign” above to create one.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {campaigns.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/campaigns/${c.id}`} className="block rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-zinc-900">{c.name}</p>
+                        <p className="text-sm text-zinc-500">
+                          {c.platform.charAt(0).toUpperCase() + c.platform.slice(1)} · ${c.totalDailyBudget}/day
+                          {c.variantCount != null && ` · ${c.variantCount} variant${c.variantCount === 1 ? "" : "s"}`}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${c.status === "launched" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                        {c.status === "draft" ? "Draft" : "Launched"}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-4">
+            <Link href="/campaigns" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+              View all campaigns →
+            </Link>
+          </p>
+        </section>
       </main>
-    </div>
+    </>
   );
 }

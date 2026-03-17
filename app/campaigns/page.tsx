@@ -27,6 +27,7 @@ export default function CampaignsPage() {
   // Form state for new campaign
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<"meta" | "google" | "tiktok">("meta");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<("meta" | "google" | "tiktok")[]>(["meta"]);
   const [budget, setBudget] = useState("30");
   const [prompt, setPrompt] = useState("");
   const [variantCount, setVariantCount] = useState(10);
@@ -83,10 +84,12 @@ export default function CampaignsPage() {
       return;
     }
 
+    const platformsToUse = selectedPlatforms.length > 0 ? selectedPlatforms : [platform];
     try {
       const experiment = await api.createExperiment({
         name,
-        platform,
+        platform: platformsToUse[0],
+        platforms: platformsToUse.length > 1 ? platformsToUse : undefined,
         totalDailyBudget,
         prompt: prompt.trim() || "Generate varied ad copy for this campaign.",
         variantCount: count,
@@ -115,6 +118,11 @@ export default function CampaignsPage() {
       setCreateOpen(false);
       setCreateLoading(false);
       setCreateStatus("");
+      const createdIds = (experiment as Experiment & { createdExperimentIds?: string[] }).createdExperimentIds;
+      if (createdIds && createdIds.length > 1) {
+        const data = await api.listExperiments();
+        setCampaigns(data);
+      }
       router.push(`/campaigns/${experiment.id}`);
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Failed to create campaign");
@@ -140,6 +148,7 @@ export default function CampaignsPage() {
 
   function selectPlatform(p: "meta" | "google" | "tiktok") {
     setPlatform(p);
+    setSelectedPlatforms([p]);
     setPlatformSelected(true);
   }
 
@@ -238,7 +247,9 @@ export default function CampaignsPage() {
                     <div>
                       <h2 className="text-lg font-semibold text-zinc-900">New campaign</h2>
                       <p className="mt-0.5 text-sm text-zinc-500">
-                        Platform: {PLATFORMS.find((p) => p.id === platform)?.name ?? platform}
+                        {selectedPlatforms.length > 1
+                          ? `Run on ${selectedPlatforms.length} platforms: ${selectedPlatforms.map((id) => PLATFORMS.find((p) => p.id === id)?.name ?? id).join(", ")}`
+                          : `Platform: ${PLATFORMS.find((p) => p.id === platform)?.name ?? platform}`}
                       </p>
                     </div>
                     <button
@@ -248,6 +259,28 @@ export default function CampaignsPage() {
                     >
                       Change platform
                     </button>
+                  </div>
+                  <div className="border-b border-zinc-100 px-5 py-3">
+                    <p className="text-xs font-medium text-zinc-500">Run on (select one or more)</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {PLATFORMS.map((p) => {
+                        const connected = integrations.some((i) => i.platform === p.id);
+                        const selected = selectedPlatforms.includes(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => connected && (selectedPlatforms.includes(p.id) ? setSelectedPlatforms((prev) => prev.filter((x) => x !== p.id)) : setSelectedPlatforms((prev) => [...prev, p].sort()))}
+                            disabled={!connected}
+                            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm ${connected ? (selected ? "border-blue-500 bg-blue-50 text-blue-800" : "border-zinc-200 hover:border-zinc-300") : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400"}`}
+                          >
+                            <IntegrationLogo platform={p.id} size={20} />
+                            {p.name}
+                            {selected && " ✓"}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <form onSubmit={handleCreateSubmit} className="p-5 space-y-5">
                     {createError && (
