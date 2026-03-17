@@ -44,7 +44,8 @@ export default function CampaignDetailPage() {
         setExperiment(data);
         const copies: Record<string, string> = {};
         (data.variants || []).forEach((v) => {
-          copies[v.id] = v.copy;
+          const text = (v.copy != null && String(v.copy).trim()) ? String(v.copy).trim() : "";
+          copies[v.id] = text || `Variant ${v.index} — Ad copy`;
         });
         setVariantCopies(copies);
       } catch (e) {
@@ -56,6 +57,25 @@ export default function CampaignDetailPage() {
     load();
     return () => { cancelled = true; };
   }, [id]);
+
+  // When server sends empty copy, fill from server + fallback so preview isn't blank on first paint
+  useEffect(() => {
+    if (!experiment?.variants?.length) return;
+    setVariantCopies((prev) => {
+      let next: Record<string, string> | null = null;
+      for (const v of experiment.variants!) {
+        const serverCopy = (v.copy != null && String(v.copy).trim()) ? String(v.copy).trim() : "";
+        const fallback = `Variant ${v.index} — Ad copy`;
+        const value = serverCopy || fallback;
+        const current = prev[v.id];
+        if (current === undefined || (typeof current === "string" && !current.trim())) {
+          if (!next) next = { ...prev };
+          next[v.id] = value;
+        }
+      }
+      return next ?? prev;
+    });
+  }, [experiment?.id, experiment?.variants]);
 
   // When launched, load metrics from backend (Meta when we have metaCampaignId, else placeholder)
   useEffect(() => {
