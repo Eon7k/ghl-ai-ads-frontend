@@ -317,7 +317,12 @@ export function HomeClient() {
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Google connected. You can launch Google Ads campaigns below.</div>
         )}
         {errorParam && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{decodeURIComponent(errorParam)}</div>
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p>{decodeURIComponent(errorParam)}</p>
+            <p className="mt-2 text-xs text-red-700">
+              If integrations sign-in keeps failing, check: you’re logged in, <strong>NEXT_PUBLIC_BACKEND_URL</strong> is set in the frontend (and redeployed on Vercel), backend has <strong>BACKEND_URL</strong>, <strong>FRONTEND_URL</strong>, and the platform’s app ID/secret (e.g. META_APP_ID, META_APP_SECRET). The redirect URI in Meta/Google/TikTok must match <strong>BACKEND_URL/integrations/meta/callback</strong> (or google/tiktok). See INTEGRATIONS_SIGNIN_TROUBLESHOOTING.md for details.
+            </p>
+          </div>
         )}
 
         {/* Integration bar — cards in a row at top */}
@@ -391,7 +396,9 @@ export function HomeClient() {
             })}
           </div>
           {!BACKEND_URL && (
-            <p className="mt-2 text-sm text-amber-700">Set NEXT_PUBLIC_BACKEND_URL to enable Connect.</p>
+            <p className="mt-2 text-sm text-amber-700">
+              Set <strong>NEXT_PUBLIC_BACKEND_URL</strong> (or NEXT_PUBLIC_API_URL) to your backend URL so Connect can redirect there. Use .env.local locally (e.g. <code className="rounded bg-amber-100 px-1">NEXT_PUBLIC_BACKEND_URL=http://localhost:4000</code>) and add it in Vercel → Environment Variables for production, then redeploy.
+            </p>
           )}
         </section>
 
