@@ -176,6 +176,13 @@ export const api = {
       body: { variantIds },
     }),
 
+  /** Swap creatives (images) between two variants. */
+  swapVariantCreatives: (experimentId: string, variantIdA: string, variantIdB: string) =>
+    request<{ variants: import("./types").AdVariant[] }>(`experiments/${experimentId}/variants/swap-creatives`, {
+      method: "POST",
+      body: { variantIdA, variantIdB },
+    }),
+
   /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx) and optional landingPageUrl. Use dryRun: true to create on Meta but leave paused (no spend). */
   launchExperiment: (
     id: string,

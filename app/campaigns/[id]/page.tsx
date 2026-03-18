@@ -42,6 +42,8 @@ export default function CampaignDetailPage() {
   const [metaTestResult, setMetaTestResult] = useState<{ ok: true; adAccountCount: number } | { ok: false; error: string } | null>(null);
   const [draggedVariantId, setDraggedVariantId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
+  const [draggedCreativeVariantId, setDraggedCreativeVariantId] = useState<string | null>(null);
+  const [swapCreativesLoading, setSwapCreativesLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -322,6 +324,35 @@ export default function CampaignDetailPage() {
     }
   }
 
+  async function handleSwapCreatives(variantIdA: string, variantIdB: string) {
+    if (!experiment || variantIdA === variantIdB) return;
+    setSwapCreativesLoading(true);
+    try {
+      const { variants: updated } = await api.swapVariantCreatives(experiment.id, variantIdA, variantIdB);
+      setExperiment((prev) => {
+        if (!prev?.variants) return prev;
+        const byId = new Map(updated.map((u) => [u.id, u]));
+        return { ...prev, variants: prev.variants.map((v) => byId.get(v.id) ?? v) };
+      });
+      setCreativeUrls((prev) => {
+        const next = { ...prev };
+        [variantIdA, variantIdB].forEach((id) => {
+          if (next[id]) URL.revokeObjectURL(next[id]);
+          delete next[id];
+        });
+        return next;
+      });
+      const [urlA, urlB] = await Promise.all([
+        api.getVariantCreativeBlobUrl(experiment.id, variantIdA),
+        api.getVariantCreativeBlobUrl(experiment.id, variantIdB),
+      ]);
+      setCreativeUrls((prev) => ({ ...prev, [variantIdA]: urlA, [variantIdB]: urlB }));
+    } finally {
+      setSwapCreativesLoading(false);
+      setDraggedCreativeVariantId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -349,14 +380,15 @@ export default function CampaignDetailPage() {
       : null;
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <div className="mb-4">
-        <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
-          ← Back to Campaigns
-        </Link>
-      </div>
+    <>
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-4">
+          <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
+            ← Back to Campaigns
+          </Link>
+        </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">{experiment.name}</h1>
           <p className="text-zinc-600 text-sm mt-1">
@@ -605,25 +637,25 @@ export default function CampaignDetailPage() {
         </>
       )}
 
-      {experiment.prompt && (
-        <div className="mt-6 rounded-lg bg-zinc-100 p-4">
-          <p className="text-sm font-medium text-zinc-700">Ad idea / prompt</p>
-          <p className="text-zinc-600 text-sm mt-1">{experiment.prompt}</p>
-        </div>
-      )}
+        {experiment.prompt && (
+          <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-zinc-700">Ad idea / prompt</p>
+            <p className="mt-1 text-sm text-zinc-600">{experiment.prompt}</p>
+          </section>
+        )}
 
-      <div className="mt-6">
-        <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
-        <p className="mb-4 text-sm text-zinc-600">
-          {experiment.creativesSource === "own"
-            ? "Paste your ad copy for each variant and click Save. When ready, click Launch campaign."
-            : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. Drag the handle to reorder. When ready, click Launch campaign."}
-        </p>
+        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
+          <p className="mb-4 text-sm text-zinc-600">
+            {experiment.creativesSource === "own"
+              ? "Paste your ad copy for each variant and click Save. When ready, click Launch campaign."
+              : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. Drag the handle to reorder variants; drag a creative onto another to swap images. When ready, click Launch campaign."}
+          </p>
 
-        {sortedVariants.length === 0 ? (
-          <p className="text-zinc-500">No variants yet. Create this campaign again from the new campaign flow.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {sortedVariants.length === 0 ? (
+            <p className="text-zinc-500">No variants yet. Create this campaign again from the new campaign flow.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {sortedVariants.map((v) => (
               <div
                 key={v.id}
@@ -641,6 +673,7 @@ export default function CampaignDetailPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   e.currentTarget.removeAttribute("data-drop-target");
+                  if (e.dataTransfer.getData("application/x-variant-creative")) return;
                   const draggedId = e.dataTransfer.getData("text/plain");
                   if (draggedId && draggedId !== v.id) handleVariantReorder(draggedId, v.id);
                 }}
@@ -718,11 +751,41 @@ export default function CampaignDetailPage() {
                       </button>
                     )}
                   </div>
-                  <AdPreview
-                    copy={variantCopies[v.id] ?? v.copy}
-                    platform={experiment.platform}
-                    imageUrl={creativeUrls[v.id] ?? null}
-                  />
+                  <div
+                    className={`rounded-lg border transition-colors ${
+                      draggedCreativeVariantId === v.id ? "border-blue-400 bg-blue-50/50" : "border-transparent"
+                    } ${
+                      draggedCreativeVariantId && draggedCreativeVariantId !== v.id ? "border-dashed border-zinc-300 bg-zinc-50/50" : ""
+                    } ${(v.hasCreative || creativeUrls[v.id]) ? "cursor-grab active:cursor-grabbing" : ""}`}
+                    draggable={!!(v.hasCreative || creativeUrls[v.id]) && !swapCreativesLoading}
+                    onDragStart={(e) => {
+                      if (!(v.hasCreative || creativeUrls[v.id])) return;
+                      setDraggedCreativeVariantId(v.id);
+                      e.dataTransfer.setData("application/x-variant-creative", v.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => setDraggedCreativeVariantId(null)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const sourceId = e.dataTransfer.getData("application/x-variant-creative");
+                      if (!sourceId || sourceId === v.id) return;
+                      handleSwapCreatives(sourceId, v.id);
+                    }}
+                  >
+                    <AdPreview
+                      copy={variantCopies[v.id] ?? v.copy}
+                      platform={experiment.platform}
+                      imageUrl={creativeUrls[v.id] ?? null}
+                    />
+                  </div>
+                  {(v.hasCreative || creativeUrls[v.id]) && (
+                    <p className="mt-1 text-[10px] text-zinc-400">Drag creative onto another variant to swap</p>
+                  )}
                 </div>
                 <textarea
                   className="min-h-[80px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -734,9 +797,10 @@ export default function CampaignDetailPage() {
                 />
               </div>
             ))}
-          </div>
-        )}
-      </div>
-    </div>
+            </div>
+          )}
+        </section>
+      </main>
+    </>
   );
 }
