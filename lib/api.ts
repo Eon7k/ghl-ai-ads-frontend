@@ -5,8 +5,18 @@
  */
 
 import { getToken } from "./auth";
+import { getViewingAs } from "./viewingAs";
 
 const API_BASE = "/api/proxy";
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+  const token = getToken();
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  const viewingAs = getViewingAs();
+  if (viewingAs) h["X-Viewing-As"] = viewingAs;
+  return h;
+}
 
 async function request<T>(
   path: string,
@@ -16,10 +26,7 @@ async function request<T>(
   const url = `${API_BASE}/${path.replace(/^\//, "")}`;
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (!skipAuth) {
-    const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-  }
+  if (!skipAuth) Object.assign(headers, authHeaders());
   const res = await fetch(url, {
     method,
     headers: Object.keys(headers).length ? headers : undefined,
@@ -37,7 +44,12 @@ async function request<T>(
 
 export type AuthUser = { id: string; email: string };
 export type LoginResponse = { token: string; user: AuthUser };
-export type MeResponse = { user: AuthUser; isAdmin?: boolean };
+export type MeResponse = {
+  user: AuthUser;
+  isAdmin?: boolean;
+  accountType?: "single" | "agency";
+  clients?: { id: string; email: string }[];
+};
 
 export type AdminOverview = {
   totalUsers: number;
@@ -73,10 +85,32 @@ export const api = {
     me: () => request<MeResponse>("auth/me"),
   },
 
-  /** Admin-only: overview and AI performance. Requires admin email in backend ADMIN_EMAILS. */
+  /** Admin-only: overview, AI performance, users, and agency clients. */
   admin: {
     overview: () => request<AdminOverview>("admin/overview"),
     aiPerformance: () => request<AdminAiPerformance>("admin/ai-performance"),
+    listUsers: () =>
+      request<{ users: { id: string; email: string; accountType: string; createdAt: string }[] }>("admin/users").then(
+        (r) => r.users
+      ),
+    updateUserAccountType: (userId: string, accountType: "single" | "agency") =>
+      request<{ ok: boolean; accountType: string }>(`admin/users/${userId}`, {
+        method: "PATCH",
+        body: { accountType },
+      }),
+    listAgencyClients: (agencyUserId: string) =>
+      request<{ clients: { id: string; email: string }[] }>(`admin/agencies/${agencyUserId}/clients`).then(
+        (r) => r.clients
+      ),
+    addAgencyClient: (agencyUserId: string, emailOrId: string) =>
+      request<{ client: { id: string; email: string } }>(`admin/agencies/${agencyUserId}/clients`, {
+        method: "POST",
+        body: emailOrId.includes("@") ? { email: emailOrId } : { clientUserId: emailOrId },
+      }),
+    removeAgencyClient: (agencyUserId: string, clientUserId: string) =>
+      request<{ ok: boolean }>(`admin/agencies/${agencyUserId}/clients/${clientUserId}`, {
+        method: "DELETE",
+      }),
   },
 
   /** List all experiments (requires auth) */
@@ -113,21 +147,25 @@ export const api = {
 
   /** Get blob URL for variant creative image (for use in <img src>. Caller should revoke the URL when done.) */
   getVariantCreativeBlobUrl: async (experimentId: string, variantId: string): Promise<string> => {
-    const token = getToken();
     const url = `${API_BASE}/experiments/${experimentId}/variants/${variantId}/creative`;
-    const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) throw new Error("Failed to load creative");
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   },
 
-  /** Mark experiment as launched; optional aiCreativeCount = how many variants get AI creatives at launch */
-  launchExperiment: (id: string, options?: { aiCreativeCount?: number }) =>
+  /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx) and optional landingPageUrl to create live campaign. */
+  launchExperiment: (
+    id: string,
+    options?: { aiCreativeCount?: number; metaAdAccountId?: string; landingPageUrl?: string }
+  ) =>
     request<import("./types").Experiment>(`experiments/${id}/launch`, {
       method: "POST",
-      body: options?.aiCreativeCount != null ? { aiCreativeCount: options.aiCreativeCount } : {},
+      body: {
+        ...(options?.aiCreativeCount != null && { aiCreativeCount: options.aiCreativeCount }),
+        ...(options?.metaAdAccountId && { metaAdAccountId: options.metaAdAccountId }),
+        ...(options?.landingPageUrl && { landingPageUrl: options.landingPageUrl }),
+      },
     }),
 
   /** Get campaign metrics (full Meta-style) for a launched campaign. Source is "meta" or "placeholder". */
@@ -162,9 +200,8 @@ export const api = {
     /** Returns a URL that loads the creative image (via proxy). Call revokeObjectURL when done if you created one. */
     /** Fetch creative image with auth; returns object URL. Call URL.revokeObjectURL when done. */
     getAssetBlobUrl: async (id: string): Promise<string> => {
-      const token = getToken();
       const res = await fetch(`${API_BASE}/creatives/${id}/asset`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders(),
       });
       if (!res.ok) throw new Error("Failed to load creative");
       const blob = await res.blob();

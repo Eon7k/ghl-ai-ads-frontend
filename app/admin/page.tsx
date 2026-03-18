@@ -36,7 +36,7 @@ export default function AdminPage() {
 
   const loadAgencyClients = useCallback(async (agencyUserId: string) => {
     try {
-      const { clients } = await api.admin.listAgencyClients(agencyUserId);
+      const clients = await api.admin.listAgencyClients(agencyUserId);
       setAgencyClients((prev) => ({ ...prev, [agencyUserId]: clients }));
     } catch {
       setAgencyClients((prev) => ({ ...prev, [agencyUserId]: [] }));
