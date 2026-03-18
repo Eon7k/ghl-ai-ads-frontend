@@ -113,6 +113,21 @@ export const api = {
       }),
   },
 
+  /** Agency self-serve clients (agency account only) */
+  agency: {
+    listClients: () =>
+      request<{ clients: { id: string; email: string; loginDisabled: boolean; createdAt: string }[] }>("agency/clients").then(
+        (r) => r.clients
+      ),
+    addClient: (email: string, allowLogin: boolean) =>
+      request<{ client: { id: string; email: string; loginDisabled: boolean }; tempPassword?: string }>("agency/clients", {
+        method: "POST",
+        body: { email, allowLogin },
+      }),
+    removeClient: (clientUserId: string) =>
+      request<{ ok: boolean }>(`agency/clients/${clientUserId}`, { method: "DELETE" }),
+  },
+
   /** List all experiments (requires auth) */
   listExperiments: () => request<import("./types").Experiment[]>("experiments"),
 
