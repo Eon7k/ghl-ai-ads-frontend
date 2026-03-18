@@ -1,15 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type AdminOverview, type AdminAiPerformance } from "@/lib/api";
+
+type AdminUser = { id: string; email: string; accountType: string; createdAt: string };
 
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [aiPerf, setAiPerf] = useState<AdminAiPerformance | null>(null);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [expandedAgencyId, setExpandedAgencyId] = useState<string | null>(null);
+  const [agencyClients, setAgencyClients] = useState<Record<string, { id: string; email: string }[]>>({});
+  const [addClientEmail, setAddClientEmail] = useState<Record<string, string>>({});
+  const [addingClientFor, setAddingClientFor] = useState<string | null>(null);
+  const [removingClient, setRemovingClient] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState("");
+
+  const filteredUsers = userSearch.trim()
+    ? adminUsers.filter((u) => u.email.toLowerCase().includes(userSearch.trim().toLowerCase()))
+    : adminUsers;
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const list = await api.admin.listUsers();
+      setAdminUsers(list);
+    } catch {
+      setAdminUsers([]);
+    }
+  }, []);
+
+  const loadAgencyClients = useCallback(async (agencyUserId: string) => {
+    try {
+      const { clients } = await api.admin.listAgencyClients(agencyUserId);
+      setAgencyClients((prev) => ({ ...prev, [agencyUserId]: clients }));
+    } catch {
+      setAgencyClients((prev) => ({ ...prev, [agencyUserId]: [] }));
+    }
+  }, []);
 
   useEffect(() => {
     if (!user || !isAdmin) {
@@ -19,10 +51,15 @@ export default function AdminPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, ai] = await Promise.all([api.admin.overview(), api.admin.aiPerformance()]);
+        const [ov, ai, users] = await Promise.all([
+          api.admin.overview(),
+          api.admin.aiPerformance(),
+          api.admin.listUsers(),
+        ]);
         if (!cancelled) {
           setOverview(ov);
           setAiPerf(ai);
+          setAdminUsers(users);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load admin data");
@@ -74,6 +111,147 @@ export default function AdminPage() {
         <p className="mt-6 text-zinc-500">Loading admin data…</p>
       ) : (
         <div className="mt-8 space-y-10">
+          {/* All users – search and change account type */}
+          <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-zinc-900">All users</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Search by email and set account type to Single or Agency. Agency users can be assigned clients below.
+            </p>
+            <div className="mt-4">
+              <input
+                type="text"
+                placeholder="Search by email…"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full max-w-md rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              />
+              <p className="mt-2 text-xs text-zinc-500">
+                Showing {filteredUsers.length} of {adminUsers.length} user{adminUsers.length !== 1 ? "s" : ""}
+                {userSearch.trim() ? " (filtered by search)" : ""}
+              </p>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-200 text-left">
+                    <th className="pb-2 font-medium text-zinc-700">Email</th>
+                    <th className="pb-2 font-medium text-zinc-700">Account type</th>
+                    <th className="pb-2 font-medium text-zinc-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-zinc-500">
+                        {adminUsers.length === 0 ? "No users yet." : "No users match your search."}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <tr key={u.id} className="border-b border-zinc-100">
+                        <td className="py-3 text-zinc-900">{u.email}</td>
+                        <td className="py-3">
+                          <select
+                            value={u.accountType || "single"}
+                            disabled={updatingUserId !== null}
+                            onChange={async (e) => {
+                              const v = e.target.value as "single" | "agency";
+                              setUpdatingUserId(u.id);
+                              try {
+                                await api.admin.updateUserAccountType(u.id, v);
+                                setAdminUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, accountType: v } : x)));
+                              } finally {
+                                setUpdatingUserId(null);
+                              }
+                            }}
+                            className="rounded border border-zinc-300 bg-white px-2 py-1 text-zinc-800"
+                          >
+                            <option value="single">Single</option>
+                            <option value="agency">Agency</option>
+                          </select>
+                        </td>
+                        <td className="py-3">
+                          {(u.accountType || "single") === "agency" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = expandedAgencyId === u.id ? null : u.id;
+                                setExpandedAgencyId(next);
+                                if (next) loadAgencyClients(next);
+                              }}
+                              className="text-violet-600 hover:underline"
+                            >
+                              {expandedAgencyId === u.id ? "Hide clients" : "Manage clients"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {expandedAgencyId && (
+              <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/50 p-4">
+                <h3 className="text-sm font-medium text-violet-900">Clients for this agency</h3>
+                <ul className="mt-2 space-y-1">
+                  {(agencyClients[expandedAgencyId] ?? []).map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-zinc-800">{c.email}</span>
+                      <button
+                        type="button"
+                        disabled={removingClient !== null}
+                        onClick={async () => {
+                          setRemovingClient(c.id);
+                          try {
+                            await api.admin.removeAgencyClient(expandedAgencyId, c.id);
+                            await loadAgencyClients(expandedAgencyId);
+                          } finally {
+                            setRemovingClient(null);
+                          }
+                        }}
+                        className="text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        {removingClient === c.id ? "Removing…" : "Remove"}
+                      </button>
+                    </li>
+                  ))}
+                  {(!agencyClients[expandedAgencyId] || agencyClients[expandedAgencyId].length === 0) && (
+                    <li className="text-zinc-500">No clients assigned.</li>
+                  )}
+                </ul>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Client email to add"
+                    value={addClientEmail[expandedAgencyId] ?? ""}
+                    onChange={(e) => setAddClientEmail((prev) => ({ ...prev, [expandedAgencyId]: e.target.value }))}
+                    className="flex-1 rounded border border-zinc-300 px-2 py-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={addingClientFor !== null || !(addClientEmail[expandedAgencyId] ?? "").trim()}
+                    onClick={async () => {
+                      const email = (addClientEmail[expandedAgencyId] ?? "").trim();
+                      if (!email) return;
+                      setAddingClientFor(expandedAgencyId);
+                      try {
+                        await api.admin.addAgencyClient(expandedAgencyId, email);
+                        setAddClientEmail((prev) => ({ ...prev, [expandedAgencyId]: "" }));
+                        await loadAgencyClients(expandedAgencyId);
+                      } finally {
+                        setAddingClientFor(null);
+                      }
+                    }}
+                    className="rounded bg-violet-600 px-3 py-1 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {addingClientFor === expandedAgencyId ? "Adding…" : "Add client"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* Overview */}
           {overview && (
             <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
