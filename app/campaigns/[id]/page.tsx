@@ -38,6 +38,9 @@ export default function CampaignDetailPage() {
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [selectedMetaAdAccountId, setSelectedMetaAdAccountId] = useState<string>("");
   const [launchLandingPageUrl, setLaunchLandingPageUrl] = useState<string>("");
+  const [launchAsTest, setLaunchAsTest] = useState(false);
+  const [metaTestLoading, setMetaTestLoading] = useState(false);
+  const [metaTestResult, setMetaTestResult] = useState<{ ok: true; adAccountCount: number } | { ok: false; error: string } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -250,17 +253,31 @@ export default function CampaignDetailPage() {
     }
   }
 
+  async function testMetaConnection() {
+    setMetaTestLoading(true);
+    setMetaTestResult(null);
+    try {
+      const result = await api.integrations.testMetaConnection();
+      setMetaTestResult(result);
+    } catch (e) {
+      setMetaTestResult({ ok: false, error: e instanceof Error ? e.message : "Request failed" });
+    } finally {
+      setMetaTestLoading(false);
+    }
+  }
+
   async function launch() {
     if (!experiment || experiment.status === "launched") return;
     setLaunching(true);
     setLaunchError(null);
     const countWithCreatives = variants.filter((v) => v.hasCreative || creativeUrls[v.id]).length;
-    const opts: { aiCreativeCount: number; metaAdAccountId?: string; landingPageUrl?: string } = {
+    const opts: { aiCreativeCount: number; metaAdAccountId?: string; landingPageUrl?: string; dryRun?: boolean } = {
       aiCreativeCount: countWithCreatives,
     };
     if (experiment.platform === "meta" && selectedMetaAdAccountId) {
       opts.metaAdAccountId = selectedMetaAdAccountId;
       if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
+      if (launchAsTest) opts.dryRun = true;
     }
     try {
       const updated = await api.launchExperiment(experiment.id, opts);
@@ -357,6 +374,34 @@ export default function CampaignDetailPage() {
                             placeholder="https://example.com"
                             className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
                           />
+                          <div className="mt-2 flex flex-wrap items-center gap-3">
+                            <label className="flex items-center gap-2 text-sm text-zinc-700">
+                              <input
+                                type="checkbox"
+                                checked={launchAsTest}
+                                onChange={(e) => setLaunchAsTest(e.target.checked)}
+                                className="rounded border-zinc-300"
+                              />
+                              Launch as test (create on Meta but keep paused — no spend)
+                            </label>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={testMetaConnection}
+                              disabled={metaTestLoading}
+                              className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                            >
+                              {metaTestLoading ? "Testing…" : "Test Meta connection"}
+                            </button>
+                            {metaTestResult && (
+                              <span className={`text-xs ${metaTestResult.ok ? "text-green-700" : "text-red-700"}`}>
+                                {metaTestResult.ok
+                                  ? `Connected — ${metaTestResult.adAccountCount} ad account(s)`
+                                  : metaTestResult.error}
+                              </span>
+                            )}
+                          </div>
                         </>
                       )}
                     </>
@@ -370,7 +415,13 @@ export default function CampaignDetailPage() {
                   disabled={launching || variants.length === 0}
                   className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 >
-                  {launching ? "Launching…" : experiment.platform === "meta" && selectedMetaAdAccountId ? "Launch to Meta (live)" : "Launch campaign"}
+                  {launching
+                    ? "Launching…"
+                    : experiment.platform === "meta" && selectedMetaAdAccountId
+                      ? launchAsTest
+                        ? "Launch as test (no spend)"
+                        : "Launch to Meta (live)"
+                      : "Launch campaign"}
                 </button>
                 {launchError && (
                   <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

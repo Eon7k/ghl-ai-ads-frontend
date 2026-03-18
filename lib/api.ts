@@ -169,17 +169,18 @@ export const api = {
     return URL.createObjectURL(blob);
   },
 
-  /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx) and optional landingPageUrl to create live campaign. */
+  /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx) and optional landingPageUrl. Use dryRun: true to create on Meta but leave paused (no spend). */
   launchExperiment: (
     id: string,
-    options?: { aiCreativeCount?: number; metaAdAccountId?: string; landingPageUrl?: string }
+    options?: { aiCreativeCount?: number; metaAdAccountId?: string; landingPageUrl?: string; dryRun?: boolean }
   ) =>
-    request<import("./types").Experiment>(`experiments/${id}/launch`, {
+    request<import("./types").Experiment & { dryRun?: boolean }>(`experiments/${id}/launch`, {
       method: "POST",
       body: {
         ...(options?.aiCreativeCount != null && { aiCreativeCount: options.aiCreativeCount }),
         ...(options?.metaAdAccountId && { metaAdAccountId: options.metaAdAccountId }),
         ...(options?.landingPageUrl && { landingPageUrl: options.landingPageUrl }),
+        ...(options?.dryRun === true && { dryRun: true }),
       },
     }),
 
@@ -233,6 +234,9 @@ export const api = {
     /** Meta ad accounts (requires Meta connected) */
     getMetaAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/meta/ad-accounts").then((r) => r.adAccounts),
+    /** Test Meta connection (token + ad account access). Returns { ok, adAccountCount } or error. */
+    testMetaConnection: () =>
+      request<{ ok: true; adAccountCount: number } | { ok: false; error: string }>("integrations/meta/test"),
     /** TikTok ad accounts / advertisers (requires TikTok connected) */
     getTiktokAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/tiktok/ad-accounts").then((r) => r.adAccounts),
