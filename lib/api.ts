@@ -169,6 +169,13 @@ export const api = {
     return URL.createObjectURL(blob);
   },
 
+  /** Reorder variants. Pass variant ids in the desired order. */
+  reorderVariants: (experimentId: string, variantIds: string[]) =>
+    request<{ variants: import("./types").AdVariant[] }>(`experiments/${experimentId}/variants/reorder`, {
+      method: "PATCH",
+      body: { variantIds },
+    }),
+
   /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx) and optional landingPageUrl. Use dryRun: true to create on Meta but leave paused (no spend). */
   launchExperiment: (
     id: string,

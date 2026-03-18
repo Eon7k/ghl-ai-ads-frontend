@@ -38,9 +38,10 @@ export default function CampaignDetailPage() {
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [selectedMetaAdAccountId, setSelectedMetaAdAccountId] = useState<string>("");
   const [launchLandingPageUrl, setLaunchLandingPageUrl] = useState<string>("");
-  const [launchAsTest, setLaunchAsTest] = useState(false);
   const [metaTestLoading, setMetaTestLoading] = useState(false);
   const [metaTestResult, setMetaTestResult] = useState<{ ok: true; adAccountCount: number } | { ok: false; error: string } | null>(null);
+  const [draggedVariantId, setDraggedVariantId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -266,7 +267,7 @@ export default function CampaignDetailPage() {
     }
   }
 
-  async function launch() {
+  async function launch(dryRun: boolean) {
     if (!experiment || experiment.status === "launched") return;
     setLaunching(true);
     setLaunchError(null);
@@ -277,7 +278,7 @@ export default function CampaignDetailPage() {
     if (experiment.platform === "meta" && selectedMetaAdAccountId) {
       opts.metaAdAccountId = selectedMetaAdAccountId;
       if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
-      if (launchAsTest) opts.dryRun = true;
+      opts.dryRun = dryRun;
     }
     try {
       const updated = await api.launchExperiment(experiment.id, opts);
@@ -286,6 +287,38 @@ export default function CampaignDetailPage() {
       setLaunchError(e instanceof Error ? e.message : "Failed to launch");
     } finally {
       setLaunching(false);
+    }
+  }
+
+  function handleLaunchLive() {
+    if (!experiment || experiment.status === "launched") return;
+    const confirmed = window.confirm(
+      "Are you sure you want to launch this campaign live? It will start running on Meta and may incur spend."
+    );
+    if (confirmed) launch(false);
+  }
+
+  function handleLaunchDryRun() {
+    launch(true);
+  }
+
+  const sortedVariants = [...(experiment?.variants ?? [])].sort((a, b) => a.index - b.index);
+
+  async function handleVariantReorder(draggedId: string, dropTargetId: string) {
+    if (!experiment || draggedId === dropTargetId) return;
+    const list = [...sortedVariants];
+    const fromIdx = list.findIndex((v) => v.id === draggedId);
+    const toIdx = list.findIndex((v) => v.id === dropTargetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [removed] = list.splice(fromIdx, 1);
+    list.splice(toIdx, 0, removed);
+    const variantIds = list.map((v) => v.id);
+    setReordering(true);
+    try {
+      const { variants: updatedVariants } = await api.reorderVariants(experiment.id, variantIds);
+      setExperiment((prev) => (prev ? { ...prev, variants: updatedVariants } : null));
+    } finally {
+      setReordering(false);
     }
   }
 
@@ -374,17 +407,6 @@ export default function CampaignDetailPage() {
                             placeholder="https://example.com"
                             className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
                           />
-                          <div className="mt-2 flex flex-wrap items-center gap-3">
-                            <label className="flex items-center gap-2 text-sm text-zinc-700">
-                              <input
-                                type="checkbox"
-                                checked={launchAsTest}
-                                onChange={(e) => setLaunchAsTest(e.target.checked)}
-                                className="rounded border-zinc-300"
-                              />
-                              Launch as test (create on Meta but keep paused — no spend)
-                            </label>
-                          </div>
                           <div className="mt-2 flex items-center gap-2">
                             <button
                               type="button"
@@ -409,20 +431,35 @@ export default function CampaignDetailPage() {
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={launch}
-                  disabled={launching || variants.length === 0}
-                  className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                >
-                  {launching
-                    ? "Launching…"
-                    : experiment.platform === "meta" && selectedMetaAdAccountId
-                      ? launchAsTest
-                        ? "Launch as test (no spend)"
-                        : "Launch to Meta (live)"
-                      : "Launch campaign"}
-                </button>
+                {experiment.platform === "meta" && selectedMetaAdAccountId ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleLaunchLive}
+                      disabled={launching || variants.length === 0}
+                      className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {launching ? "Launching…" : "Launch (live)"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLaunchDryRun}
+                      disabled={launching || variants.length === 0}
+                      className="rounded-lg border border-zinc-300 bg-white px-4 py-2 font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      {launching ? "Launching…" : "Launch as dry run (no spend)"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => launch(false)}
+                    disabled={launching || variants.length === 0}
+                    className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {launching ? "Launching…" : "Launch campaign"}
+                  </button>
+                )}
                 {launchError && (
                   <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                     {launchError}
@@ -580,30 +617,69 @@ export default function CampaignDetailPage() {
         <p className="mb-4 text-sm text-zinc-600">
           {experiment.creativesSource === "own"
             ? "Paste your ad copy for each variant and click Save. When ready, click Launch campaign."
-            : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. When ready, click Launch campaign."}
+            : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. Drag the handle to reorder. When ready, click Launch campaign."}
         </p>
 
-        {variants.length === 0 ? (
+        {sortedVariants.length === 0 ? (
           <p className="text-zinc-500">No variants yet. Create this campaign again from the new campaign flow.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {variants.map((v) => (
+            {sortedVariants.map((v) => (
               <div
                 key={v.id}
-                className="flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
+                data-variant-id={v.id}
+                className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm ${
+                  draggedVariantId === v.id ? "border-blue-400 opacity-80" : "border-zinc-200"
+                } ${reordering ? "pointer-events-none" : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.setAttribute("data-drop-target", "true");
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.removeAttribute("data-drop-target");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.removeAttribute("data-drop-target");
+                  const draggedId = e.dataTransfer.getData("text/plain");
+                  if (draggedId && draggedId !== v.id) handleVariantReorder(draggedId, v.id);
+                }}
               >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium text-zinc-800">
-                    Variant {v.index}
-                    {isAdmin && v.aiSource && (
-                      <span
-                        className="ml-2 rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600"
-                        title="Which AI generated this variant"
-                      >
-                        {v.aiSource === "openai" ? "OpenAI" : "Anthropic"}
-                      </span>
-                    )}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedVariantId(v.id);
+                        e.dataTransfer.setData("text/plain", v.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => setDraggedVariantId(null)}
+                      className="cursor-grab touch-none rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 active:cursor-grabbing"
+                      title="Drag to reorder"
+                      aria-label="Drag to reorder"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="9" cy="5" r="1" />
+                        <circle cx="9" cy="12" r="1" />
+                        <circle cx="9" cy="19" r="1" />
+                        <circle cx="15" cy="5" r="1" />
+                        <circle cx="15" cy="12" r="1" />
+                        <circle cx="15" cy="19" r="1" />
+                      </svg>
+                    </span>
+                    <span className="font-medium text-zinc-800">
+                      Variant {v.index}
+                      {isAdmin && v.aiSource && (
+                        <span
+                          className="ml-2 rounded bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600"
+                          title="Which AI generated this variant"
+                        >
+                          {v.aiSource === "openai" ? "OpenAI" : "Anthropic"}
+                        </span>
+                      )}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5">
                     {savedVariantId === v.id && (
                       <span className="text-xs text-green-600">Saved</span>
