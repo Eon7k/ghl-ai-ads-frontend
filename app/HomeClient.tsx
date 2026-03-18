@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getToken } from "@/lib/auth";
+import { getViewingAs } from "@/lib/viewingAs";
 import { api } from "@/lib/api";
 import type { MetaAdAccount } from "@/lib/api";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
@@ -41,7 +42,7 @@ function CreativeThumbnail({ creativeId, className }: { creativeId: string; clas
 
 export function HomeClient() {
   const router = useRouter();
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, accountType, clients } = useAuth();
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
@@ -103,6 +104,14 @@ export function HomeClient() {
     if (searchParams.get("open") === "create") setCreateOpen(true);
   }, [searchParams]);
 
+  // Agency: must select a client before seeing home data
+  useEffect(() => {
+    if (loading || !user || accountType !== "agency") return;
+    if (clients.length > 0 && !getViewingAs()) {
+      router.replace("/agency");
+    }
+  }, [loading, user, accountType, clients.length, router]);
+
   useEffect(() => {
     if (!user) return;
     setCreativesLoading(true);
@@ -139,7 +148,9 @@ export function HomeClient() {
   function connectTo(platform: "meta" | "google" | "tiktok") {
     const token = getToken();
     if (!token) return;
-    const path = `/integrations/${platform}/connect?token=${encodeURIComponent(token)}`;
+    let path = `/integrations/${platform}/connect?token=${encodeURIComponent(token)}`;
+    const viewingAs = getViewingAs();
+    if (viewingAs) path += `&viewingAs=${encodeURIComponent(viewingAs)}`;
     window.location.href = `${BACKEND_URL.replace(/\/$/, "")}${path}`;
   }
 

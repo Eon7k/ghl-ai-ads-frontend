@@ -46,6 +46,8 @@ export async function GET(
     const headers: HeadersInit = {};
     const auth = request.headers.get("authorization");
     if (auth) headers["Authorization"] = auth;
+    const viewingAs = request.headers.get("x-viewing-as");
+    if (viewingAs) headers["X-Viewing-As"] = viewingAs;
     const res = await fetch(url, {
       headers: Object.keys(headers).length ? headers : undefined,
       cache: "no-store",
@@ -101,10 +103,12 @@ export async function POST(
     const url = buildUrl(path);
     const body = await request.text();
     const headers: HeadersInit = {};
-    const contentType = request.headers.get("content-type");
-    if (contentType) headers["Content-Type"] = contentType;
+    const reqContentType = request.headers.get("content-type");
+    if (reqContentType) headers["Content-Type"] = reqContentType;
     const auth = request.headers.get("authorization");
     if (auth) headers["Authorization"] = auth;
+    const viewingAs = request.headers.get("x-viewing-as");
+    if (viewingAs) headers["X-Viewing-As"] = viewingAs;
     const res = await fetch(url, {
       method: "POST",
       body: body || undefined,
@@ -112,7 +116,10 @@ export async function POST(
       cache: "no-store",
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
-    const data = await res.json().catch(() => ({ error: "Invalid JSON from backend" }));
+    const resContentType = res.headers.get("content-type") || "";
+    const data = resContentType.includes("application/json")
+      ? await res.json().catch(() => ({ error: "Invalid JSON from backend" }))
+      : { error: res.status >= 400 ? `Backend error (${res.status}). Check that your database schema is up to date (run prisma db push).` : "Backend did not return JSON." };
     return Response.json(data, { status: res.status });
   } catch (err: unknown) {
     const message =
@@ -153,6 +160,8 @@ export async function PATCH(
     if (contentType) headers["Content-Type"] = contentType;
     const auth = request.headers.get("authorization");
     if (auth) headers["Authorization"] = auth;
+    const viewingAs = request.headers.get("x-viewing-as");
+    if (viewingAs) headers["X-Viewing-As"] = viewingAs;
     const res = await fetch(url, {
       method: "PATCH",
       body: body || undefined,
@@ -198,6 +207,8 @@ export async function DELETE(
     const headers: HeadersInit = {};
     const auth = request.headers.get("authorization");
     if (auth) headers["Authorization"] = auth;
+    const viewingAs = request.headers.get("x-viewing-as");
+    if (viewingAs) headers["X-Viewing-As"] = viewingAs;
     const res = await fetch(url, {
       method: "DELETE",
       headers: Object.keys(headers).length ? headers : undefined,

@@ -4,10 +4,16 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useRouter } from "next/navigation";
 import { api, type AuthUser } from "@/lib/api";
 import { getToken, setToken, clearToken } from "@/lib/auth";
+import { setViewingAs } from "@/lib/viewingAs";
+
+export type AccountType = "single" | "agency";
+export type ClientOption = { id: string; email: string };
 
 type AuthState = {
   user: AuthUser | null;
   isAdmin: boolean;
+  accountType: AccountType;
+  clients: ClientOption[];
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
@@ -19,6 +25,8 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [accountType, setAccountType] = useState<AccountType>("single");
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -27,17 +35,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!token) {
       setUser(null);
       setIsAdmin(false);
+      setAccountType("single");
+      setClients([]);
+      setViewingAs(null);
       setLoading(false);
       return;
     }
     try {
-      const { user: u, isAdmin: admin } = await api.auth.me();
-      setUser(u);
-      setIsAdmin(!!admin);
+      const me = await api.auth.me();
+      setUser(me.user);
+      setIsAdmin(!!me.isAdmin);
+      setAccountType((me.accountType as AccountType) ?? "single");
+      setClients(me.clients ?? []);
+      if ((me.accountType as AccountType) !== "agency") setViewingAs(null);
     } catch {
       clearToken();
       setUser(null);
       setIsAdmin(false);
+      setAccountType("single");
+      setClients([]);
+      setViewingAs(null);
     } finally {
       setLoading(false);
     }
@@ -52,8 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { token, user: u } = await api.auth.login(email, password);
       setToken(token);
       setUser(u);
-      const { isAdmin: admin } = await api.auth.me();
-      setIsAdmin(!!admin);
+      const me = await api.auth.me();
+      setIsAdmin(!!me.isAdmin);
+      setAccountType((me.accountType as AccountType) ?? "single");
+      setClients(me.clients ?? []);
+      if ((me.accountType as AccountType) !== "agency") setViewingAs(null);
       router.push("/");
     },
     [router]
@@ -64,8 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { token, user: u } = await api.auth.register(email, password);
       setToken(token);
       setUser(u);
-      const { isAdmin: admin } = await api.auth.me();
-      setIsAdmin(!!admin);
+      const me = await api.auth.me();
+      setIsAdmin(!!me.isAdmin);
+      setAccountType((me.accountType as AccountType) ?? "single");
+      setClients(me.clients ?? []);
+      if ((me.accountType as AccountType) !== "agency") setViewingAs(null);
       router.push("/");
     },
     [router]
@@ -73,12 +96,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearToken();
+    setViewingAs(null);
     setUser(null);
+    setAccountType("single");
+    setClients([]);
     router.push("/");
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, accountType, clients, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

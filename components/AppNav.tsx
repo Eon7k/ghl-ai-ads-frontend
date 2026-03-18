@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { getViewingAs } from "@/lib/viewingAs";
 
 /**
  * Top nav for Campaigns and Integrations so testing is easy: jump between sections without hunting for links.
  */
 export default function AppNav() {
   const pathname = usePathname();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, accountType, clients, logout } = useAuth();
+  const viewingAsId = getViewingAs();
+  const viewingAsEmail = viewingAsId && clients.find((c) => c.id === viewingAsId)?.email;
 
   return (
     <nav className="border-b border-zinc-200 bg-white">
@@ -42,6 +45,18 @@ export default function AppNav() {
             >
               Campaign Manager
             </Link>
+            {accountType === "agency" && (
+              <Link
+                href="/agency"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname === "/agency"
+                    ? "bg-violet-100 text-violet-900"
+                    : "text-violet-700 hover:bg-violet-50 hover:text-violet-900"
+                }`}
+              >
+                {viewingAsEmail ? "Switch client" : "Select client"}
+              </Link>
+            )}
             {pathname?.startsWith("/campaigns/") && (
               <Link
                 href="/"
@@ -65,6 +80,11 @@ export default function AppNav() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {accountType === "agency" && viewingAsEmail && (
+            <span className="rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800">
+              Viewing as: {viewingAsEmail}
+            </span>
+          )}
           {user && (
             <>
               <span className="text-sm text-zinc-500">{user.email}</span>

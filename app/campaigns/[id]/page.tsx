@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, type MetaAdAccount } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Experiment, AdVariant } from "@/lib/types";
@@ -35,6 +35,9 @@ export default function CampaignDetailPage() {
   const [budgetValue, setBudgetValue] = useState<string>("");
   const [budgetUpdating, setBudgetUpdating] = useState(false);
   const [budgetError, setBudgetError] = useState<string | null>(null);
+  const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [selectedMetaAdAccountId, setSelectedMetaAdAccountId] = useState<string>("");
+  const [launchLandingPageUrl, setLaunchLandingPageUrl] = useState<string>("");
 
   useEffect(() => {
     if (!id) return;
@@ -78,6 +81,14 @@ export default function CampaignDetailPage() {
       return next ?? prev;
     });
   }, [experiment?.id, experiment?.variants]);
+
+  // Load Meta ad accounts when this is a Meta draft (for launch to live)
+  useEffect(() => {
+    if (!experiment || experiment.platform !== "meta" || experiment.status !== "draft") return;
+    api.integrations.getMetaAdAccounts()
+      .then(setMetaAdAccounts)
+      .catch(() => setMetaAdAccounts([]));
+  }, [experiment?.id, experiment?.platform, experiment?.status]);
 
   // When launched, load metrics from backend (Meta when we have metaCampaignId, else placeholder)
   useEffect(() => {
@@ -244,8 +255,15 @@ export default function CampaignDetailPage() {
     setLaunching(true);
     setLaunchError(null);
     const countWithCreatives = variants.filter((v) => v.hasCreative || creativeUrls[v.id]).length;
+    const opts: { aiCreativeCount: number; metaAdAccountId?: string; landingPageUrl?: string } = {
+      aiCreativeCount: countWithCreatives,
+    };
+    if (experiment.platform === "meta" && selectedMetaAdAccountId) {
+      opts.metaAdAccountId = selectedMetaAdAccountId;
+      if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
+    }
     try {
-      const updated = await api.launchExperiment(experiment.id, { aiCreativeCount: countWithCreatives });
+      const updated = await api.launchExperiment(experiment.id, opts);
       setExperiment(updated);
     } catch (e) {
       setLaunchError(e instanceof Error ? e.message : "Failed to launch");
@@ -306,20 +324,60 @@ export default function CampaignDetailPage() {
             {experiment.status === "draft" ? "Draft" : "Launched"}
           </span>
           {isDraft && (
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={launch}
-                disabled={launching || variants.length === 0}
-                className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                {launching ? "Launching…" : "Launch campaign"}
-              </button>
-              {launchError && (
-                <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                  {launchError}
-                </p>
+            <div className="flex flex-col gap-3">
+              {experiment.platform === "meta" && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
+                  <p className="mb-2 text-sm font-medium text-zinc-700">Launch to Meta (live)</p>
+                  {metaAdAccounts === null ? (
+                    <p className="text-xs text-zinc-500">Loading ad accounts…</p>
+                  ) : metaAdAccounts.length === 0 ? (
+                    <p className="text-xs text-amber-700">Connect Meta in Integrations to launch to a real ad account.</p>
+                  ) : (
+                    <>
+                      <label className="block text-xs text-zinc-600">Ad account</label>
+                      <select
+                        value={selectedMetaAdAccountId}
+                        onChange={(e) => setSelectedMetaAdAccountId(e.target.value)}
+                        className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                      >
+                        <option value="">— Don’t create on Meta (draft only) —</option>
+                        {metaAdAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} ({a.id})
+                          </option>
+                        ))}
+                      </select>
+                      {selectedMetaAdAccountId && (
+                        <>
+                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL (optional)</label>
+                          <input
+                            type="url"
+                            value={launchLandingPageUrl}
+                            onChange={(e) => setLaunchLandingPageUrl(e.target.value)}
+                            placeholder="https://example.com"
+                            className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                          />
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={launch}
+                  disabled={launching || variants.length === 0}
+                  className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {launching ? "Launching…" : experiment.platform === "meta" && selectedMetaAdAccountId ? "Launch to Meta (live)" : "Launch campaign"}
+                </button>
+                {launchError && (
+                  <p className="w-full basis-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    {launchError}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
