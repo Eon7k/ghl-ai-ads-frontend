@@ -725,7 +725,7 @@ export default function CampaignDetailPage() {
                   />
                 </div>
                 <textarea
-                  className="min-h-[80px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-black placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="min-h-[80px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={variantCopies[v.id] ?? v.copy}
                   onChange={(e) =>
                     setVariantCopies((prev) => ({ ...prev, [v.id]: e.target.value }))

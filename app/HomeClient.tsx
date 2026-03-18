@@ -512,7 +512,7 @@ export function HomeClient() {
                   )}
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Campaign name</label>
-                    <input className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Sale" required />
+                    <input className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Sale" required />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Creatives</label>
@@ -549,15 +549,15 @@ export function HomeClient() {
                   )}
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Ad idea / prompt</label>
-                    <textarea className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-300 px-3 py-2" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai" || creativesSource === "mix"} />
+                    <textarea className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai" || creativesSource === "mix"} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Variants</label>
-                    <input type="number" min={1} max={20} className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={variantCount} onChange={(e) => setVariantCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
+                    <input type="number" min={1} max={20} className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={variantCount} onChange={(e) => setVariantCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700">Creative description (optional)</label>
-                    <textarea className="mt-1 min-h-[60px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
+                    <textarea className="mt-1 min-h-[60px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
                   </div>
                   {(creativesSource === "own" || creativesSource === "mix") && (
                     <div>
