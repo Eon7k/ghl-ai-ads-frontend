@@ -187,10 +187,10 @@ export const api = {
       body: { variantIdA, variantIdB },
     }),
 
-  /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx) and optional landingPageUrl. Use dryRun: true to create on Meta but leave paused (no spend). */
+  /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx), optional landingPageUrl, optional variantIds (subset of variants to launch). Use dryRun: true to create on Meta but leave paused (no spend). */
   launchExperiment: (
     id: string,
-    options?: { aiCreativeCount?: number; metaAdAccountId?: string; landingPageUrl?: string; dryRun?: boolean }
+    options?: { aiCreativeCount?: number; metaAdAccountId?: string; landingPageUrl?: string; dryRun?: boolean; variantIds?: string[] }
   ) =>
     request<import("./types").Experiment & { dryRun?: boolean }>(`experiments/${id}/launch`, {
       method: "POST",
@@ -199,6 +199,7 @@ export const api = {
         ...(options?.metaAdAccountId && { metaAdAccountId: options.metaAdAccountId }),
         ...(options?.landingPageUrl && { landingPageUrl: options.landingPageUrl }),
         ...(options?.dryRun === true && { dryRun: true }),
+        ...(options?.variantIds && options.variantIds.length > 0 && { variantIds: options.variantIds }),
       },
     }),
 

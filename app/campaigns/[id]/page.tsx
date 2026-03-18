@@ -48,6 +48,8 @@ export default function CampaignDetailPage() {
   const [savingCreativePrompt, setSavingCreativePrompt] = useState(false);
   const [redesigningVariantIds, setRedesigningVariantIds] = useState<Set<string>>(new Set());
   const [variantsSelectedForRedesign, setVariantsSelectedForRedesign] = useState<Set<string>>(new Set());
+  const [variantsSelectedForLaunch, setVariantsSelectedForLaunch] = useState<Set<string>>(new Set());
+  const prevExperimentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -96,6 +98,28 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (experiment) setCreativePromptInput(experiment.creativePrompt ?? "");
   }, [experiment?.id, experiment?.creativePrompt]);
+
+  // Init/update which variants are selected for launch (only those with creatives; reset when switching campaign)
+  useEffect(() => {
+    if (!experiment?.variants?.length) return;
+    const withCreative = experiment.variants.filter((v) => v.hasCreative).map((v) => v.id);
+    if (prevExperimentIdRef.current !== experiment.id) {
+      prevExperimentIdRef.current = experiment.id;
+      setVariantsSelectedForLaunch(new Set(withCreative));
+    } else {
+      setVariantsSelectedForLaunch((prev) => {
+        const next = new Set(prev);
+        let added = false;
+        for (const id of withCreative) {
+          if (!prev.has(id)) {
+            next.add(id);
+            added = true;
+          }
+        }
+        return added ? next : prev;
+      });
+    }
+  }, [experiment?.id, experiment?.variants]);
 
   // Load Meta ad accounts when this is a Meta draft (for launch to live)
   useEffect(() => {
@@ -282,14 +306,22 @@ export default function CampaignDetailPage() {
     if (!experiment || experiment.status === "launched") return;
     setLaunching(true);
     setLaunchError(null);
-    const countWithCreatives = variants.filter((v) => v.hasCreative || creativeUrls[v.id]).length;
-    const opts: { aiCreativeCount: number; metaAdAccountId?: string; landingPageUrl?: string; dryRun?: boolean } = {
-      aiCreativeCount: countWithCreatives,
-    };
+    const selectedWithCreative = variants.filter(
+      (v) => (v.hasCreative || creativeUrls[v.id]) && variantsSelectedForLaunch.has(v.id)
+    );
+    const countWithCreatives = selectedWithCreative.length;
+    const opts: {
+      aiCreativeCount: number;
+      metaAdAccountId?: string;
+      landingPageUrl?: string;
+      dryRun?: boolean;
+      variantIds?: string[];
+    } = { aiCreativeCount: countWithCreatives };
     if (experiment.platform === "meta" && selectedMetaAdAccountId) {
       opts.metaAdAccountId = selectedMetaAdAccountId;
       if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
       opts.dryRun = dryRun;
+      if (variantsSelectedForLaunch.size > 0) opts.variantIds = Array.from(variantsSelectedForLaunch);
     }
     try {
       const updated = await api.launchExperiment(experiment.id, opts);
@@ -428,6 +460,9 @@ export default function CampaignDetailPage() {
 
   const variants = experiment.variants || [];
   const isDraft = experiment.status === "draft";
+  const launchableSelectedCount = variants.filter(
+    (v) => (v.hasCreative || creativeUrls[v.id]) && variantsSelectedForLaunch.has(v.id)
+  ).length;
   const budgetPerVariant =
     variants.length > 0
       ? Math.round((experiment.totalDailyBudget / variants.length) * 100) / 100
@@ -510,6 +545,36 @@ export default function CampaignDetailPage() {
                               </span>
                             )}
                           </div>
+                          {sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
+                            <div className="mt-3">
+                              <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
+                              <p className="mb-2 text-[11px] text-zinc-500">Only selected variants will be included in the campaign. Only variants with creatives can be launched.</p>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {sortedVariants.map((v) => {
+                                  const hasCreative = v.hasCreative || creativeUrls[v.id];
+                                  if (!hasCreative) return null;
+                                  return (
+                                    <label key={v.id} className="flex cursor-pointer items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={variantsSelectedForLaunch.has(v.id)}
+                                        onChange={(e) => {
+                                          setVariantsSelectedForLaunch((prev) => {
+                                            const next = new Set(prev);
+                                            if (e.target.checked) next.add(v.id);
+                                            else next.delete(v.id);
+                                            return next;
+                                          });
+                                        }}
+                                        className="rounded border-zinc-300"
+                                      />
+                                      <span className="text-sm text-zinc-800">Variant {v.index}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
                     </>
@@ -522,7 +587,7 @@ export default function CampaignDetailPage() {
                     <button
                       type="button"
                       onClick={handleLaunchLive}
-                      disabled={launching || variants.length === 0}
+                      disabled={launching || launchableSelectedCount === 0}
                       className="rounded-lg bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700 disabled:opacity-50"
                     >
                       {launching ? "Launching…" : "Launch (live)"}
@@ -530,7 +595,7 @@ export default function CampaignDetailPage() {
                     <button
                       type="button"
                       onClick={handleLaunchDryRun}
-                      disabled={launching || variants.length === 0}
+                      disabled={launching || launchableSelectedCount === 0}
                       className="rounded-lg border border-zinc-300 bg-white px-4 py-2 font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
                     >
                       {launching ? "Launching…" : "Launch as dry run (no spend)"}
