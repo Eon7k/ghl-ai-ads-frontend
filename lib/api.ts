@@ -139,6 +139,10 @@ export const api = {
   getExperiment: (id: string) =>
     request<import("./types").Experiment>(`experiments/${id}`),
 
+  /** Update experiment (e.g. creative direction for image generation). */
+  updateExperiment: (id: string, data: { creativePrompt?: string | null }) =>
+    request<import("./types").Experiment>(`experiments/${id}`, { method: "PATCH", body: data }),
+
   /** Update a variant's ad copy */
   updateVariant: (experimentId: string, variantId: string, copy: string) =>
     request<import("./types").AdVariant>(

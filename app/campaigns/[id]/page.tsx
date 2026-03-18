@@ -44,6 +44,10 @@ export default function CampaignDetailPage() {
   const [reordering, setReordering] = useState(false);
   const [draggedCreativeVariantId, setDraggedCreativeVariantId] = useState<string | null>(null);
   const [swapCreativesLoading, setSwapCreativesLoading] = useState(false);
+  const [creativePromptInput, setCreativePromptInput] = useState("");
+  const [savingCreativePrompt, setSavingCreativePrompt] = useState(false);
+  const [redesigningVariantIds, setRedesigningVariantIds] = useState<Set<string>>(new Set());
+  const [variantsSelectedForRedesign, setVariantsSelectedForRedesign] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!id) return;
@@ -87,6 +91,11 @@ export default function CampaignDetailPage() {
       return next ?? prev;
     });
   }, [experiment?.id, experiment?.variants]);
+
+  // Sync creative direction input from experiment
+  useEffect(() => {
+    if (experiment) setCreativePromptInput(experiment.creativePrompt ?? "");
+  }, [experiment?.id, experiment?.creativePrompt]);
 
   // Load Meta ad accounts when this is a Meta draft (for launch to live)
   useEffect(() => {
@@ -321,6 +330,51 @@ export default function CampaignDetailPage() {
       setExperiment((prev) => (prev ? { ...prev, variants: updatedVariants } : null));
     } finally {
       setReordering(false);
+    }
+  }
+
+  async function saveCreativePrompt() {
+    if (!experiment) return;
+    setSavingCreativePrompt(true);
+    try {
+      await api.updateExperiment(experiment.id, { creativePrompt: creativePromptInput.trim() || null });
+      setExperiment((prev) => (prev ? { ...prev, creativePrompt: creativePromptInput.trim() || undefined } : null));
+    } finally {
+      setSavingCreativePrompt(false);
+    }
+  }
+
+  async function redesignCreatives(variantIds: string[]) {
+    if (!experiment || variantIds.length === 0) return;
+    const promptDirty = (creativePromptInput.trim() || "") !== (experiment.creativePrompt ?? "");
+    if (promptDirty) {
+      setSavingCreativePrompt(true);
+      try {
+        await api.updateExperiment(experiment.id, { creativePrompt: creativePromptInput.trim() || null });
+        setExperiment((prev) => (prev ? { ...prev, creativePrompt: creativePromptInput.trim() || undefined } : null));
+      } finally {
+        setSavingCreativePrompt(false);
+      }
+    }
+    setRedesigningVariantIds(new Set(variantIds));
+    for (const variantId of variantIds) {
+      try {
+        await api.generateVariantCreative(experiment.id, variantId);
+        const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId);
+        setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
+        setExperiment((prev) => {
+          if (!prev?.variants) return prev;
+          return { ...prev, variants: prev.variants.map((x) => (x.id === variantId ? { ...x, hasCreative: true } : x)) };
+        });
+      } catch (_e) {
+        // continue with next
+      } finally {
+        setRedesigningVariantIds((prev) => {
+          const next = new Set(prev);
+          next.delete(variantId);
+          return next;
+        });
+      }
     }
   }
 
@@ -645,6 +699,29 @@ export default function CampaignDetailPage() {
         )}
 
         <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-1 text-lg font-semibold text-zinc-900">Creative direction for images</h2>
+          <p className="mb-3 text-sm text-zinc-600">
+            This prompt guides how the ad images look when you generate or redesign creatives. Edit and save, then use &quot;Redesign creatives&quot; below to apply to all or selected variants.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <textarea
+              className="min-h-[72px] w-full max-w-xl rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              value={creativePromptInput}
+              onChange={(e) => setCreativePromptInput(e.target.value)}
+              placeholder="e.g. Clean product shot, minimal background, bright lighting"
+            />
+            <button
+              type="button"
+              onClick={saveCreativePrompt}
+              disabled={savingCreativePrompt || creativePromptInput === (experiment.creativePrompt ?? "")}
+              className="rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-300 disabled:opacity-50"
+            >
+              {savingCreativePrompt ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
           <p className="mb-4 text-sm text-zinc-600">
             {experiment.creativesSource === "own"
@@ -655,7 +732,58 @@ export default function CampaignDetailPage() {
           {sortedVariants.length === 0 ? (
             <p className="text-zinc-500">No variants yet. Create this campaign again from the new campaign flow.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <>
+              <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4">
+                <p className="mb-3 text-sm font-medium text-zinc-700">Redesign creatives</p>
+                <p className="mb-3 text-xs text-zinc-600">
+                  Use the creative direction above. Select variants to regenerate their images, then click Redesign selected or Redesign all.
+                </p>
+                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {sortedVariants.map((v) => (
+                    <label key={v.id} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={variantsSelectedForRedesign.has(v.id)}
+                        onChange={(e) => {
+                          setVariantsSelectedForRedesign((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(v.id);
+                            else next.delete(v.id);
+                            return next;
+                          });
+                        }}
+                        disabled={redesigningVariantIds.size > 0}
+                        className="rounded border-zinc-300"
+                      />
+                      <span className="text-sm text-zinc-800">Variant {v.index}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => redesignCreatives(Array.from(variantsSelectedForRedesign))}
+                    disabled={variantsSelectedForRedesign.size === 0 || redesigningVariantIds.size > 0}
+                    className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    Redesign selected
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => redesignCreatives(sortedVariants.map((v) => v.id))}
+                    disabled={redesigningVariantIds.size > 0}
+                    className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    Redesign all
+                  </button>
+                  {redesigningVariantIds.size > 0 && (
+                    <span className="text-sm text-zinc-500">
+                      Regenerating {sortedVariants.length - redesigningVariantIds.size} of {sortedVariants.length}…
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {sortedVariants.map((v) => (
               <div
                 key={v.id}
@@ -744,10 +872,10 @@ export default function CampaignDetailPage() {
                       <button
                         type="button"
                         onClick={() => generateCreative(v)}
-                        disabled={generatingCreativeId === v.id}
+                        disabled={generatingCreativeId === v.id || redesigningVariantIds.has(v.id)}
                         className="rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-200 disabled:opacity-50"
                       >
-                        {generatingCreativeId === v.id ? "Regenerating…" : "Regenerate creative"}
+                        {generatingCreativeId === v.id || redesigningVariantIds.has(v.id) ? "Regenerating…" : "Regenerate creative"}
                       </button>
                     )}
                   </div>
@@ -797,7 +925,8 @@ export default function CampaignDetailPage() {
                 />
               </div>
             ))}
-            </div>
+              </div>
+            </>
           )}
         </section>
       </main>
