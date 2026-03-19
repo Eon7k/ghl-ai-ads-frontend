@@ -9,10 +9,13 @@ export default function AdPreview({
   copy,
   platform = "meta",
   imageUrl,
+  /** When false, the creative image won’t start its own browser drag (use when the parent handles drag-to-swap). */
+  imageDraggable = true,
 }: {
   copy: string;
   platform?: string;
   imageUrl?: string | null;
+  imageDraggable?: boolean;
 }) {
   const text = (copy || "").trim() || "Your ad copy will appear here.";
   const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
@@ -37,7 +40,8 @@ export default function AdPreview({
           <img
             src={imageUrl}
             alt="Ad creative"
-            className="absolute inset-0 w-full h-full object-cover"
+            draggable={imageDraggable}
+            className={`absolute inset-0 h-full w-full object-cover select-none ${imageDraggable ? "" : "pointer-events-none"}`}
           />
         ) : (
           <span className="text-xs text-zinc-400">Image / creative</span>

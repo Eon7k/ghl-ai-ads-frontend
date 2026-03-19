@@ -10,6 +10,9 @@ import type { Experiment, AdVariant } from "@/lib/types";
 
 import type { CampaignMetricsResponse } from "@/lib/api";
 
+/** Prefix for drag payload so card reorder (raw variant id) doesn’t clash with creative swap. */
+const CREATIVE_SWAP_PREFIX = "creative-swap:";
+
 export default function CampaignDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -1001,8 +1004,9 @@ export default function CampaignDetailPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   e.currentTarget.removeAttribute("data-drop-target");
-                  if (e.dataTransfer.getData("application/x-variant-creative")) return;
-                  const draggedId = e.dataTransfer.getData("text/plain");
+                  const raw = e.dataTransfer.getData("text/plain");
+                  if (raw.startsWith(CREATIVE_SWAP_PREFIX)) return;
+                  const draggedId = raw;
                   if (draggedId && draggedId !== v.id) handleVariantReorder(draggedId, v.id);
                 }}
               >
@@ -1089,18 +1093,28 @@ export default function CampaignDetailPage() {
                     onDragStart={(e) => {
                       if (!(v.hasCreative || creativeUrls[v.id])) return;
                       setDraggedCreativeVariantId(v.id);
-                      e.dataTransfer.setData("application/x-variant-creative", v.id);
+                      // text/plain works reliably cross-browser; custom MIME types often fail on drop/getData
+                      e.dataTransfer.setData("text/plain", `${CREATIVE_SWAP_PREFIX}${v.id}`);
                       e.dataTransfer.effectAllowed = "move";
+                      try {
+                        e.dataTransfer.setDragImage(e.currentTarget, 10, 10);
+                      } catch {
+                        /* ignore */
+                      }
                     }}
                     onDragEnd={() => setDraggedCreativeVariantId(null)}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      if (e.dataTransfer.types.includes("text/plain")) {
+                        e.dataTransfer.dropEffect = "move";
+                      }
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      const sourceId = e.dataTransfer.getData("application/x-variant-creative");
+                      const raw = e.dataTransfer.getData("text/plain");
+                      const sourceId = raw.startsWith(CREATIVE_SWAP_PREFIX) ? raw.slice(CREATIVE_SWAP_PREFIX.length) : "";
                       if (!sourceId || sourceId === v.id) return;
                       handleSwapCreatives(sourceId, v.id);
                     }}
@@ -1109,6 +1123,7 @@ export default function CampaignDetailPage() {
                       copy={variantCopies[v.id] ?? v.copy}
                       platform={experiment.platform}
                       imageUrl={creativeUrls[v.id] ?? null}
+                      imageDraggable={false}
                     />
                   </div>
                   {(v.hasCreative || creativeUrls[v.id]) && (
