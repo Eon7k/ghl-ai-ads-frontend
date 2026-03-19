@@ -46,6 +46,11 @@ export default function CampaignDetailPage() {
   const [swapCreativesLoading, setSwapCreativesLoading] = useState(false);
   const [creativePromptInput, setCreativePromptInput] = useState("");
   const [savingCreativePrompt, setSavingCreativePrompt] = useState(false);
+  const [targetAudienceInput, setTargetAudienceInput] = useState("");
+  const [savingTargetAudience, setSavingTargetAudience] = useState(false);
+  const [targetPreview, setTargetPreview] = useState<Record<string, unknown> | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [redesigningVariantIds, setRedesigningVariantIds] = useState<Set<string>>(new Set());
   const [variantsSelectedForRedesign, setVariantsSelectedForRedesign] = useState<Set<string>>(new Set());
   const [variantsSelectedForLaunch, setVariantsSelectedForLaunch] = useState<Set<string>>(new Set());
@@ -99,6 +104,10 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (experiment) setCreativePromptInput(experiment.creativePrompt ?? "");
   }, [experiment?.id, experiment?.creativePrompt]);
+
+  useEffect(() => {
+    if (experiment) setTargetAudienceInput(experiment.targetAudiencePrompt ?? "");
+  }, [experiment?.id, experiment?.targetAudiencePrompt]);
 
   // Init/update which variants are selected for launch (only those with creatives; reset when switching campaign)
   useEffect(() => {
@@ -384,6 +393,40 @@ export default function CampaignDetailPage() {
       setExperiment((prev) => (prev ? { ...prev, creativePrompt: creativePromptInput.trim() || undefined } : null));
     } finally {
       setSavingCreativePrompt(false);
+    }
+  }
+
+  async function saveTargetAudience() {
+    if (!experiment) return;
+    setSavingTargetAudience(true);
+    setPreviewError(null);
+    try {
+      await api.updateExperiment(experiment.id, { targetAudiencePrompt: targetAudienceInput.trim() || null });
+      setExperiment((prev) => (prev ? { ...prev, targetAudiencePrompt: targetAudienceInput.trim() || undefined } : null));
+    } catch (e) {
+      setPreviewError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingTargetAudience(false);
+    }
+  }
+
+  async function previewTargetAudience() {
+    if (!experiment || experiment.platform !== "meta") return;
+    const text = targetAudienceInput.trim();
+    if (!text) {
+      setPreviewError("Enter a description first");
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const { targeting } = await api.previewMetaTargeting(experiment.id, text);
+      setTargetPreview(targeting);
+    } catch (e) {
+      setTargetPreview(null);
+      setPreviewError(e instanceof Error ? e.message : "Preview failed");
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -830,6 +873,53 @@ export default function CampaignDetailPage() {
             </button>
           </div>
         </section>
+
+        {experiment.platform === "meta" && (
+          <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-1 text-lg font-semibold text-zinc-900">Target audience (Meta)</h2>
+            <p className="mb-3 text-sm text-zinc-600">
+              Describe who should see this campaign in plain English. AI turns it into Meta ad set targeting
+              (countries, age range, gender). Save before launch. Use &quot;Preview&quot; to see the JSON
+              Meta will receive. Detailed interests and job titles are not included yet—only location, age, and
+              gender.
+            </p>
+            <div className="flex flex-col gap-3">
+              <textarea
+                className="min-h-[88px] w-full max-w-2xl rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                value={targetAudienceInput}
+                onChange={(e) => setTargetAudienceInput(e.target.value)}
+                placeholder="e.g. Women 35–55 in Texas and Florida interested in home wellness; US English speakers."
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={saveTargetAudience}
+                  disabled={savingTargetAudience || targetAudienceInput === (experiment.targetAudiencePrompt ?? "")}
+                  className="rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-300 disabled:opacity-50"
+                >
+                  {savingTargetAudience ? "Saving…" : "Save audience"}
+                </button>
+                <button
+                  type="button"
+                  onClick={previewTargetAudience}
+                  disabled={previewLoading || !targetAudienceInput.trim()}
+                  className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {previewLoading ? "Generating…" : "Preview Meta targeting"}
+                </button>
+              </div>
+              {previewError && (
+                <p className="text-sm text-red-600">{previewError}</p>
+              )}
+              {targetPreview && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-800">
+                  <p className="mb-1 font-medium text-zinc-700">Resolved targeting (at preview time)</p>
+                  <pre className="whitespace-pre-wrap break-all font-mono text-[11px]">{JSON.stringify(targetPreview, null, 2)}</pre>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>

@@ -139,9 +139,16 @@ export const api = {
   getExperiment: (id: string) =>
     request<import("./types").Experiment>(`experiments/${id}`),
 
-  /** Update experiment (e.g. creative direction for image generation). */
-  updateExperiment: (id: string, data: { creativePrompt?: string | null }) =>
+  /** Update experiment (e.g. creative direction, target audience description for Meta). */
+  updateExperiment: (id: string, data: { creativePrompt?: string | null; targetAudiencePrompt?: string | null }) =>
     request<import("./types").Experiment>(`experiments/${id}`, { method: "PATCH", body: data }),
+
+  /** Preview Meta ad set targeting from natural-language audience (Meta campaigns only). */
+  previewMetaTargeting: (experimentId: string, targetAudiencePrompt: string) =>
+    request<{ targeting: Record<string, unknown> }>(`experiments/${experimentId}/preview-meta-targeting`, {
+      method: "POST",
+      body: { targetAudiencePrompt },
+    }),
 
   /** Update a variant's ad copy */
   updateVariant: (experimentId: string, variantId: string, copy: string) =>

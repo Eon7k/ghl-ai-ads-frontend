@@ -33,6 +33,8 @@ export type Experiment = {
   aiCreativeCount?: number;
   /** Optional: how the user wants the ad image/creative to look (used when generating AI creatives). */
   creativePrompt?: string;
+  /** Natural-language target audience; AI converts to Meta ad set geo/age/gender at launch. */
+  targetAudiencePrompt?: string;
   variants?: AdVariant[];
   /** IDs of creatives from the library attached to this campaign. */
   attachedCreativeIds?: string[];
