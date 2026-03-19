@@ -49,6 +49,7 @@ export default function CampaignDetailPage() {
   const [redesigningVariantIds, setRedesigningVariantIds] = useState<Set<string>>(new Set());
   const [variantsSelectedForRedesign, setVariantsSelectedForRedesign] = useState<Set<string>>(new Set());
   const [variantsSelectedForLaunch, setVariantsSelectedForLaunch] = useState<Set<string>>(new Set());
+  const [launchPickCount, setLaunchPickCount] = useState<string>("3");
   const prevExperimentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -120,6 +121,16 @@ export default function CampaignDetailPage() {
       });
     }
   }, [experiment?.id, experiment?.variants]);
+
+  function selectFirstNLaunchable(n: number) {
+    if (!experiment?.variants?.length) return;
+    const launchable = [...experiment.variants]
+      .sort((a, b) => a.index - b.index)
+      .filter((v) => v.hasCreative || creativeUrls[v.id])
+      .slice(0, Math.max(0, n))
+      .map((v) => v.id);
+    setVariantsSelectedForLaunch(new Set(launchable));
+  }
 
   // Load Meta ad accounts when this is a Meta draft (for launch to live)
   useEffect(() => {
@@ -549,6 +560,40 @@ export default function CampaignDetailPage() {
                             <div className="mt-3">
                               <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
                               <p className="mb-2 text-[11px] text-zinc-500">Only selected variants will be included in the campaign. Only variants with creatives can be launched.</p>
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setVariantsSelectedForLaunch(new Set(sortedVariants.filter((v) => v.hasCreative || creativeUrls[v.id]).map((v) => v.id)))}
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Select all
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setVariantsSelectedForLaunch(new Set())}
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Clear
+                                </button>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-zinc-500">Pick first</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={sortedVariants.length}
+                                    value={launchPickCount}
+                                    onChange={(e) => setLaunchPickCount(e.target.value)}
+                                    className="h-7 w-16 rounded border border-zinc-300 bg-white px-2 text-xs text-zinc-900"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => selectFirstNLaunchable(Number(launchPickCount) || 0)}
+                                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                  >
+                                    Apply
+                                  </button>
+                                </div>
+                              </div>
                               <div className="flex flex-wrap gap-x-4 gap-y-1">
                                 {sortedVariants.map((v) => {
                                   const hasCreative = v.hasCreative || creativeUrls[v.id];
