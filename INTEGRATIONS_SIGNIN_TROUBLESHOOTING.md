@@ -4,6 +4,22 @@ If **Connect** for Meta, Google, or TikTok doesn’t work or you get an error af
 
 ---
 
+## “Failed to connect” or similar on Facebook’s page
+
+If Facebook shows **“Failed to connect”** (or “Can’t load URL”, “Redirect URI mismatch”) before or after you log in, the **redirect URI** doesn’t match.
+
+**Fix:**
+
+1. **Backend env:** On Render (or wherever the backend runs), set **`BACKEND_URL`** to your **exact** public backend URL, e.g. `https://your-app.onrender.com` (no trailing slash). Redeploy.
+2. **Meta app:** In [Facebook Developers](https://developers.facebook.com/) → your app → **Facebook Login** → **Settings** → **Valid OAuth Redirect URIs**, add **exactly**:
+   ```
+   https://your-app.onrender.com/integrations/meta/callback
+   ```
+   Use your real `BACKEND_URL`; no trailing slash. Save.
+3. Try **Connect** again. If it still fails, double-check there are no typos and that the backend has finished redeploying with the new `BACKEND_URL`.
+
+---
+
 ## 1. Connect button is disabled or does nothing
 
 **Cause:** The frontend doesn’t know your backend URL.

@@ -3,8 +3,9 @@
  * Open: https://your-app.vercel.app/api/backend-check
  * Use this to debug 502s when BACKEND_URL is already set.
  */
+export const maxDuration = 60;
 
-const TIMEOUT_MS = 35000;
+const TIMEOUT_MS = 58_000;
 
 export async function GET() {
   const base =

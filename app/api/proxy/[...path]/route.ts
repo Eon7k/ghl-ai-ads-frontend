@@ -5,9 +5,15 @@
  * Vercel env (required): set BACKEND_URL or NEXT_PUBLIC_API_URL to your Render backend URL
  * (e.g. https://your-app.onrender.com — no trailing slash).
  * If you get 502: check that this is set in Vercel → Project → Settings → Environment Variables.
+ *
+ * Creating campaigns calls the backend for AI variant generation — that can take 30–90s with many
+ * variants. **Vercel Hobby** caps serverless routes at **10s** unless you upgrade; use fewer variants
+ * or Vercel Pro (60s max below) for reliable creates.
  */
+/** Allow long-running POST (e.g. AI). Vercel Hobby max is 10s; Pro supports up to 60s+ per plan. */
+export const maxDuration = 60;
 
-const PROXY_TIMEOUT_MS = 35000; // Render free tier can cold-start in 30–60s
+const PROXY_TIMEOUT_MS = 58_000; // Stay just under maxDuration; Render cold start + AI can be slow
 
 function getBackendUrl(): string {
   const url =
@@ -26,6 +32,46 @@ function buildUrl(path: string[], search?: string): string {
 
 function fail502(code: string, error: string) {
   return Response.json({ error, code }, { status: 502 });
+}
+
+/** Backend sometimes returns plain text or HTML (e.g. Render 503). Parse JSON when possible; otherwise a clear message (not always Prisma). */
+function formatNonJsonBackendError(status: number, rawBody: string): { error: string } {
+  const t = rawBody.trim();
+  const isHtml = t.startsWith("<!") || /^<html/i.test(t);
+  const snippet = isHtml ? "" : t.replace(/\s+/g, " ").slice(0, 800);
+
+  const chunks: string[] = [];
+  if (snippet) {
+    chunks.push(snippet);
+  } else {
+    chunks.push(`Backend returned HTTP ${status} with a non-JSON body.`);
+  }
+  if (status === 503) {
+    chunks.push(
+      "This often means the API is waking up or busy (Render free tier can take a minute after sleep). Retry shortly."
+    );
+  }
+  if (status === 502) {
+    chunks.push("Check Vercel BACKEND_URL and that your Render web service is running.");
+  }
+  if (/prisma|P20\d{2}|column .*does not exist|relation .* does not exist|db push|migrate/i.test(t)) {
+    chunks.push('If the backend logs mention a missing DB column, run `npx prisma db push` against production.');
+  }
+  return { error: chunks.join(" ") };
+}
+
+async function readBackendProxyBody(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) {
+    return res.status >= 400 ? formatNonJsonBackendError(res.status, "") : {};
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return res.status >= 400
+      ? formatNonJsonBackendError(res.status, text)
+      : { error: "Backend did not return valid JSON.", preview: text.slice(0, 200) };
+  }
 }
 
 export async function GET(
@@ -81,7 +127,7 @@ export async function GET(
     return fail502(
       "BACKEND_UNREACHABLE",
       isTimeout
-        ? "Backend took too long to respond. If using Render free tier, the service may be starting — try again in a moment."
+        ? "Backend took too long (proxy timeout). If you had many AI variants, try 1–3 first. Render free tier can be slow to wake; Vercel Hobby only allows ~10s unless you upgrade to Pro."
         : `Cannot reach backend: ${message}`
     );
   }
@@ -116,10 +162,7 @@ export async function POST(
       cache: "no-store",
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
-    const resContentType = res.headers.get("content-type") || "";
-    const data = resContentType.includes("application/json")
-      ? await res.json().catch(() => ({ error: "Invalid JSON from backend" }))
-      : { error: res.status >= 400 ? `Backend error (${res.status}). Check that your database schema is up to date (run prisma db push).` : "Backend did not return JSON." };
+    const data = await readBackendProxyBody(res);
     return Response.json(data, { status: res.status });
   } catch (err: unknown) {
     const message =
@@ -134,7 +177,7 @@ export async function POST(
     return fail502(
       "BACKEND_UNREACHABLE",
       isTimeout
-        ? "Backend took too long to respond. If using Render free tier, the service may be starting — try again in a moment."
+        ? "Backend took too long (proxy timeout). If you had many AI variants, try fewer. Vercel Hobby limits routes to ~10s; Pro allows longer."
         : `Cannot reach backend: ${message}`
     );
   }
@@ -184,7 +227,7 @@ export async function PATCH(
     return fail502(
       "BACKEND_UNREACHABLE",
       isTimeout
-        ? "Backend took too long to respond. If using Render free tier, the service may be starting — try again in a moment."
+        ? "Backend took too long (proxy timeout). Render may be waking up; Vercel Hobby limits routes to ~10s."
         : `Cannot reach backend: ${message}`
     );
   }
@@ -230,7 +273,7 @@ export async function DELETE(
     return fail502(
       "BACKEND_UNREACHABLE",
       isTimeout
-        ? "Backend took too long to respond. If using Render free tier, the service may be starting — try again in a moment."
+        ? "Backend took too long (proxy timeout). Render may be waking up; Vercel Hobby limits routes to ~10s."
         : `Cannot reach backend: ${message}`
     );
   }

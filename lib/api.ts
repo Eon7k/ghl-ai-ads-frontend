@@ -37,7 +37,8 @@ async function request<T>(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
-    throw new Error(msg);
+    const code = typeof (data as { code?: string })?.code === "string" ? (data as { code: string }).code : "";
+    throw new Error(code ? `${msg} (${code})` : msg);
   }
   return data as T;
 }
