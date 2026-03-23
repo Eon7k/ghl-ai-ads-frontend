@@ -198,13 +198,25 @@ export const api = {
   /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx), optional landingPageUrl, optional variantIds (subset of variants to launch). Use dryRun: true to create on Meta but leave paused (no spend). */
   launchExperiment: (
     id: string,
-    options?: { aiCreativeCount?: number; metaAdAccountId?: string; landingPageUrl?: string; dryRun?: boolean; variantIds?: string[] }
+    options?: {
+      aiCreativeCount?: number;
+      metaAdAccountId?: string;
+      tiktokAdvertiserId?: string;
+      tiktokIdentityId?: string;
+      tiktokIdentityType?: string;
+      landingPageUrl?: string;
+      dryRun?: boolean;
+      variantIds?: string[];
+    }
   ) =>
     request<import("./types").Experiment & { dryRun?: boolean }>(`experiments/${id}/launch`, {
       method: "POST",
       body: {
         ...(options?.aiCreativeCount != null && { aiCreativeCount: options.aiCreativeCount }),
         ...(options?.metaAdAccountId && { metaAdAccountId: options.metaAdAccountId }),
+        ...(options?.tiktokAdvertiserId && { tiktokAdvertiserId: options.tiktokAdvertiserId }),
+        ...(options?.tiktokIdentityId && { tiktokIdentityId: options.tiktokIdentityId }),
+        ...(options?.tiktokIdentityType && { tiktokIdentityType: options.tiktokIdentityType }),
         ...(options?.landingPageUrl && { landingPageUrl: options.landingPageUrl }),
         ...(options?.dryRun === true && { dryRun: true }),
         ...(options?.variantIds && options.variantIds.length > 0 && { variantIds: options.variantIds }),
@@ -267,6 +279,11 @@ export const api = {
     /** TikTok ad accounts / advertisers (requires TikTok connected) */
     getTiktokAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/tiktok/ad-accounts").then((r) => r.adAccounts),
+    /** TikTok identities for an advertiser (for ad creative “identity”; optional if backend auto-picks). */
+    getTiktokIdentities: (advertiserId: string) =>
+      request<{ identities: { identityId: string; identityType: string; displayName: string }[] }>(
+        `integrations/tiktok/identities?advertiser_id=${encodeURIComponent(advertiserId)}`
+      ).then((r) => r.identities),
     /** Google Ads customer accounts (requires Google connected and GOOGLE_ADS_DEVELOPER_TOKEN on server) */
     getGoogleAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/google/ad-accounts").then((r) => r.adAccounts),

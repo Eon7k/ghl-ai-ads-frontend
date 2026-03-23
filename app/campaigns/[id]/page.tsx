@@ -40,6 +40,13 @@ export default function CampaignDetailPage() {
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [selectedMetaAdAccountId, setSelectedMetaAdAccountId] = useState<string>("");
+  const [tiktokAdAccounts, setTiktokAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [selectedTiktokAdvertiserId, setSelectedTiktokAdvertiserId] = useState<string>("");
+  const [tiktokIdentities, setTiktokIdentities] = useState<
+    { identityId: string; identityType: string; displayName: string }[] | null
+  >(null);
+  /** Empty = let backend auto-pick an identity. Otherwise "TYPE:id". */
+  const [selectedTiktokIdentityKey, setSelectedTiktokIdentityKey] = useState<string>("");
   const [launchLandingPageUrl, setLaunchLandingPageUrl] = useState<string>("");
   const [metaTestLoading, setMetaTestLoading] = useState(false);
   const [metaTestResult, setMetaTestResult] = useState<{ ok: true; adAccountCount: number } | { ok: false; error: string } | null>(null);
@@ -151,6 +158,35 @@ export default function CampaignDetailPage() {
       .then(setMetaAdAccounts)
       .catch(() => setMetaAdAccounts([]));
   }, [experiment?.id, experiment?.platform, experiment?.status]);
+
+  useEffect(() => {
+    if (!experiment || experiment.platform !== "tiktok" || experiment.status !== "draft") return;
+    api.integrations
+      .getTiktokAdAccounts()
+      .then(setTiktokAdAccounts)
+      .catch(() => setTiktokAdAccounts([]));
+  }, [experiment?.id, experiment?.platform, experiment?.status]);
+
+  useEffect(() => {
+    if (!selectedTiktokAdvertiserId) {
+      setTiktokIdentities(null);
+      setSelectedTiktokIdentityKey("");
+      return;
+    }
+    let cancelled = false;
+    setTiktokIdentities(null);
+    api.integrations
+      .getTiktokIdentities(selectedTiktokAdvertiserId)
+      .then((list) => {
+        if (!cancelled) setTiktokIdentities(list);
+      })
+      .catch(() => {
+        if (!cancelled) setTiktokIdentities([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTiktokAdvertiserId]);
 
   // When launched, load metrics from backend (Meta when we have metaCampaignId, else placeholder)
   useEffect(() => {
@@ -336,6 +372,9 @@ export default function CampaignDetailPage() {
     const opts: {
       aiCreativeCount: number;
       metaAdAccountId?: string;
+      tiktokAdvertiserId?: string;
+      tiktokIdentityId?: string;
+      tiktokIdentityType?: string;
       landingPageUrl?: string;
       dryRun?: boolean;
       variantIds?: string[];
@@ -345,6 +384,19 @@ export default function CampaignDetailPage() {
       if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
       opts.dryRun = dryRun;
       if (variantsSelectedForLaunch.size > 0) opts.variantIds = Array.from(variantsSelectedForLaunch);
+    }
+    if (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) {
+      opts.tiktokAdvertiserId = selectedTiktokAdvertiserId;
+      if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
+      opts.dryRun = dryRun;
+      if (variantsSelectedForLaunch.size > 0) opts.variantIds = Array.from(variantsSelectedForLaunch);
+      if (selectedTiktokIdentityKey) {
+        const sep = selectedTiktokIdentityKey.indexOf(":");
+        if (sep > 0) {
+          opts.tiktokIdentityType = selectedTiktokIdentityKey.slice(0, sep);
+          opts.tiktokIdentityId = selectedTiktokIdentityKey.slice(sep + 1);
+        }
+      }
     }
     try {
       const updated = await api.launchExperiment(experiment.id, opts);
@@ -358,8 +410,9 @@ export default function CampaignDetailPage() {
 
   function handleLaunchLive() {
     if (!experiment || experiment.status === "launched") return;
+    const platformLabel = experiment.platform === "tiktok" ? "TikTok" : "Meta";
     const confirmed = window.confirm(
-      "Are you sure you want to launch this campaign live? It will start running on Meta and may incur spend."
+      `Are you sure you want to launch this campaign live? It will start running on ${platformLabel} and may incur spend.`
     );
     if (confirmed) launch(false);
   }
@@ -672,8 +725,143 @@ export default function CampaignDetailPage() {
                   )}
                 </div>
               )}
+              {experiment.platform === "tiktok" && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
+                  <p className="mb-2 text-sm font-medium text-zinc-700">Launch to TikTok Ads</p>
+                  {tiktokAdAccounts === null ? (
+                    <p className="text-xs text-zinc-500">Loading advertisers…</p>
+                  ) : tiktokAdAccounts.length === 0 ? (
+                    <p className="text-xs text-amber-700">Connect TikTok in Integrations to launch to a real ad account.</p>
+                  ) : (
+                    <>
+                      <label className="block text-xs text-zinc-600">Advertiser (ad account)</label>
+                      <select
+                        value={selectedTiktokAdvertiserId}
+                        onChange={(e) => setSelectedTiktokAdvertiserId(e.target.value)}
+                        className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                      >
+                        <option value="">— Don’t create on TikTok (draft only) —</option>
+                        {tiktokAdAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} ({a.id})
+                          </option>
+                        ))}
+                      </select>
+                      {selectedTiktokAdvertiserId && (
+                        <>
+                          <label className="mt-2 block text-xs text-zinc-600">
+                            Posting identity (optional)
+                          </label>
+                          {tiktokIdentities === null && (
+                            <p className="mt-1 text-xs text-zinc-500">Loading identities…</p>
+                          )}
+                          <select
+                            value={selectedTiktokIdentityKey}
+                            onChange={(e) => setSelectedTiktokIdentityKey(e.target.value)}
+                            disabled={tiktokIdentities === null}
+                            className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm disabled:opacity-60"
+                          >
+                            <option value="">Automatic — use first available identity</option>
+                            {(tiktokIdentities ?? []).map((i) => (
+                              <option
+                                key={`${i.identityType}:${i.identityId}`}
+                                value={`${i.identityType}:${i.identityId}`}
+                              >
+                                {i.displayName} ({i.identityType})
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-1 text-[11px] text-zinc-500">
+                            If launch fails with an identity error, create or link a TikTok identity in TikTok Ads Manager
+                            for this advertiser, then retry or pick it here.
+                          </p>
+                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL</label>
+                          <input
+                            type="url"
+                            value={launchLandingPageUrl}
+                            onChange={(e) => setLaunchLandingPageUrl(e.target.value)}
+                            placeholder="https://your-site.com"
+                            className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                          />
+                          {sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
+                            <div className="mt-3">
+                              <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
+                              <p className="mb-2 text-[11px] text-zinc-500">
+                                Only selected variants with creatives are pushed as TikTok ads (single-image format).
+                              </p>
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setVariantsSelectedForLaunch(
+                                      new Set(sortedVariants.filter((v) => v.hasCreative || creativeUrls[v.id]).map((v) => v.id))
+                                    )
+                                  }
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Select all
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setVariantsSelectedForLaunch(new Set())}
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Clear
+                                </button>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-zinc-500">Pick first</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={sortedVariants.length}
+                                    value={launchPickCount}
+                                    onChange={(e) => setLaunchPickCount(e.target.value)}
+                                    className="h-7 w-16 rounded border border-zinc-300 bg-white px-2 text-xs text-zinc-900"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => selectFirstNLaunchable(Number(launchPickCount) || 0)}
+                                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                  >
+                                    Apply
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {sortedVariants.map((v) => {
+                                  const hasCreative = v.hasCreative || creativeUrls[v.id];
+                                  if (!hasCreative) return null;
+                                  return (
+                                    <label key={v.id} className="flex cursor-pointer items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={variantsSelectedForLaunch.has(v.id)}
+                                        onChange={(e) => {
+                                          setVariantsSelectedForLaunch((prev) => {
+                                            const next = new Set(prev);
+                                            if (e.target.checked) next.add(v.id);
+                                            else next.delete(v.id);
+                                            return next;
+                                          });
+                                        }}
+                                        className="rounded border-zinc-300"
+                                      />
+                                      <span className="text-sm text-zinc-800">Variant {v.index}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
-                {experiment.platform === "meta" && selectedMetaAdAccountId ? (
+                {(experiment.platform === "meta" && selectedMetaAdAccountId) ||
+                (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) ? (
                   <>
                     <button
                       type="button"
@@ -725,7 +913,9 @@ export default function CampaignDetailPage() {
                 <p className="mb-4 text-xs text-zinc-500">
                   {metrics.source === "meta"
                     ? `Metrics from Meta${metrics.datePreset ? ` (${metrics.datePreset})` : ""}. All values match what Meta tracks.`
-                    : "Connect Meta and launch to the platform to see live data. Values below are placeholders."}
+                    : experiment.platform === "tiktok" && experiment.tiktokCampaignId
+                      ? "TikTok reporting via API is not wired yet — use TikTok Ads Manager for spend and delivery. Values below are placeholders."
+                      : "Connect the ad platform and launch to see live data. Values below are placeholders."}
                 </p>
                 <div className="mb-4">
                   <h3 className="mb-2 text-sm font-medium text-zinc-700">Spend &amp; reach</h3>

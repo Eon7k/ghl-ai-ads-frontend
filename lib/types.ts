@@ -42,6 +42,9 @@ export type Experiment = {
   campaignGroupId?: string;
   metaCampaignId?: string;
   metaAdSetId?: string;
+  /** Set after launch to TikTok Marketing API. */
+  tiktokCampaignId?: string;
+  tiktokAdGroupId?: string;
 }
 
 export type Creative = {
