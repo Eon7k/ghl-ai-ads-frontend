@@ -69,6 +69,7 @@ export function HomeClient() {
   const [creativesLoading, setCreativesLoading] = useState(false);
   const [selectedCreativeIds, setSelectedCreativeIds] = useState<string[]>([]);
   const [uploadingCreative, setUploadingCreative] = useState(false);
+  const [uploadCreativeError, setUploadCreativeError] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const connectedParam = searchParams.get("connected");
@@ -154,24 +155,72 @@ export function HomeClient() {
     window.location.href = `${BACKEND_URL.replace(/\/$/, "")}${path}`;
   }
 
-  async function handleUploadCreative(file: File) {
-    if (!file.type.startsWith("image/")) return;
-    setUploadingCreative(true);
+  /** Shrink large photos so JSON + Vercel (~4.5MB) and DB stay happy; HEIC often fails in browsers. */
+  async function fileToUploadableDataUrl(file: File): Promise<string> {
+    const maxDim = 1600;
+    const quality = 0.88;
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
+      const bmp = await createImageBitmap(file);
+      let nw = bmp.width;
+      let nh = bmp.height;
+      if (nw > maxDim || nh > maxDim) {
+        if (nw >= nh) {
+          nh = Math.round((nh * maxDim) / nw);
+          nw = maxDim;
+        } else {
+          nw = Math.round((nw * maxDim) / nh);
+          nh = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = nw;
+      canvas.height = nh;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not read image");
+      ctx.drawImage(bmp, 0, 0, nw, nh);
+      bmp.close();
+      return canvas.toDataURL("image/jpeg", quality);
+    } catch {
+      return await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
-        r.onload = () => {
-          const data = r.result as string;
-          resolve(data);
-        };
-        r.onerror = reject;
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(new Error("Could not read file"));
         r.readAsDataURL(file);
       });
+    }
+  }
+
+  async function handleUploadCreative(file: File) {
+    setUploadCreativeError(null);
+    if (
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      /\.heic$/i.test(file.name)
+    ) {
+      setUploadCreativeError(
+        "HEIC/HEIF isn’t supported here. On iPhone: Settings → Camera → Formats → “Most Compatible”, or export the photo as JPG before uploading."
+      );
+      return;
+    }
+    const looksLikeImage =
+      file.type.startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(file.name);
+    if (!looksLikeImage) {
+      setUploadCreativeError("Please choose an image file (JPG, PNG, WebP, or GIF).");
+      return;
+    }
+    setUploadingCreative(true);
+    try {
+      const base64 = await fileToUploadableDataUrl(file);
       const created = await api.creatives.create(file.name.replace(/\.[^.]+$/, "") || "Creative", base64);
       setCreatives((prev) => [...prev, { id: created.id, name: created.name, createdAt: created.createdAt }]);
       setSelectedCreativeIds((prev) => [...prev, created.id]);
-    } catch {
-      // ignore
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      setUploadCreativeError(
+        msg.includes("fetch") || msg.includes("Network")
+          ? "Could not reach the server. Check your connection or try a smaller image."
+          : msg
+      );
     } finally {
       setUploadingCreative(false);
     }
@@ -423,6 +472,11 @@ export function HomeClient() {
               />
               {uploadingCreative ? "Uploading…" : "+ Upload creative"}
             </label>
+            {uploadCreativeError && (
+              <p className="max-w-md text-sm text-red-700" role="alert">
+                {uploadCreativeError}
+              </p>
+            )}
             {creativesLoading ? (
               <div className="h-20 w-20 animate-pulse rounded-lg bg-zinc-100" />
             ) : creatives.length === 0 ? (
