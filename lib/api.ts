@@ -172,6 +172,17 @@ export const api = {
       { method: "POST", body: {} }
     ),
 
+  /** Set variant image from library (creativeId) or upload (imageData base64 / data URL). */
+  setVariantCreative: (
+    experimentId: string,
+    variantId: string,
+    body: { creativeId: string } | { imageData: string }
+  ) =>
+    request<{ variant: import("./types").AdVariant }>(
+      `experiments/${experimentId}/variants/${variantId}/set-creative`,
+      { method: "POST", body }
+    ),
+
   /** Get blob URL for variant creative image (for use in <img src>. Caller should revoke the URL when done.) */
   getVariantCreativeBlobUrl: async (experimentId: string, variantId: string): Promise<string> => {
     const url = `${API_BASE}/experiments/${experimentId}/variants/${variantId}/creative`;

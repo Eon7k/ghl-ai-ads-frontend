@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import type { MetaAdAccount } from "@/lib/api";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment, Creative } from "@/lib/types";
+import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
 import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 
@@ -155,56 +156,15 @@ export function HomeClient() {
     window.location.href = `${BACKEND_URL.replace(/\/$/, "")}${path}`;
   }
 
-  /** Shrink large photos so JSON + Vercel (~4.5MB) and DB stay happy; HEIC often fails in browsers. */
-  async function fileToUploadableDataUrl(file: File): Promise<string> {
-    const maxDim = 1600;
-    const quality = 0.88;
-    try {
-      const bmp = await createImageBitmap(file);
-      let nw = bmp.width;
-      let nh = bmp.height;
-      if (nw > maxDim || nh > maxDim) {
-        if (nw >= nh) {
-          nh = Math.round((nh * maxDim) / nw);
-          nw = maxDim;
-        } else {
-          nw = Math.round((nw * maxDim) / nh);
-          nh = maxDim;
-        }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = nw;
-      canvas.height = nh;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Could not read image");
-      ctx.drawImage(bmp, 0, 0, nw, nh);
-      bmp.close();
-      return canvas.toDataURL("image/jpeg", quality);
-    } catch {
-      return await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = () => reject(new Error("Could not read file"));
-        r.readAsDataURL(file);
-      });
-    }
-  }
-
   async function handleUploadCreative(file: File) {
     setUploadCreativeError(null);
-    if (
-      file.type === "image/heic" ||
-      file.type === "image/heif" ||
-      /\.heic$/i.test(file.name)
-    ) {
+    if (isHeicFile(file)) {
       setUploadCreativeError(
         "HEIC/HEIF isn’t supported here. On iPhone: Settings → Camera → Formats → “Most Compatible”, or export the photo as JPG before uploading."
       );
       return;
     }
-    const looksLikeImage =
-      file.type.startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(file.name);
-    if (!looksLikeImage) {
+    if (!isLikelyImageFile(file)) {
       setUploadCreativeError("Please choose an image file (JPG, PNG, WebP, or GIF).");
       return;
     }
@@ -253,6 +213,11 @@ export function HomeClient() {
 
     const attachCreatives = (creativesSource === "own" || creativesSource === "mix") && selectedCreativeIds.length > 0;
 
+    const mixAiCreativeVariantCount =
+      creativesSource === "mix"
+        ? Math.min(Math.round((count * aiCreativePercent) / 100), count)
+        : undefined;
+
     try {
       const experiment = await api.createExperiment({
         name,
@@ -265,6 +230,7 @@ export function HomeClient() {
         aiProvider: (creativesSource === "ai" || creativesSource === "mix") ? aiProvider : undefined,
         creativePrompt: creativePrompt.trim() || undefined,
         ...(attachCreatives && { attachedCreativeIds: selectedCreativeIds }),
+        ...(creativesSource === "mix" && mixAiCreativeVariantCount !== undefined && { mixAiCreativeVariantCount }),
       });
 
       const variants = experiment.variants || [];

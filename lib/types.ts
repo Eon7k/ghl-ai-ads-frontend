@@ -67,6 +67,11 @@ export type CreateExperimentBody = {
   creativePrompt?: string;
   /** IDs of creatives from library to attach to this campaign (when using own or mixed). */
   attachedCreativeIds?: string[];
+  /**
+   * When creativesSource is "mix", number of variants (from the start, by index) that will get AI-generated
+   * creatives from the client; remaining variants receive library images on the server.
+   */
+  mixAiCreativeVariantCount?: number;
 };
 
 export type UpdateVariantBody = {

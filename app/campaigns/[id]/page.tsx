@@ -6,7 +6,8 @@ import Link from "next/link";
 import { api, type MetaAdAccount } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Experiment, AdVariant } from "@/lib/types";
+import type { Experiment, AdVariant, Creative } from "@/lib/types";
+import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
 
 import type { CampaignMetricsResponse } from "@/lib/api";
 
@@ -66,6 +67,11 @@ export default function CampaignDetailPage() {
   const [variantsSelectedForLaunch, setVariantsSelectedForLaunch] = useState<Set<string>>(new Set());
   const [launchPickCount, setLaunchPickCount] = useState<string>("3");
   const prevExperimentIdRef = useRef<string | null>(null);
+  const [libraryCreatives, setLibraryCreatives] = useState<Creative[]>([]);
+  const [libraryPick, setLibraryPick] = useState<Record<string, string>>({});
+  const [settingCreativeVariantId, setSettingCreativeVariantId] = useState<string | null>(null);
+  const [attachCreativeErrors, setAttachCreativeErrors] = useState<Record<string, string>>({});
+  const variantFileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -187,6 +193,25 @@ export default function CampaignDetailPage() {
       cancelled = true;
     };
   }, [selectedTiktokAdvertiserId]);
+
+  useEffect(() => {
+    if (!experiment || experiment.status !== "draft") {
+      setLibraryCreatives([]);
+      return;
+    }
+    let cancelled = false;
+    api.creatives
+      .list()
+      .then((list) => {
+        if (!cancelled) setLibraryCreatives(list);
+      })
+      .catch(() => {
+        if (!cancelled) setLibraryCreatives([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [experiment?.id, experiment?.status]);
 
   // When launched, load metrics from backend (Meta when we have metaCampaignId, else placeholder)
   useEffect(() => {
@@ -345,6 +370,92 @@ export default function CampaignDetailPage() {
       // could set per-variant error
     } finally {
       setGeneratingCreativeId(null);
+    }
+  }
+
+  async function applyLibraryCreativeToVariant(variantId: string, creativeId: string) {
+    if (!experiment || !creativeId.trim()) return;
+    setSettingCreativeVariantId(variantId);
+    setAttachCreativeErrors((prev) => {
+      const next = { ...prev };
+      delete next[variantId];
+      return next;
+    });
+    try {
+      await api.setVariantCreative(experiment.id, variantId, { creativeId: creativeId.trim() });
+      setCreativeUrls((prev) => {
+        const next = { ...prev };
+        if (next[variantId]) URL.revokeObjectURL(next[variantId]);
+        delete next[variantId];
+        return next;
+      });
+      const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId);
+      setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
+      setExperiment((prev) => {
+        if (!prev?.variants) return prev;
+        return {
+          ...prev,
+          variants: prev.variants.map((x) =>
+            x.id === variantId ? { ...x, hasCreative: true } : x
+          ),
+        };
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not attach creative";
+      setAttachCreativeErrors((prev) => ({ ...prev, [variantId]: msg }));
+    } finally {
+      setSettingCreativeVariantId(null);
+    }
+  }
+
+  async function applyUploadCreativeToVariant(variantId: string, file: File) {
+    if (!experiment) return;
+    setAttachCreativeErrors((prev) => {
+      const next = { ...prev };
+      delete next[variantId];
+      return next;
+    });
+    if (isHeicFile(file)) {
+      setAttachCreativeErrors((prev) => ({
+        ...prev,
+        [variantId]:
+          "HEIC isn’t supported here. Export as JPG or use “Most Compatible” in iPhone camera settings.",
+      }));
+      return;
+    }
+    if (!isLikelyImageFile(file)) {
+      setAttachCreativeErrors((prev) => ({
+        ...prev,
+        [variantId]: "Please choose an image (JPG, PNG, WebP, or GIF).",
+      }));
+      return;
+    }
+    setSettingCreativeVariantId(variantId);
+    try {
+      const imageData = await fileToUploadableDataUrl(file);
+      await api.setVariantCreative(experiment.id, variantId, { imageData });
+      setCreativeUrls((prev) => {
+        const next = { ...prev };
+        if (next[variantId]) URL.revokeObjectURL(next[variantId]);
+        delete next[variantId];
+        return next;
+      });
+      const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId);
+      setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
+      setExperiment((prev) => {
+        if (!prev?.variants) return prev;
+        return {
+          ...prev,
+          variants: prev.variants.map((x) =>
+            x.id === variantId ? { ...x, hasCreative: true } : x
+          ),
+        };
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      setAttachCreativeErrors((prev) => ({ ...prev, [variantId]: msg }));
+    } finally {
+      setSettingCreativeVariantId(null);
     }
   }
 
@@ -1118,8 +1229,8 @@ export default function CampaignDetailPage() {
           <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
           <p className="mb-4 text-sm text-zinc-600">
             {experiment.creativesSource === "own"
-              ? "Paste your ad copy for each variant and click Save. When ready, click Launch campaign."
-              : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. Drag the handle to reorder variants; drag a creative onto another to swap images. When ready, click Launch campaign."}
+              ? "Paste your ad copy for each variant and click Save. Attach images from your library or upload new ones below each preview (draft only). When ready, click Launch campaign."
+              : "Review and edit copy below. Use “Regenerate with AI” for new copy or “Regenerate creative” to change the image. Drag the handle to reorder variants; drag a creative onto another to swap images. On drafts you can also attach a library image or upload a file per variant. When ready, click Launch campaign."}
           </p>
 
           {sortedVariants.length === 0 ? (
@@ -1260,7 +1371,7 @@ export default function CampaignDetailPage() {
                   </div>
                 </div>
                 <div className="mb-3">
-                  <div className="mb-1.5 flex items-center justify-between">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
                     <p className="text-xs font-medium text-zinc-500">Ad preview</p>
                     {(v.hasCreative || creativeUrls[v.id]) && (
                       <button
@@ -1270,6 +1381,16 @@ export default function CampaignDetailPage() {
                         className="rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-200 disabled:opacity-50"
                       >
                         {generatingCreativeId === v.id || redesigningVariantIds.has(v.id) ? "Regenerating…" : "Regenerate creative"}
+                      </button>
+                    )}
+                    {isDraft && !(v.hasCreative || creativeUrls[v.id]) && (
+                      <button
+                        type="button"
+                        onClick={() => generateCreative(v)}
+                        disabled={generatingCreativeId === v.id || redesigningVariantIds.has(v.id)}
+                        className="rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-200 disabled:opacity-50"
+                      >
+                        {generatingCreativeId === v.id ? "Generating…" : "Generate AI image"}
                       </button>
                     )}
                   </div>
@@ -1318,6 +1439,71 @@ export default function CampaignDetailPage() {
                   </div>
                   {(v.hasCreative || creativeUrls[v.id]) && (
                     <p className="mt-1 text-[10px] text-zinc-400">Drag creative onto another variant to swap</p>
+                  )}
+                  {isDraft && (
+                    <div className="mt-3 space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 p-2">
+                      <p className="text-[11px] font-medium text-zinc-600">Attach creative</p>
+                      <div className="flex flex-wrap items-stretch gap-2">
+                        <select
+                          value={libraryPick[v.id] ?? ""}
+                          onChange={(e) =>
+                            setLibraryPick((p) => ({ ...p, [v.id]: e.target.value }))
+                          }
+                          disabled={settingCreativeVariantId === v.id || libraryCreatives.length === 0}
+                          className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 disabled:opacity-60"
+                        >
+                          <option value="">
+                            {libraryCreatives.length === 0 ? "No library images yet" : "Choose from library…"}
+                          </option>
+                          {libraryCreatives.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          disabled={
+                            !libraryPick[v.id] ||
+                            settingCreativeVariantId === v.id ||
+                            libraryCreatives.length === 0
+                          }
+                          onClick={() =>
+                            libraryPick[v.id] &&
+                            applyLibraryCreativeToVariant(v.id, libraryPick[v.id])
+                          }
+                          className="shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                        >
+                          {settingCreativeVariantId === v.id ? "…" : "Use library"}
+                        </button>
+                      </div>
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={(el) => {
+                            variantFileInputsRef.current[v.id] = el;
+                          }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (file) void applyUploadCreativeToVariant(v.id, file);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={settingCreativeVariantId === v.id}
+                          onClick={() => variantFileInputsRef.current[v.id]?.click()}
+                          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
+                        >
+                          Upload image file
+                        </button>
+                      </div>
+                      {attachCreativeErrors[v.id] && (
+                        <p className="text-xs text-red-600">{attachCreativeErrors[v.id]}</p>
+                      )}
+                    </div>
                   )}
                 </div>
                 <textarea

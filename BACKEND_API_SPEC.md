@@ -64,7 +64,9 @@ Your frontend calls the backend through the proxy at `/api/proxy`. The backend (
 }
 ```
 
-- **`creativesSource`** (optional): `"ai"` or `"own"`. Default `"ai"`. If `"own"`, user will paste copy per variant; backend should create `variantCount` variants with **empty or placeholder** `copy` so the user fills them in on the detail page.
+- **`creativesSource`** (optional): `"ai"`, `"mix"`, or `"own"`. Default `"ai"`. If `"own"`, user will paste copy per variant; backend should create `variantCount` variants with **empty or placeholder** `copy` so the user fills them in on the detail page.
+- **`attachedCreativeIds`** (optional): string array of `creative-...` ids. When present with `"own"` or `"mix"`, the backend should copy each creative’s stored image onto variants in order (cycling if there are more variants than images). For `"mix"`, skip the first **`mixAiCreativeVariantCount`** variants (those get AI images from the client); assign library images to the rest.
+- **`mixAiCreativeVariantCount`** (optional): non-negative integer, used only when `creativesSource` is `"mix"` (typically the number of variants that will receive `generate-creative` from the client). If omitted for mix, default `0` (library applied to all variants first; client AI calls then overwrite the first N).
 - **What the backend should do:**
   1. Create an experiment with `status: "draft"` and store `creativesSource` if present.
   2. If `creativesSource` is `"own"`: create `variantCount` variants with empty or placeholder `copy` (e.g. "Paste your ad copy...").
@@ -104,6 +106,18 @@ Your frontend calls the backend through the proxy at `/api/proxy`. The backend (
 
 ---
 
+### 4b. Set variant creative (library or upload)
+
+- **Method:** `POST`
+- **Path:** `/experiments/:experimentId/variants/:variantId/set-creative`
+- **Request body (JSON):** exactly one of:
+  - `{ "creativeId": "creative-..." }` — copy image from the user’s creative library onto the variant.
+  - `{ "imageData": "data:image/jpeg;base64,..." }` or raw base64 — store upload on the variant (same rules as `POST /creatives`).
+- **Response:** `200` with `{ "variant": AdVariant }` (`hasCreative: true`).  
+  `400` if both/neither fields are sent; `404` if experiment, variant, or library creative not found.
+
+---
+
 ### 5. Launch experiment
 
 - **Method:** `POST`
@@ -124,6 +138,7 @@ Your frontend calls the backend through the proxy at `/api/proxy`. The backend (
 | POST | `/experiments` | Create experiment + generate N variants from prompt; return experiment with variants. |
 | GET | `/experiments/:id` | Get one experiment with its variants. |
 | PATCH | `/experiments/:experimentId/variants/:variantId` | Update a variant’s `copy`. |
+| POST | `/experiments/:experimentId/variants/:variantId/set-creative` | Attach library creative or uploaded image to a variant. |
 | POST | `/experiments/:id/launch` | Mark experiment as launched. |
 
 ---
