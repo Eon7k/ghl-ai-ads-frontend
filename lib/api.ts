@@ -206,7 +206,7 @@ export const api = {
       body: { variantIdA, variantIdB },
     }),
 
-  /** Mark experiment as launched. For Meta: pass metaAdAccountId (act_xxx), optional landingPageUrl, optional variantIds (subset of variants to launch). Use dryRun: true to create on Meta but leave paused (no spend). */
+  /** Mark experiment as launched. Meta: metaAdAccountId. TikTok: tiktokAdvertiserId. Google: googleAdsCustomerId + landingPageUrl. Use dryRun: true to create paused / test where supported. */
   launchExperiment: (
     id: string,
     options?: {
@@ -215,6 +215,7 @@ export const api = {
       tiktokAdvertiserId?: string;
       tiktokIdentityId?: string;
       tiktokIdentityType?: string;
+      googleAdsCustomerId?: string;
       landingPageUrl?: string;
       dryRun?: boolean;
       variantIds?: string[];
@@ -228,6 +229,7 @@ export const api = {
         ...(options?.tiktokAdvertiserId && { tiktokAdvertiserId: options.tiktokAdvertiserId }),
         ...(options?.tiktokIdentityId && { tiktokIdentityId: options.tiktokIdentityId }),
         ...(options?.tiktokIdentityType && { tiktokIdentityType: options.tiktokIdentityType }),
+        ...(options?.googleAdsCustomerId && { googleAdsCustomerId: options.googleAdsCustomerId }),
         ...(options?.landingPageUrl && { landingPageUrl: options.landingPageUrl }),
         ...(options?.dryRun === true && { dryRun: true }),
         ...(options?.variantIds && options.variantIds.length > 0 && { variantIds: options.variantIds }),
@@ -298,6 +300,9 @@ export const api = {
     /** Google Ads customer accounts (requires Google connected and GOOGLE_ADS_DEVELOPER_TOKEN on server) */
     getGoogleAdAccounts: () =>
       request<{ adAccounts: MetaAdAccount[] }>("integrations/google/ad-accounts").then((r) => r.adAccounts),
+    /** Test Google token + developer token + list accessible customers. */
+    testGoogleConnection: () =>
+      request<{ ok: true; customerCount: number } | { ok: false; error: string }>("integrations/google/test"),
   },
 };
 

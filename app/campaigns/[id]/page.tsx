@@ -66,6 +66,12 @@ export default function CampaignDetailPage() {
   const [variantsSelectedForRedesign, setVariantsSelectedForRedesign] = useState<Set<string>>(new Set());
   const [variantsSelectedForLaunch, setVariantsSelectedForLaunch] = useState<Set<string>>(new Set());
   const [launchPickCount, setLaunchPickCount] = useState<string>("3");
+  const [googleAdAccounts, setGoogleAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [selectedGoogleCustomerId, setSelectedGoogleCustomerId] = useState<string>("");
+  const [googleTestLoading, setGoogleTestLoading] = useState(false);
+  const [googleTestResult, setGoogleTestResult] = useState<
+    { ok: true; customerCount: number } | { ok: false; error: string } | null
+  >(null);
   const prevExperimentIdRef = useRef<string | null>(null);
   const [libraryCreatives, setLibraryCreatives] = useState<Creative[]>([]);
   const [libraryPick, setLibraryPick] = useState<Record<string, string>>({});
@@ -171,6 +177,14 @@ export default function CampaignDetailPage() {
       .getTiktokAdAccounts()
       .then(setTiktokAdAccounts)
       .catch(() => setTiktokAdAccounts([]));
+  }, [experiment?.id, experiment?.platform, experiment?.status]);
+
+  useEffect(() => {
+    if (!experiment || experiment.platform !== "google" || experiment.status !== "draft") return;
+    api.integrations
+      .getGoogleAdAccounts()
+      .then(setGoogleAdAccounts)
+      .catch(() => setGoogleAdAccounts([]));
   }, [experiment?.id, experiment?.platform, experiment?.status]);
 
   useEffect(() => {
@@ -472,6 +486,19 @@ export default function CampaignDetailPage() {
     }
   }
 
+  async function testGoogleConnection() {
+    setGoogleTestLoading(true);
+    setGoogleTestResult(null);
+    try {
+      const result = await api.integrations.testGoogleConnection();
+      setGoogleTestResult(result);
+    } catch (e) {
+      setGoogleTestResult({ ok: false, error: e instanceof Error ? e.message : "Request failed" });
+    } finally {
+      setGoogleTestLoading(false);
+    }
+  }
+
   async function launch(dryRun: boolean) {
     if (!experiment || experiment.status === "launched") return;
     setLaunching(true);
@@ -486,6 +513,7 @@ export default function CampaignDetailPage() {
       tiktokAdvertiserId?: string;
       tiktokIdentityId?: string;
       tiktokIdentityType?: string;
+      googleAdsCustomerId?: string;
       landingPageUrl?: string;
       dryRun?: boolean;
       variantIds?: string[];
@@ -509,6 +537,12 @@ export default function CampaignDetailPage() {
         }
       }
     }
+    if (experiment.platform === "google" && selectedGoogleCustomerId) {
+      opts.googleAdsCustomerId = selectedGoogleCustomerId.replace(/\D/g, "");
+      if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
+      opts.dryRun = dryRun;
+      if (variantsSelectedForLaunch.size > 0) opts.variantIds = Array.from(variantsSelectedForLaunch);
+    }
     try {
       const updated = await api.launchExperiment(experiment.id, opts);
       setExperiment(updated);
@@ -521,7 +555,12 @@ export default function CampaignDetailPage() {
 
   function handleLaunchLive() {
     if (!experiment || experiment.status === "launched") return;
-    const platformLabel = experiment.platform === "tiktok" ? "TikTok" : "Meta";
+    const platformLabel =
+      experiment.platform === "tiktok"
+        ? "TikTok"
+        : experiment.platform === "google"
+          ? "Google Ads"
+          : "Meta";
     const confirmed = window.confirm(
       `Are you sure you want to launch this campaign live? It will start running on ${platformLabel} and may incur spend.`
     );
@@ -705,6 +744,12 @@ export default function CampaignDetailPage() {
             {experiment.platform.toUpperCase()} · ${experiment.totalDailyBudget}/day total
             {variants.length > 0 && ` · ${variants.length} variant${variants.length === 1 ? "" : "s"}`}
             {budgetPerVariant != null && ` · $${budgetPerVariant}/day per variant`}
+            {experiment.status === "launched" && experiment.googleCampaignId && (
+              <span className="block mt-1 text-xs text-zinc-500">
+                Google Ads campaign id {experiment.googleCampaignId}
+                {experiment.googleAdGroupId ? ` · ad group ${experiment.googleAdGroupId}` : ""}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -741,12 +786,14 @@ export default function CampaignDetailPage() {
                       </select>
                       {selectedMetaAdAccountId && (
                         <>
-                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL (optional)</label>
+                          <label className="mt-2 block text-xs text-zinc-600">
+                            Landing page URL (used for ad destination and Meta ad set website promotion)
+                          </label>
                           <input
                             type="url"
                             value={launchLandingPageUrl}
                             onChange={(e) => setLaunchLandingPageUrl(e.target.value)}
-                            placeholder="https://example.com"
+                            placeholder="https://yoursite.com/landing"
                             className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
                           />
                           <div className="mt-2 flex items-center gap-2">
@@ -970,9 +1017,146 @@ export default function CampaignDetailPage() {
                   )}
                 </div>
               )}
+              {experiment.platform === "google" && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
+                  <p className="mb-2 text-sm font-medium text-zinc-700">Launch to Google Ads</p>
+                  <p className="mb-2 text-[11px] text-zinc-500">
+                    Creates a <strong>Display</strong> campaign with responsive display ads (one ad per selected variant).
+                    Backend needs <code className="rounded bg-zinc-200 px-1">GOOGLE_ADS_DEVELOPER_TOKEN</code> and a
+                    valid OAuth refresh token. Dry run keeps everything paused in Google Ads.
+                  </p>
+                  {googleAdAccounts === null ? (
+                    <p className="text-xs text-zinc-500">Loading Google Ads accounts…</p>
+                  ) : googleAdAccounts.length === 0 ? (
+                    <p className="text-xs text-amber-700">
+                      Connect Google in Integrations and ensure the server has a developer token to list customer ids.
+                    </p>
+                  ) : (
+                    <>
+                      <label className="block text-xs text-zinc-600">Customer account</label>
+                      <select
+                        value={selectedGoogleCustomerId}
+                        onChange={(e) => setSelectedGoogleCustomerId(e.target.value)}
+                        className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                      >
+                        <option value="">— Don’t create in Google Ads (draft only) —</option>
+                        {googleAdAccounts.map((a) => (
+                          <option key={a.id} value={a.accountId || a.id}>
+                            {a.name} ({a.accountId || a.id})
+                          </option>
+                        ))}
+                      </select>
+                      {selectedGoogleCustomerId && (
+                        <>
+                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL (required)</label>
+                          <input
+                            type="url"
+                            value={launchLandingPageUrl}
+                            onChange={(e) => setLaunchLandingPageUrl(e.target.value)}
+                            placeholder="https://your-site.com/offer"
+                            className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                          />
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={testGoogleConnection}
+                              disabled={googleTestLoading}
+                              className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                            >
+                              {googleTestLoading ? "Testing…" : "Test Google Ads API"}
+                            </button>
+                            {googleTestResult && (
+                              <span className={`text-xs ${googleTestResult.ok ? "text-green-700" : "text-red-700"}`}>
+                                {googleTestResult.ok
+                                  ? `OK — ${googleTestResult.customerCount} accessible customer(s)`
+                                  : googleTestResult.error}
+                              </span>
+                            )}
+                          </div>
+                          {sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
+                            <div className="mt-3">
+                              <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
+                              <p className="mb-2 text-[11px] text-zinc-500">
+                                Each selected variant becomes a responsive display ad in one ad group.
+                              </p>
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setVariantsSelectedForLaunch(
+                                      new Set(
+                                        sortedVariants
+                                          .filter((v) => v.hasCreative || creativeUrls[v.id])
+                                          .map((v) => v.id)
+                                      )
+                                    )
+                                  }
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Select all
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setVariantsSelectedForLaunch(new Set())}
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Clear
+                                </button>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-zinc-500">Pick first</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={sortedVariants.length}
+                                    value={launchPickCount}
+                                    onChange={(e) => setLaunchPickCount(e.target.value)}
+                                    className="h-7 w-16 rounded border border-zinc-300 bg-white px-2 text-xs text-zinc-900"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => selectFirstNLaunchable(Number(launchPickCount) || 0)}
+                                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                  >
+                                    Apply
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {sortedVariants.map((v) => {
+                                  const hasCreative = v.hasCreative || creativeUrls[v.id];
+                                  if (!hasCreative) return null;
+                                  return (
+                                    <label key={v.id} className="flex cursor-pointer items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={variantsSelectedForLaunch.has(v.id)}
+                                        onChange={(e) => {
+                                          setVariantsSelectedForLaunch((prev) => {
+                                            const next = new Set(prev);
+                                            if (e.target.checked) next.add(v.id);
+                                            else next.delete(v.id);
+                                            return next;
+                                          });
+                                        }}
+                                        className="rounded border-zinc-300"
+                                      />
+                                      <span className="text-sm text-zinc-800">Variant {v.index}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
                 {(experiment.platform === "meta" && selectedMetaAdAccountId) ||
-                (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) ? (
+                (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) ||
+                (experiment.platform === "google" && selectedGoogleCustomerId) ? (
                   <>
                     <button
                       type="button"
@@ -1026,7 +1210,9 @@ export default function CampaignDetailPage() {
                     ? `Metrics from Meta${metrics.datePreset ? ` (${metrics.datePreset})` : ""}. All values match what Meta tracks.`
                     : experiment.platform === "tiktok" && experiment.tiktokCampaignId
                       ? "TikTok reporting via API is not wired yet — use TikTok Ads Manager for spend and delivery. Values below are placeholders."
-                      : "Connect the ad platform and launch to see live data. Values below are placeholders."}
+                      : experiment.platform === "google" && experiment.googleCampaignId
+                        ? "Google Ads metrics are not pulled into this app yet — use Google Ads for delivery, spend, and approvals. Values below are placeholders."
+                        : "Connect the ad platform and launch to see live data. Values below are placeholders."}
                 </p>
                 <div className="mb-4">
                   <h3 className="mb-2 text-sm font-medium text-zinc-700">Spend &amp; reach</h3>
