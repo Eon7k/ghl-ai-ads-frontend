@@ -112,9 +112,27 @@ export default function ManagerPage() {
                           )}
                         </p>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${g.status === "Active" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                        {g.status === "Active" ? "Launched" : "Draft"}
-                      </span>
+                      <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+                        {(() => {
+                          const m = g.experiments[0]?.aiOptimizationMode ?? "off";
+                          const aiLabel =
+                            m === "auto" ? "AI: Auto" : m === "suggestions" ? "AI: Suggestions" : "AI: Off";
+                          const aiClass =
+                            m === "auto"
+                              ? "bg-violet-100 text-violet-900"
+                              : m === "suggestions"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-zinc-100 text-zinc-600";
+                          return (
+                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${aiClass}`}>
+                              {aiLabel}
+                            </span>
+                          );
+                        })()}
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${g.status === "Active" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                          {g.status === "Active" ? "Launched" : "Draft"}
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 </li>

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { api, type MetaAdAccount } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Experiment, AdVariant, Creative } from "@/lib/types";
+import type { Experiment, AdVariant, Creative, AiOptimizationMode } from "@/lib/types";
 import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
 
 import type { CampaignMetricsResponse } from "@/lib/api";
@@ -79,6 +79,19 @@ export default function CampaignDetailPage() {
   const [attachCreativeErrors, setAttachCreativeErrors] = useState<Record<string, string>>({});
   const variantFileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
   const [createGenWarning, setCreateGenWarning] = useState<string | null>(null);
+  const [optimizationModeDraft, setOptimizationModeDraft] = useState<AiOptimizationMode>("off");
+  const [savingOptimizationMode, setSavingOptimizationMode] = useState(false);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [insightsResult, setInsightsResult] = useState<{
+    summary: string;
+    suggestions: string[];
+    recommendedDailyBudget: number | null;
+    budgetAutoApplied: boolean;
+    budgetNote?: string;
+    metricsSource: string;
+    platform: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!id || typeof window === "undefined") return;
@@ -141,6 +154,12 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (experiment) setTargetAudienceInput(experiment.targetAudiencePrompt ?? "");
   }, [experiment?.id, experiment?.targetAudiencePrompt]);
+
+  useEffect(() => {
+    const m = experiment?.aiOptimizationMode;
+    if (m === "off" || m === "suggestions" || m === "auto") setOptimizationModeDraft(m);
+    else setOptimizationModeDraft("off");
+  }, [experiment?.id, experiment?.aiOptimizationMode]);
 
   // Init/update which variants are selected for launch (only those with creatives; reset when switching campaign)
   useEffect(() => {
@@ -580,6 +599,43 @@ export default function CampaignDetailPage() {
 
   function handleLaunchDryRun() {
     launch(true);
+  }
+
+  async function saveOptimizationMode() {
+    if (!experiment) return;
+    setSavingOptimizationMode(true);
+    setInsightsError(null);
+    try {
+      const updated = await api.updateExperiment(experiment.id, { aiOptimizationMode: optimizationModeDraft });
+      setExperiment((prev) =>
+        prev ? { ...prev, ...updated, variants: prev.variants } : null
+      );
+    } catch (e) {
+      setInsightsError(e instanceof Error ? e.message : "Could not save optimization mode");
+    } finally {
+      setSavingOptimizationMode(false);
+    }
+  }
+
+  async function runAiPerformanceReview() {
+    if (!experiment) return;
+    setInsightsLoading(true);
+    setInsightsError(null);
+    setInsightsResult(null);
+    try {
+      const r = await api.getAiPerformanceInsights(experiment.id);
+      setInsightsResult(r);
+      if (r.newTotalDailyBudget != null) {
+        setExperiment((prev) =>
+          prev ? { ...prev, totalDailyBudget: r.newTotalDailyBudget! } : null
+        );
+        setBudgetValue(String(r.newTotalDailyBudget));
+      }
+    } catch (e) {
+      setInsightsError(e instanceof Error ? e.message : "AI insights failed");
+    } finally {
+      setInsightsLoading(false);
+    }
   }
 
   const sortedVariants = [...(experiment?.variants ?? [])].sort((a, b) => a.index - b.index);
@@ -1296,6 +1352,74 @@ export default function CampaignDetailPage() {
             ) : (
               <p className="text-sm text-zinc-500">Metrics unavailable.</p>
             )}
+          </section>
+
+          <section className="mt-4 rounded-xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
+            <h2 className="mb-2 text-lg font-semibold text-zinc-900">AI optimization (all platforms)</h2>
+            <p className="mb-4 text-sm text-zinc-600">
+              Choose how the assistant uses performance data. <strong>Meta</strong> campaigns can use live metrics from this app;
+              <strong> Google Ads</strong> and <strong>TikTok</strong> use the same AI review with placeholder metrics until native reporting is connected — the AI will still tailor advice to each platform.{" "}
+              <strong>Auto</strong> can update the <strong>Meta ad set daily budget</strong> only (±25% clamp) when you run a review and the model recommends a budget; Google/TikTok budgets stay manual in their own UIs.
+            </p>
+            <div className="mb-4 flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">Optimization mode</label>
+                <select
+                  value={optimizationModeDraft}
+                  onChange={(e) => setOptimizationModeDraft(e.target.value as AiOptimizationMode)}
+                  className="mt-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                >
+                  <option value="off">Off — no budget automation</option>
+                  <option value="suggestions">Suggestions — AI advice only</option>
+                  <option value="auto">Auto — apply Meta budget when AI recommends (Meta only)</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={saveOptimizationMode}
+                disabled={
+                  savingOptimizationMode ||
+                  optimizationModeDraft === (experiment.aiOptimizationMode ?? "off")
+                }
+                className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-900 disabled:opacity-50"
+              >
+                {savingOptimizationMode ? "Saving…" : "Save mode"}
+              </button>
+            </div>
+            <div className="border-t border-violet-200 pt-4">
+              <button
+                type="button"
+                onClick={runAiPerformanceReview}
+                disabled={insightsLoading}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {insightsLoading ? "Analyzing…" : "Run AI performance review"}
+              </button>
+              {insightsError && <p className="mt-2 text-sm text-red-600">{insightsError}</p>}
+              {insightsResult && (
+                <div className="mt-4 space-y-3 rounded-lg border border-violet-200 bg-white p-4 text-sm text-zinc-800">
+                  <p className="text-xs text-zinc-500">
+                    Data source: {insightsResult.metricsSource} · Platform: {insightsResult.platform}
+                  </p>
+                  <p className="font-medium text-zinc-900">{insightsResult.summary}</p>
+                  <ul className="list-inside list-disc space-y-1 text-zinc-700">
+                    {insightsResult.suggestions.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                  {insightsResult.recommendedDailyBudget != null && (
+                    <p className="text-zinc-700">
+                      AI suggested daily budget:{" "}
+                      <span className="font-semibold">${insightsResult.recommendedDailyBudget.toFixed(2)}</span>
+                      {insightsResult.budgetAutoApplied ? " (applied on Meta)" : ""}
+                    </p>
+                  )}
+                  {insightsResult.budgetNote && (
+                    <p className="rounded bg-zinc-50 px-2 py-1.5 text-xs text-zinc-600">{insightsResult.budgetNote}</p>
+                  )}
+                </div>
+              )}
+            </div>
           </section>
 
           {/* Campaign controls: pause/activate and budget when linked to Meta */}

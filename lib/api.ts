@@ -140,9 +140,28 @@ export const api = {
   getExperiment: (id: string) =>
     request<import("./types").Experiment>(`experiments/${id}`),
 
-  /** Update experiment (e.g. creative direction, target audience description for Meta). */
-  updateExperiment: (id: string, data: { creativePrompt?: string | null; targetAudiencePrompt?: string | null }) =>
-    request<import("./types").Experiment>(`experiments/${id}`, { method: "PATCH", body: data }),
+  /** Update experiment (e.g. creative direction, target audience, AI optimization mode). */
+  updateExperiment: (
+    id: string,
+    data: {
+      creativePrompt?: string | null;
+      targetAudiencePrompt?: string | null;
+      aiOptimizationMode?: import("./types").AiOptimizationMode;
+    }
+  ) => request<import("./types").Experiment>(`experiments/${id}`, { method: "PATCH", body: data }),
+
+  /** AI performance snapshot for any launched platform; may apply Meta budget when mode is auto. */
+  getAiPerformanceInsights: (experimentId: string) =>
+    request<{
+      summary: string;
+      suggestions: string[];
+      recommendedDailyBudget: number | null;
+      budgetAutoApplied: boolean;
+      budgetNote?: string;
+      metricsSource: string;
+      platform: string;
+      newTotalDailyBudget?: number;
+    }>(`experiments/${experimentId}/ai-performance-insights`, { method: "POST", body: {} }),
 
   /** Preview Meta ad set targeting from natural-language audience (Meta campaigns only). */
   previewMetaTargeting: (experimentId: string, targetAudiencePrompt: string) =>

@@ -18,6 +18,9 @@ export type AdVariant = {
 
 export type CreativesSource = "ai" | "mix" | "own";
 
+/** Campaign-level AI optimization: Off | Suggestions only | Auto (Meta ad-set budget may update when AI recommends). */
+export type AiOptimizationMode = "off" | "suggestions" | "auto";
+
 export type Experiment = {
   id: string;
   name: string;
@@ -48,6 +51,7 @@ export type Experiment = {
   /** Set after launch via Google Ads API (Display campaign). */
   googleCampaignId?: string;
   googleAdGroupId?: string;
+  aiOptimizationMode?: AiOptimizationMode;
 }
 
 export type Creative = {
