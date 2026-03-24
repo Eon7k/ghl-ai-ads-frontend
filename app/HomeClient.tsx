@@ -233,27 +233,49 @@ export function HomeClient() {
         ...(creativesSource === "mix" && mixAiCreativeVariantCount !== undefined && { mixAiCreativeVariantCount }),
       });
 
-      const variants = experiment.variants || [];
+      const variantsSorted = [...(experiment.variants || [])].sort((a, b) => a.index - b.index);
       const createdIds = (experiment as Experiment & { createdExperimentIds?: string[] }).createdExperimentIds || [experiment.id];
       const creativeCount = creativesSource === "mix"
-        ? Math.min(Math.round((variants.length * aiCreativePercent) / 100), variants.length)
-        : creativesSource === "ai" ? variants.length : 0;
+        ? Math.min(Math.round((variantsSorted.length * aiCreativePercent) / 100), variantsSorted.length)
+        : creativesSource === "ai" ? variantsSorted.length : 0;
 
+      const genErrors: string[] = [];
       if (creativeCount > 0) {
         for (let i = 0; i < creativeCount; i++) {
+          const vid = variantsSorted[i]?.id;
+          if (!vid) continue;
           setCreateStatus(`Generating creatives ${i + 1} of ${creativeCount}…`);
           try {
-            await api.generateVariantCreative(experiment.id, variants[i].id);
-          } catch {
-            // continue
+            await api.generateVariantCreative(experiment.id, vid);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "Generation failed";
+            genErrors.push(`Variant ${i + 1}: ${msg}`);
           }
         }
+      }
+
+      let experimentForList = experiment;
+      try {
+        experimentForList = await api.getExperiment(experiment.id);
+      } catch {
+        /* keep create response */
       }
 
       setCreateOpen(false);
       setCreateLoading(false);
       setCreateStatus("");
-      setCampaigns((prev) => [...prev, experiment]);
+      if (genErrors.length > 0) {
+        try {
+          const text =
+            genErrors.length === creativeCount && creativeCount > 0
+              ? `AI images failed for all ${creativeCount} slot(s) that use AI. Check the backend OpenAI key and proxy timeouts. ${genErrors[0]}`
+              : `Some AI images failed: ${genErrors.slice(0, 2).join(" · ")}`;
+          sessionStorage.setItem(`ghl-ai-gen-warn:${experiment.id}`, text);
+        } catch {
+          /* ignore quota / private mode */
+        }
+      }
+      setCampaigns((prev) => [...prev, experimentForList]);
       if (createdIds.length > 1) {
         setCampaignsLoading(true);
         api.listExperiments().then(setCampaigns).finally(() => setCampaignsLoading(false));

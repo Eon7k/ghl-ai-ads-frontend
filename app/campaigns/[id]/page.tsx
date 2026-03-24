@@ -78,6 +78,17 @@ export default function CampaignDetailPage() {
   const [settingCreativeVariantId, setSettingCreativeVariantId] = useState<string | null>(null);
   const [attachCreativeErrors, setAttachCreativeErrors] = useState<Record<string, string>>({});
   const variantFileInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
+  const [createGenWarning, setCreateGenWarning] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id || typeof window === "undefined") return;
+    const key = `ghl-ai-gen-warn:${id}`;
+    const msg = sessionStorage.getItem(key);
+    if (msg) {
+      sessionStorage.removeItem(key);
+      setCreateGenWarning(msg);
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -736,6 +747,19 @@ export default function CampaignDetailPage() {
             ← Back to Campaigns
           </Link>
         </div>
+
+        {createGenWarning && (
+          <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p>{createGenWarning}</p>
+            <button
+              type="button"
+              onClick={() => setCreateGenWarning(null)}
+              className="shrink-0 rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
