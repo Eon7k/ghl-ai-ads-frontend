@@ -76,6 +76,20 @@ export type AdminAiPerformance = {
   >;
 };
 
+export type MetaPermissionTestRow = {
+  id: string;
+  label: string;
+  useCases: ("captureLeads" | "measurePerformance")[];
+  request: string;
+  ok: boolean;
+  detail?: string;
+};
+
+export type MetaPermissionTestsResponse = {
+  summary: { adAccountId: string | null; pageId: string | null; allOk: boolean };
+  results: MetaPermissionTestRow[];
+};
+
 export const api = {
   /** Register; returns token and user. Use skipAuth so we don't require a token. */
   auth: {
@@ -111,6 +125,12 @@ export const api = {
     removeAgencyClient: (agencyUserId: string, clientUserId: string) =>
       request<{ ok: boolean }>(`admin/agencies/${agencyUserId}/clients/${clientUserId}`, {
         method: "DELETE",
+      }),
+    /** Run Graph API calls that map to Meta App Dashboard permission tests (admin’s connected Meta token). */
+    runMetaPermissionTests: (metaAdAccountId?: string) =>
+      request<MetaPermissionTestsResponse>("admin/meta-permission-tests", {
+        method: "POST",
+        body: metaAdAccountId?.trim() ? { metaAdAccountId: metaAdAccountId.trim() } : {},
       }),
   },
 

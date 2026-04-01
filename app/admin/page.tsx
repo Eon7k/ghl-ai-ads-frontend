@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, type AdminOverview, type AdminAiPerformance } from "@/lib/api";
+import {
+  api,
+  type AdminOverview,
+  type AdminAiPerformance,
+  type MetaPermissionTestsResponse,
+} from "@/lib/api";
 
 type AdminUser = { id: string; email: string; accountType: string; createdAt: string };
 
@@ -20,6 +25,10 @@ export default function AdminPage() {
   const [addingClientFor, setAddingClientFor] = useState<string | null>(null);
   const [removingClient, setRemovingClient] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
+  const [metaTestLoading, setMetaTestLoading] = useState(false);
+  const [metaTestResult, setMetaTestResult] = useState<MetaPermissionTestsResponse | null>(null);
+  const [metaTestError, setMetaTestError] = useState<string | null>(null);
+  const [metaAdAccountInput, setMetaAdAccountInput] = useState("");
 
   const filteredUsers = userSearch.trim()
     ? adminUsers.filter((u) => u.email.toLowerCase().includes(userSearch.trim().toLowerCase()))
@@ -111,6 +120,105 @@ export default function AdminPage() {
         <p className="mt-6 text-zinc-500">Loading admin data…</p>
       ) : (
         <div className="mt-8 space-y-10">
+          <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-zinc-900">Meta permission tests (App Dashboard)</h2>
+            <p className="mt-1 text-sm text-zinc-600">
+              Runs Graph API calls using <strong>your</strong> connected Meta token (same as Integrations). Connect Meta as this admin user first. Reconnect Meta after backend adds new OAuth scopes. Mapped to Meta &quot;Capture and manage ad leads&quot; and &quot;Measure ad performance&quot; checklist items.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <label htmlFor="meta-act" className="text-xs font-medium text-zinc-600">
+                  Ad account (optional)
+                </label>
+                <input
+                  id="meta-act"
+                  type="text"
+                  placeholder="act_505127637151996 or numeric id"
+                  value={metaAdAccountInput}
+                  onChange={(e) => setMetaAdAccountInput(e.target.value)}
+                  className="mt-1 w-full max-w-md rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={metaTestLoading}
+                onClick={async () => {
+                  setMetaTestLoading(true);
+                  setMetaTestError(null);
+                  setMetaTestResult(null);
+                  try {
+                    const r = await api.admin.runMetaPermissionTests(
+                      metaAdAccountInput.trim() || undefined
+                    );
+                    setMetaTestResult(r);
+                  } catch (e) {
+                    setMetaTestError(e instanceof Error ? e.message : "Request failed");
+                  } finally {
+                    setMetaTestLoading(false);
+                  }
+                }}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {metaTestLoading ? "Running tests…" : "Run all Meta permission tests"}
+              </button>
+            </div>
+            {metaTestError && (
+              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{metaTestError}</p>
+            )}
+            {metaTestResult && (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-zinc-700">
+                  <span className="font-medium">Page id:</span> {metaTestResult.summary.pageId ?? "—"} ·{" "}
+                  <span className="font-medium">Ad account:</span> {metaTestResult.summary.adAccountId ?? "—"} ·{" "}
+                  <span className={metaTestResult.summary.allOk ? "font-medium text-green-700" : "font-medium text-amber-800"}>
+                    {metaTestResult.summary.allOk ? "All calls succeeded" : "Some calls failed — see rows"}
+                  </span>
+                </p>
+                <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
+                        <th className="px-3 py-2 font-medium text-zinc-700">Permission / test</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700">Use case</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700">API</th>
+                        <th className="px-3 py-2 font-medium text-zinc-700">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metaTestResult.results.map((row) => (
+                        <tr key={row.id} className="border-b border-zinc-100">
+                          <td className="px-3 py-2 text-zinc-900">{row.label}</td>
+                          <td className="px-3 py-2 text-zinc-600">
+                            {row.useCases.includes("captureLeads") && row.useCases.includes("measurePerformance")
+                              ? "Leads + Performance"
+                              : row.useCases.includes("captureLeads")
+                                ? "Capture leads"
+                                : "Measure performance"}
+                          </td>
+                          <td className="max-w-xs truncate px-3 py-2 font-mono text-xs text-zinc-500" title={row.request}>
+                            {row.request}
+                          </td>
+                          <td className="px-3 py-2">
+                            {row.ok ? (
+                              <span className="text-green-700">OK</span>
+                            ) : (
+                              <span className="text-red-700" title={row.detail}>
+                                Failed
+                              </span>
+                            )}
+                            {row.detail && !row.ok && (
+                              <p className="mt-1 max-w-md text-xs text-red-600">{row.detail}</p>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* All users – search and change account type */}
           <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-900">All users</h2>
