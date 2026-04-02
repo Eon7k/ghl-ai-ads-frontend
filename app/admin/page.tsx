@@ -123,8 +123,48 @@ export default function AdminPage() {
           <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-900">Meta permission tests (App Dashboard)</h2>
             <p className="mt-1 text-sm text-zinc-600">
-              Runs Graph API calls using <strong>your</strong> connected Meta token (same as Integrations). Connect Meta as this admin user first. Reconnect Meta after backend adds new OAuth scopes. Mapped to Meta &quot;Capture and manage ad leads&quot; and &quot;Measure ad performance&quot; checklist items.
+              Runs Graph API calls as your app (<strong>Ai Ad</strong>) using the Meta token stored for this admin account (same token as <strong>Integrations → Meta</strong>). This helps Meta&apos;s Testing tab register API calls. Green &quot;Completed&quot; bubbles are decided by Meta (use case finished + right calls), not only by how many times you click.
             </p>
+
+            <details className="mt-4 rounded-lg border border-violet-200 bg-white px-4 py-3 text-sm text-zinc-800">
+              <summary className="cursor-pointer font-medium text-violet-900">Step-by-step: what you must do outside this app</summary>
+              <ol className="mt-3 list-decimal space-y-3 pl-5 text-zinc-700">
+                <li>
+                  <strong>Meta Developers</strong> → your app <strong>Ai Ad</strong> → <strong>Testing</strong>. Keep this tab open so you can refresh after each run.
+                </li>
+                <li>
+                  <strong>Use the same Facebook user</strong> that owns or manages the Page and ad account, and that you will connect in your product.
+                </li>
+                <li>
+                  <strong>Page access (critical for pages_manage_ads and leads):</strong> Meta Business Suite (or Business Settings) → <strong>Accounts → Pages</strong> → open
+                  your Page → <strong>People</strong> / <strong>Partners</strong> → ensure this Facebook profile has <strong>Advertise</strong> on the Page (or{" "}
+                  <strong>Full control</strong> / Admin). Without <strong>ADVERTISE</strong> in Page tasks, <code className="rounded bg-zinc-100 px-1 text-xs">ads_posts</code> and{" "}
+                  <code className="rounded bg-zinc-100 px-1 text-xs">leadgen_forms</code> often fail.
+                </li>
+                <li>
+                  <strong>Reconnect Meta</strong> in your app: <strong>Integrations</strong> → disconnect if needed → <strong>Connect Meta</strong> again, and approve{" "}
+                  <em>all</em> permissions (email, pages, leads, ads). Required at least once after we add scopes like{" "}
+                  <code className="rounded bg-zinc-100 px-1 text-xs">pages_read_engagement</code> or{" "}
+                  <code className="rounded bg-zinc-100 px-1 text-xs">leads_retrieval</code>.
+                </li>
+                <li>
+                  <strong>Optional ad account field</strong> below: paste your <code className="rounded bg-zinc-100 px-1 text-xs">act_…</code> id if auto-detect is wrong.
+                </li>
+                <li>
+                  Click <strong>Run all Meta permission tests</strong>. Wait until every row shows <strong>OK</strong> (or read the red error — fix roles, then reconnect, then run again).
+                </li>
+                <li>
+                  <strong>leads_retrieval:</strong> If the Page has <strong>no Instant Forms</strong>, create one (Page tools / Ads) so we can call{" "}
+                  <code className="rounded bg-zinc-100 px-1 text-xs">/leadgen_forms</code> and optionally <code className="rounded bg-zinc-100 px-1 text-xs">/…/leads</code>.
+                </li>
+                <li>
+                  <strong>Testing tab grey bubbles:</strong> If a line still shows grey with many calls, open that permission in Meta → <strong>View details</strong> and do any <strong>required</strong> call they list. Then complete the <strong>use case</strong> (e.g. &quot;Capture &amp; manage ad leads&quot;) when Meta offers <strong>Complete testing</strong>.
+                </li>
+                <li>
+                  <strong>Live ads (production):</strong> You must still <strong>Publish</strong> the app and pass <strong>App Review</strong> for Advanced Access — testing alone does not replace that.
+                </li>
+              </ol>
+            </details>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <label htmlFor="meta-act" className="text-xs font-medium text-zinc-600">
@@ -174,6 +214,24 @@ export default function AdminPage() {
                     {metaTestResult.summary.allOk ? "All calls succeeded" : "Some calls failed — see rows"}
                   </span>
                 </p>
+                {metaTestResult.summary.pageTasks != null && metaTestResult.summary.pageTasks.length > 0 && (
+                  <p className="text-sm text-zinc-700">
+                    <span className="font-medium">Page tasks (Graph):</span>{" "}
+                    {metaTestResult.summary.pageTasks.join(", ")}
+                    {!metaTestResult.summary.pageTasks.some((t) => t.toUpperCase().includes("ADVERTISE")) && (
+                      <span className="ml-1 text-amber-800">
+                        — Missing ADVERTISE; add it in Business/Page settings, then reconnect Meta.
+                      </span>
+                    )}
+                  </p>
+                )}
+                {metaTestResult.summary.suggestions != null && metaTestResult.summary.suggestions.length > 0 && (
+                  <ul className="list-disc space-y-1 rounded-lg border border-amber-200 bg-amber-50/80 py-2 pl-8 pr-3 text-sm text-amber-950">
+                    {metaTestResult.summary.suggestions.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                )}
                 <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
                   <table className="min-w-full text-sm">
                     <thead>

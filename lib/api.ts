@@ -86,7 +86,13 @@ export type MetaPermissionTestRow = {
 };
 
 export type MetaPermissionTestsResponse = {
-  summary: { adAccountId: string | null; pageId: string | null; allOk: boolean };
+  summary: {
+    adAccountId: string | null;
+    pageId: string | null;
+    pageTasks?: string[];
+    allOk: boolean;
+    suggestions?: string[];
+  };
   results: MetaPermissionTestRow[];
 };
 
