@@ -22,7 +22,7 @@ export default function AppNav() {
             href="/"
             className="text-lg font-bold text-zinc-900 hover:text-zinc-700"
           >
-            AI Ad Manager
+            SkyVault AI Allocation
           </Link>
           <div className="flex gap-1">
             <Link

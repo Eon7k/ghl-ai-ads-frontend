@@ -145,7 +145,8 @@ export default function AdminPage() {
                   <strong>Reconnect Meta</strong> in your app: <strong>Integrations</strong> → disconnect if needed → <strong>Connect Meta</strong> again, and approve{" "}
                   <em>all</em> permissions (email, pages, leads, ads). Required at least once after we add scopes like{" "}
                   <code className="rounded bg-zinc-100 px-1 text-xs">pages_read_engagement</code> or{" "}
-                  <code className="rounded bg-zinc-100 px-1 text-xs">leads_retrieval</code>.
+                  <code className="rounded bg-zinc-100 px-1 text-xs">leads_retrieval</code>. If{" "}
+                  <strong>pages_read_engagement</strong> fails with Meta error <strong>#10</strong>, your stored token is missing that scope — reconnecting fixes it (no code change on your side).
                 </li>
                 <li>
                   <strong>Optional ad account field</strong> below: paste your <code className="rounded bg-zinc-100 px-1 text-xs">act_…</code> id if auto-detect is wrong.

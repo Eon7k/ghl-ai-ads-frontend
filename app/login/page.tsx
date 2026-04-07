@@ -76,7 +76,22 @@ export default function LoginPage() {
           </Link>
         </p>
         <p className="mt-2 text-center text-sm text-zinc-500">
-          <Link href="/" className="hover:underline">Back to home</Link>
+          <Link href="/" className="hover:underline">
+            Back to home
+          </Link>
+        </p>
+        <p className="mt-4 text-center text-xs text-zinc-500">
+          <Link href="/contact" className="hover:underline">
+            Contact us
+          </Link>
+          {" · "}
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+          {" · "}
+          <Link href="/terms" className="hover:underline">
+            Terms of Service
+          </Link>
         </p>
       </main>
     </div>

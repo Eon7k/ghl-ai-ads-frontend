@@ -13,6 +13,7 @@ import type { Experiment, Creative } from "@/lib/types";
 import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
 import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
+import { PublicLanding } from "@/components/PublicLanding";
 
 const BACKEND_URL =
   typeof process !== "undefined"
@@ -313,30 +314,7 @@ export function HomeClient() {
   }
 
   if (!user) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
-        <main className="w-full max-w-md text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900">AI Ad Manager</h1>
-          <p className="mt-3 text-zinc-600">
-            Create and manage campaigns, generate ad copy with AI, and optimize budgets.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-8 py-3.5 font-semibold text-white shadow-sm hover:bg-blue-700"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center rounded-xl border-2 border-zinc-300 bg-white px-8 py-3.5 font-semibold text-zinc-700 hover:bg-zinc-50"
-            >
-              Sign up
-            </Link>
-          </div>
-        </main>
-      </div>
-    );
+    return <PublicLanding />;
   }
 
   return (
