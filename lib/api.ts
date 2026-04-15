@@ -416,6 +416,35 @@ export type AgencyBrandingRecord = AgencyBrandingPublic & {
   updatedAt: string;
 };
 
+/** Stored JSON for landing page content (headline, CTAs, etc.). */
+export type LandingPageData = {
+  headline?: string;
+  subheadline?: string;
+  body?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+};
+
+export type LandingPageRecord = {
+  id: string;
+  agencyId: string;
+  clientId: string;
+  campaignId: string | null;
+  title: string;
+  slug: string;
+  status: string;
+  hostingType: string;
+  subdomain: string | null;
+  pageData: LandingPageData;
+  aiGenerationPrompt: string | null;
+  conversionGoal: string | null;
+  conversionTrackingPixel: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  experiment?: { id: string; name: string; platform: string; status: string } | null;
+};
+
 async function expansionMultipart(
   path: string,
   formData: FormData
@@ -468,4 +497,38 @@ export const expansion = {
       "api/agency/branding/domain/verify-check",
       { method: "POST", body: {} }
     ),
+
+  landingPages: {
+    list: () => request<{ pages: LandingPageRecord[] }>("api/agency/landing-pages"),
+    get: (id: string) => request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}`),
+    create: (body: {
+      title: string;
+      slug?: string;
+      campaignId?: string | null;
+      status?: string;
+      hostingType?: string;
+      subdomain?: string | null;
+      pageData?: LandingPageData;
+      aiGenerationPrompt?: string | null;
+      conversionGoal?: string | null;
+      conversionTrackingPixel?: string | null;
+    }) =>
+      request<{ page: LandingPageRecord }>("api/agency/landing-pages", { method: "POST", body }),
+    update: (
+      id: string,
+      body: Partial<{
+        title: string;
+        slug: string;
+        status: string;
+        hostingType: string;
+        subdomain: string | null;
+        campaignId: string | null;
+        pageData: LandingPageData | null;
+        aiGenerationPrompt: string | null;
+        conversionGoal: string | null;
+        conversionTrackingPixel: string | null;
+      }>
+    ) => request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}`, { method: "PATCH", body }),
+    delete: (id: string) => request<{ ok: boolean }>(`api/agency/landing-pages/${id}`, { method: "DELETE" }),
+  },
 };
