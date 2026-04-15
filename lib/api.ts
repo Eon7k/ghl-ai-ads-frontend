@@ -458,6 +458,103 @@ export type LandingPageRecord = {
   experiment?: { id: string; name: string; platform: string; status: string } | null;
 };
 
+export type ReportConfigInput = {
+  reportName: string;
+  frequency?: string;
+  sendDay?: number | null;
+  sendTime?: string | null;
+  emailRecipients?: string[];
+  includeSections?: Record<string, unknown>;
+  reportFormat?: string;
+  isActive?: boolean;
+};
+
+export type ReportConfigRow = {
+  id: string;
+  agencyId: string;
+  clientId: string;
+  reportName: string;
+  frequency: string;
+  sendDay: number | null;
+  sendTime: string | null;
+  emailRecipients: unknown;
+  includeSections: unknown;
+  reportFormat: string;
+  isActive: boolean;
+  lastSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { generatedReports: number };
+};
+
+export type GeneratedReportRow = {
+  id: string;
+  configId: string;
+  agencyId: string;
+  clientId: string;
+  reportPeriodStart: string;
+  reportPeriodEnd: string;
+  fileUrlPdf: string | null;
+  fileUrlHtml: string | null;
+  status: string;
+  sentAt: string | null;
+  sentTo: unknown;
+  createdAt: string;
+};
+
+export type CompetitorWatchInput = {
+  competitorName: string;
+  competitorWebsite?: string | null;
+  competitorFacebookPageId?: string | null;
+  competitorGoogleAdvertiserId?: string | null;
+  keywords?: string[];
+  platforms?: string[];
+  isActive?: boolean;
+};
+
+export type CompetitorWatchRow = {
+  id: string;
+  agencyId: string;
+  clientId: string;
+  competitorName: string;
+  competitorWebsite: string | null;
+  competitorFacebookPageId: string | null;
+  competitorGoogleAdvertiserId: string | null;
+  keywords: unknown;
+  platforms: unknown;
+  isActive: boolean;
+  lastScannedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { ads: number; insights: number };
+};
+
+export type CompetitorInsightRow = {
+  id: string;
+  watchId: string;
+  generatedAt: string;
+  summary: string;
+  topThemes: unknown;
+  suggestedCounterAngles: unknown;
+  strongestAds: unknown;
+};
+
+export type CompetitorAdRow = {
+  id: string;
+  watchId: string;
+  platform: string;
+  adLibraryId: string;
+  headline: string | null;
+  bodyText: string | null;
+  destinationUrl: string | null;
+  lastSeenAt: string;
+};
+
+export type CompetitorWatchDetail = CompetitorWatchRow & {
+  insights: CompetitorInsightRow[];
+  ads: CompetitorAdRow[];
+};
+
 async function expansionMultipart(
   path: string,
   formData: FormData
@@ -543,5 +640,38 @@ export const expansion = {
       }>
     ) => request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}`, { method: "PATCH", body }),
     delete: (id: string) => request<{ ok: boolean }>(`api/agency/landing-pages/${id}`, { method: "DELETE" }),
+  },
+
+  reports: {
+    listConfigs: () =>
+      request<{ configs: ReportConfigRow[] }>("api/agency/reports/configs"),
+    getConfig: (id: string) => request<{ config: ReportConfigRow }>(`api/agency/reports/configs/${id}`),
+    createConfig: (body: ReportConfigInput) =>
+      request<{ config: ReportConfigRow }>("api/agency/reports/configs", { method: "POST", body }),
+    updateConfig: (id: string, body: Partial<ReportConfigInput>) =>
+      request<{ config: ReportConfigRow }>(`api/agency/reports/configs/${id}`, { method: "PATCH", body }),
+    deleteConfig: (id: string) => request<{ ok: boolean }>(`api/agency/reports/configs/${id}`, { method: "DELETE" }),
+    listGenerated: (configId: string) =>
+      request<{ generated: GeneratedReportRow[] }>(`api/agency/reports/configs/${configId}/generated`),
+    recordRun: (configId: string, body?: { reportPeriodStart?: string; reportPeriodEnd?: string }) =>
+      request<{ generated: GeneratedReportRow }>(`api/agency/reports/configs/${configId}/record-run`, {
+        method: "POST",
+        body: body ?? {},
+      }),
+  },
+
+  competitor: {
+    listWatches: () => request<{ watches: CompetitorWatchRow[] }>("api/agency/competitor/watches"),
+    getWatch: (id: string) => request<{ watch: CompetitorWatchDetail }>(`api/agency/competitor/watches/${id}`),
+    createWatch: (body: CompetitorWatchInput) =>
+      request<{ watch: CompetitorWatchRow }>("api/agency/competitor/watches", { method: "POST", body }),
+    updateWatch: (id: string, body: Partial<CompetitorWatchInput>) =>
+      request<{ watch: CompetitorWatchRow }>(`api/agency/competitor/watches/${id}`, { method: "PATCH", body }),
+    deleteWatch: (id: string) => request<{ ok: boolean }>(`api/agency/competitor/watches/${id}`, { method: "DELETE" }),
+    scanWatch: (id: string, summary?: string) =>
+      request<{ watch: CompetitorWatchDetail; insight: CompetitorInsightRow }>(
+        `api/agency/competitor/watches/${id}/scan`,
+        { method: "POST", body: summary ? { summary } : {} }
+      ),
   },
 };
