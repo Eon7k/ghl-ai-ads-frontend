@@ -8,8 +8,15 @@ import {
   type AdminAiPerformance,
   type MetaPermissionTestsResponse,
 } from "@/lib/api";
+import { EXPANSION_PRODUCTS } from "@/lib/products";
 
-type AdminUser = { id: string; email: string; accountType: string; createdAt: string };
+type AdminUser = {
+  id: string;
+  email: string;
+  accountType: string;
+  createdAt: string;
+  enabledProductKeys: string[] | null;
+};
 
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -29,6 +36,32 @@ export default function AdminPage() {
   const [metaTestResult, setMetaTestResult] = useState<MetaPermissionTestsResponse | null>(null);
   const [metaTestError, setMetaTestError] = useState<string | null>(null);
   const [metaAdAccountInput, setMetaAdAccountInput] = useState("");
+  const [productEditorUser, setProductEditorUser] = useState<AdminUser | null>(null);
+  const [productEditorMode, setProductEditorMode] = useState<"all" | "custom">("custom");
+  const [productEditorKeys, setProductEditorKeys] = useState<Set<string>>(new Set());
+  const [productEditorSaving, setProductEditorSaving] = useState(false);
+  const [productEditorError, setProductEditorError] = useState<string | null>(null);
+
+  function openProductEditor(u: AdminUser) {
+    setProductEditorError(null);
+    setProductEditorUser(u);
+    if (u.enabledProductKeys === null) {
+      setProductEditorMode("all");
+      setProductEditorKeys(new Set(EXPANSION_PRODUCTS.map((p) => p.key)));
+    } else {
+      setProductEditorMode("custom");
+      setProductEditorKeys(new Set(u.enabledProductKeys));
+    }
+  }
+
+  function toggleProductEditorKey(key: string) {
+    setProductEditorKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   const filteredUsers = userSearch.trim()
     ? adminUsers.filter((u) => u.email.toLowerCase().includes(userSearch.trim().toLowerCase()))
@@ -282,7 +315,10 @@ export default function AdminPage() {
           <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-zinc-900">All users</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Search by email and set account type to Single or Agency. Agency users can be assigned clients below.
+              Search by email and set account type to Single or Agency. Use <strong>Expansion products</strong> to choose
+              which optional modules (white label, landing pages, kits, etc.) each account can access.{" "}
+              <strong>All modules</strong> means the same as legacy accounts (no restriction). New signups default to no
+              modules until you enable them here.
             </p>
             <div className="mt-4">
               <input
@@ -303,13 +339,14 @@ export default function AdminPage() {
                   <tr className="border-b border-zinc-200 text-left">
                     <th className="pb-2 font-medium text-zinc-700">Email</th>
                     <th className="pb-2 font-medium text-zinc-700">Account type</th>
+                    <th className="pb-2 font-medium text-zinc-700">Expansion products</th>
                     <th className="pb-2 font-medium text-zinc-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-6 text-center text-zinc-500">
+                      <td colSpan={4} className="py-6 text-center text-zinc-500">
                         {adminUsers.length === 0 ? "No users yet." : "No users match your search."}
                       </td>
                     </tr>
@@ -336,6 +373,22 @@ export default function AdminPage() {
                             <option value="single">Single</option>
                             <option value="agency">Agency</option>
                           </select>
+                        </td>
+                        <td className="max-w-[200px] py-3 text-xs text-zinc-600">
+                          {u.enabledProductKeys === null ? (
+                            <span className="font-medium text-green-800">All modules</span>
+                          ) : u.enabledProductKeys.length === 0 ? (
+                            <span className="text-zinc-500">None</span>
+                          ) : (
+                            <span>{u.enabledProductKeys.length} selected</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openProductEditor(u)}
+                            className="ml-2 text-violet-600 hover:underline"
+                          >
+                            Edit
+                          </button>
                         </td>
                         <td className="py-3">
                           {(u.accountType || "single") === "agency" && (
@@ -553,6 +606,123 @@ export default function AdminPage() {
                 <p className="mt-4 text-sm text-zinc-500">No launched AI campaigns with Meta metrics yet. Launch some campaigns (with AI-generated copy) to see comparison here.</p>
               )}
             </section>
+          )}
+
+          {productEditorUser && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="product-editor-title"
+            >
+              <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-zinc-200 bg-white p-6 shadow-xl">
+                <h2 id="product-editor-title" className="text-lg font-semibold text-zinc-900">
+                  Expansion products for {productEditorUser.email}
+                </h2>
+                <p className="mt-1 text-sm text-zinc-600">
+                  Control which optional modules appear in the nav and API for this account. Your admin email bypasses
+                  these checks for testing.
+                </p>
+
+                <fieldset className="mt-4 space-y-2">
+                  <legend className="sr-only">Access mode</legend>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="product-mode"
+                      checked={productEditorMode === "all"}
+                      onChange={() => setProductEditorMode("all")}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-medium text-zinc-900">All modules</span>
+                      <span className="block text-zinc-600">Same as legacy: every expansion feature is allowed.</span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="product-mode"
+                      checked={productEditorMode === "custom"}
+                      onChange={() => {
+                        setProductEditorMode("custom");
+                        if (productEditorKeys.size === 0) {
+                          setProductEditorKeys(new Set(EXPANSION_PRODUCTS.map((p) => p.key)));
+                        }
+                      }}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-medium text-zinc-900">Custom</span>
+                      <span className="block text-zinc-600">Choose individual products below.</span>
+                    </span>
+                  </label>
+                </fieldset>
+
+                {productEditorMode === "custom" && (
+                  <ul className="mt-4 space-y-2 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
+                    {EXPANSION_PRODUCTS.map((p) => (
+                      <li key={p.key}>
+                        <label className="flex cursor-pointer items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={productEditorKeys.has(p.key)}
+                            onChange={() => toggleProductEditorKey(p.key)}
+                            className="mt-0.5 rounded"
+                          />
+                          <span>
+                            <span className="font-medium text-zinc-900">{p.label}</span>
+                            <span className="block text-xs text-zinc-600">{p.description}</span>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {productEditorError && (
+                  <p className="mt-3 text-sm text-red-600">{productEditorError}</p>
+                )}
+
+                <div className="mt-6 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProductEditorUser(null)}
+                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={productEditorSaving}
+                    onClick={async () => {
+                      if (!productEditorUser) return;
+                      setProductEditorSaving(true);
+                      setProductEditorError(null);
+                      try {
+                        const value = productEditorMode === "all" ? null : Array.from(productEditorKeys);
+                        const r = await api.admin.updateUserEntitlements(productEditorUser.id, value);
+                        setAdminUsers((prev) =>
+                          prev.map((x) =>
+                            x.id === productEditorUser.id
+                              ? { ...x, enabledProductKeys: r.enabledProductKeys ?? value }
+                              : x
+                          )
+                        );
+                        setProductEditorUser(null);
+                      } catch (e) {
+                        setProductEditorError(e instanceof Error ? e.message : "Save failed");
+                      } finally {
+                        setProductEditorSaving(false);
+                      }
+                    }}
+                    className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {productEditorSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Quick note */}

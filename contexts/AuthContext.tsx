@@ -14,6 +14,8 @@ type AuthState = {
   isAdmin: boolean;
   accountType: AccountType;
   clients: ClientOption[];
+  /** From /auth/me; null means all expansion modules allowed (legacy). */
+  enabledProductKeys: string[] | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [accountType, setAccountType] = useState<AccountType>("single");
   const [clients, setClients] = useState<ClientOption[]>([]);
+  const [enabledProductKeys, setEnabledProductKeys] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -37,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(false);
       setAccountType("single");
       setClients([]);
+      setEnabledProductKeys(null);
       setViewingAs(null);
       setLoading(false);
       return;
@@ -47,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(!!me.isAdmin);
       setAccountType((me.accountType as AccountType) ?? "single");
       setClients(me.clients ?? []);
+      setEnabledProductKeys(me.enabledProductKeys ?? null);
       if ((me.accountType as AccountType) !== "agency") setViewingAs(null);
     } catch {
       clearToken();
@@ -54,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(false);
       setAccountType("single");
       setClients([]);
+      setEnabledProductKeys(null);
       setViewingAs(null);
     } finally {
       setLoading(false);
@@ -73,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(!!me.isAdmin);
       setAccountType((me.accountType as AccountType) ?? "single");
       setClients(me.clients ?? []);
+      setEnabledProductKeys(me.enabledProductKeys ?? null);
       if ((me.accountType as AccountType) !== "agency") setViewingAs(null);
       router.push("/");
     },
@@ -88,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAdmin(!!me.isAdmin);
       setAccountType((me.accountType as AccountType) ?? "single");
       setClients(me.clients ?? []);
+      setEnabledProductKeys(me.enabledProductKeys ?? null);
       if ((me.accountType as AccountType) !== "agency") setViewingAs(null);
       router.push("/");
     },
@@ -100,11 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setAccountType("single");
     setClients([]);
+    setEnabledProductKeys(null);
     router.push("/");
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, accountType, clients, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, isAdmin, accountType, clients, enabledProductKeys, loading, login, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

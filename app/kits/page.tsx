@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function KitsPage() {
+function KitsPageInner() {
   const { user, loading, accountType } = useAuth();
 
   if (loading) {
@@ -45,5 +46,13 @@ export default function KitsPage() {
         </p>
       </main>
     </div>
+  );
+}
+
+export default function KitsPage() {
+  return (
+    <ExpansionProductGate productKey="kits">
+      <KitsPageInner />
+    </ExpansionProductGate>
   );
 }

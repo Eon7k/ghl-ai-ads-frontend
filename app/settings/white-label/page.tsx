@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { expansion, type AgencyBrandingRecord } from "@/lib/api";
 
-export default function WhiteLabelSettingsPage() {
+function WhiteLabelSettingsPageInner() {
   const router = useRouter();
   const { user, loading, accountType } = useAuth();
   const [branding, setBranding] = useState<AgencyBrandingRecord | null | undefined>(undefined);
@@ -346,5 +347,13 @@ export default function WhiteLabelSettingsPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function WhiteLabelSettingsPage() {
+  return (
+    <ExpansionProductGate productKey="white_label">
+      <WhiteLabelSettingsPageInner />
+    </ExpansionProductGate>
   );
 }

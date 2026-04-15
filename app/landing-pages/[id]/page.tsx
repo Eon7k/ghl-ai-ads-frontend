@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, expansion, type LandingPageData, type LandingPageRecord } from "@/lib/api";
 import type { Experiment } from "@/lib/types";
@@ -20,7 +21,7 @@ function normalizePageData(raw: unknown): LandingPageData {
   };
 }
 
-export default function LandingPageEditorPage() {
+function LandingPageEditorPageInner() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const router = useRouter();
@@ -310,5 +311,13 @@ export default function LandingPageEditorPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function LandingPageEditorPage() {
+  return (
+    <ExpansionProductGate productKey="landing_pages">
+      <LandingPageEditorPageInner />
+    </ExpansionProductGate>
   );
 }

@@ -4,15 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getViewingAs } from "@/lib/viewingAs";
+import { hasExpansionProduct } from "@/lib/products";
 
 /**
  * Top nav for Campaigns and Integrations so testing is easy: jump between sections without hunting for links.
  */
 export default function AppNav() {
   const pathname = usePathname();
-  const { user, isAdmin, accountType, clients, logout } = useAuth();
+  const { user, isAdmin, accountType, clients, logout, enabledProductKeys } = useAuth();
   const viewingAsId = getViewingAs();
   const viewingAsEmail = viewingAsId && clients.find((c) => c.id === viewingAsId)?.email;
+  const canUse = (productKey: string) => isAdmin || hasExpansionProduct(enabledProductKeys, productKey);
 
   return (
     <nav className="border-b border-zinc-200 bg-white">
@@ -77,70 +79,78 @@ export default function AppNav() {
                 Admin
               </Link>
             )}
-            {accountType === "agency" && (
-              <>
-                <Link
-                  href="/settings/white-label"
-                  className={`rounded-md px-3 py-2 text-sm font-medium ${
-                    pathname?.startsWith("/settings")
-                      ? "bg-zinc-100 text-zinc-900"
-                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                  }`}
-                >
-                  White label
-                </Link>
-                <Link
-                  href="/kits"
-                  className={`rounded-md px-3 py-2 text-sm font-medium ${
-                    pathname === "/kits"
-                      ? "bg-zinc-100 text-zinc-900"
-                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                  }`}
-                >
-                  Kits
-                </Link>
-                <Link
-                  href="/dfy"
-                  className={`rounded-md px-3 py-2 text-sm font-medium ${
-                    pathname?.startsWith("/dfy")
-                      ? "bg-zinc-100 text-zinc-900"
-                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                  }`}
-                >
-                  DFY
-                </Link>
-              </>
+            {accountType === "agency" && canUse("white_label") && (
+              <Link
+                href="/settings/white-label"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname?.startsWith("/settings")
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                White label
+              </Link>
             )}
-            <Link
-              href="/landing-pages"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname?.startsWith("/landing-pages")
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-              }`}
-            >
-              Landing pages
-            </Link>
-            <Link
-              href="/reports"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname?.startsWith("/reports")
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-              }`}
-            >
-              Reports
-            </Link>
-            <Link
-              href="/competitors"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                pathname?.startsWith("/competitors")
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-              }`}
-            >
-              Competitors
-            </Link>
+            {accountType === "agency" && canUse("kits") && (
+              <Link
+                href="/kits"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname === "/kits"
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                Kits
+              </Link>
+            )}
+            {accountType === "agency" && canUse("dfy") && (
+              <Link
+                href="/dfy"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname?.startsWith("/dfy")
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                DFY
+              </Link>
+            )}
+            {canUse("landing_pages") && (
+              <Link
+                href="/landing-pages"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname?.startsWith("/landing-pages")
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                Landing pages
+              </Link>
+            )}
+            {canUse("reports") && (
+              <Link
+                href="/reports"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname?.startsWith("/reports")
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                Reports
+              </Link>
+            )}
+            {canUse("competitors") && (
+              <Link
+                href="/competitors"
+                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                  pathname?.startsWith("/competitors")
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                Competitors
+              </Link>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 
-export default function CompetitorsPlaceholder() {
+function CompetitorsPlaceholderInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
@@ -17,5 +18,13 @@ export default function CompetitorsPlaceholder() {
         </p>
       </main>
     </div>
+  );
+}
+
+export default function CompetitorsPlaceholder() {
+  return (
+    <ExpansionProductGate productKey="competitors">
+      <CompetitorsPlaceholderInner />
+    </ExpansionProductGate>
   );
 }

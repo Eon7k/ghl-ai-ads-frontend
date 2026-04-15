@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { expansion, type LandingPageRecord } from "@/lib/api";
-export default function LandingPagesListPage() {
+function LandingPagesListPageInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [pages, setPages] = useState<LandingPageRecord[]>([]);
@@ -157,5 +158,13 @@ export default function LandingPagesListPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function LandingPagesListPage() {
+  return (
+    <ExpansionProductGate productKey="landing_pages">
+      <LandingPagesListPageInner />
+    </ExpansionProductGate>
   );
 }

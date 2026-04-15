@@ -56,6 +56,8 @@ export type MeResponse = {
   isAdmin?: boolean;
   accountType?: "single" | "agency";
   clients?: { id: string; email: string }[];
+  /** null = all expansion products (legacy). [] = none. Else allowlist of product keys. */
+  enabledProductKeys?: string[] | null;
 };
 
 export type AdminOverview = {
@@ -117,13 +119,24 @@ export const api = {
     overview: () => request<AdminOverview>("admin/overview"),
     aiPerformance: () => request<AdminAiPerformance>("admin/ai-performance"),
     listUsers: () =>
-      request<{ users: { id: string; email: string; accountType: string; createdAt: string }[] }>("admin/users").then(
-        (r) => r.users
-      ),
+      request<{
+        users: {
+          id: string;
+          email: string;
+          accountType: string;
+          createdAt: string;
+          enabledProductKeys: string[] | null;
+        }[];
+      }>("admin/users").then((r) => r.users),
     updateUserAccountType: (userId: string, accountType: "single" | "agency") =>
       request<{ ok: boolean; accountType: string }>(`admin/users/${userId}`, {
         method: "PATCH",
         body: { accountType },
+      }),
+    updateUserEntitlements: (userId: string, enabledProductKeys: string[] | null) =>
+      request<{ ok: boolean; enabledProductKeys: string[] | null }>(`admin/users/${userId}`, {
+        method: "PATCH",
+        body: { enabledProductKeys },
       }),
     listAgencyClients: (agencyUserId: string) =>
       request<{ clients: { id: string; email: string }[] }>(`admin/agencies/${agencyUserId}/clients`).then(

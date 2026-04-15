@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function DfyPlaceholder() {
+function DfyPlaceholderInner() {
   const { user, loading, accountType } = useAuth();
 
   if (loading) {
@@ -42,5 +43,13 @@ export default function DfyPlaceholder() {
         </p>
       </main>
     </div>
+  );
+}
+
+export default function DfyPlaceholder() {
+  return (
+    <ExpansionProductGate productKey="dfy">
+      <DfyPlaceholderInner />
+    </ExpansionProductGate>
   );
 }

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
+import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 
-export default function ReportsPlaceholder() {
+function ReportsPlaceholderInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
@@ -17,5 +18,13 @@ export default function ReportsPlaceholder() {
         </p>
       </main>
     </div>
+  );
+}
+
+export default function ReportsPlaceholder() {
+  return (
+    <ExpansionProductGate productKey="reports">
+      <ReportsPlaceholderInner />
+    </ExpansionProductGate>
   );
 }
