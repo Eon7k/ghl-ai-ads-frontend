@@ -77,6 +77,70 @@ export default function AppNav() {
                 Admin
               </Link>
             )}
+            {accountType === "agency" && (
+              <>
+                <Link
+                  href="/settings/white-label"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    pathname?.startsWith("/settings")
+                      ? "bg-zinc-100 text-zinc-900"
+                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  }`}
+                >
+                  White label
+                </Link>
+                <Link
+                  href="/kits"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    pathname === "/kits"
+                      ? "bg-zinc-100 text-zinc-900"
+                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  }`}
+                >
+                  Kits
+                </Link>
+                <Link
+                  href="/dfy"
+                  className={`rounded-md px-3 py-2 text-sm font-medium ${
+                    pathname?.startsWith("/dfy")
+                      ? "bg-zinc-100 text-zinc-900"
+                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  }`}
+                >
+                  DFY
+                </Link>
+              </>
+            )}
+            <Link
+              href="/landing-pages"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname?.startsWith("/landing-pages")
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              }`}
+            >
+              Landing pages
+            </Link>
+            <Link
+              href="/reports"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname?.startsWith("/reports")
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              }`}
+            >
+              Reports
+            </Link>
+            <Link
+              href="/competitors"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname?.startsWith("/competitors")
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              }`}
+            >
+              Competitors
+            </Link>
           </div>
         </div>
         <div className="flex items-center gap-3">

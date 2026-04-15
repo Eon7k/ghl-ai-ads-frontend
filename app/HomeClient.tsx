@@ -20,10 +20,11 @@ const BACKEND_URL =
     ? process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || ""
     : "";
 
-const PLATFORMS: { id: "meta" | "google" | "tiktok"; name: string }[] = [
+const PLATFORMS: { id: "meta" | "google" | "tiktok" | "linkedin"; name: string }[] = [
   { id: "meta", name: "Meta (Facebook & Instagram)" },
   { id: "google", name: "Google Ads" },
   { id: "tiktok", name: "TikTok Ads" },
+  { id: "linkedin", name: "LinkedIn Ads" },
 ];
 
 function CreativeThumbnail({ creativeId, className }: { creativeId: string; className?: string }) {
@@ -50,7 +51,7 @@ export function HomeClient() {
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [integrationsLoading, setIntegrationsLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<("meta" | "google" | "tiktok")[]>(["meta"]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<("meta" | "google" | "tiktok" | "linkedin")[]>(["meta"]);
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("30");
   const [prompt, setPrompt] = useState("");
@@ -65,8 +66,9 @@ export function HomeClient() {
   const [metaAdAccounts, setMetaAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [tiktokAdAccounts, setTiktokAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [googleAdAccounts, setGoogleAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [linkedinAdAccounts, setLinkedinAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  const [expandedPlatform, setExpandedPlatform] = useState<"meta" | "google" | "tiktok" | null>(null);
+  const [expandedPlatform, setExpandedPlatform] = useState<"meta" | "google" | "tiktok" | "linkedin" | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [creativesLoading, setCreativesLoading] = useState(false);
   const [selectedCreativeIds, setSelectedCreativeIds] = useState<string[]>([]);
@@ -102,6 +104,10 @@ export function HomeClient() {
     if (!integrations.some((i) => i.platform === "google")) return;
     api.integrations.getGoogleAdAccounts().then(setGoogleAdAccounts).catch(() => setGoogleAdAccounts([]));
   }, [integrations]);
+  useEffect(() => {
+    if (!integrations.some((i) => i.platform === "linkedin")) return;
+    api.integrations.getLinkedInAdAccounts().then(setLinkedinAdAccounts).catch(() => setLinkedinAdAccounts([]));
+  }, [integrations]);
 
   useEffect(() => {
     if (searchParams.get("open") === "create") setCreateOpen(true);
@@ -134,13 +140,14 @@ export function HomeClient() {
     }
   }
 
-  function getAdAccounts(platform: "meta" | "google" | "tiktok"): MetaAdAccount[] | null {
+  function getAdAccounts(platform: "meta" | "google" | "tiktok" | "linkedin"): MetaAdAccount[] | null {
     if (platform === "meta") return metaAdAccounts;
     if (platform === "tiktok") return tiktokAdAccounts;
+    if (platform === "linkedin") return linkedinAdAccounts;
     return googleAdAccounts;
   }
 
-  function togglePlatform(p: "meta" | "google" | "tiktok") {
+  function togglePlatform(p: "meta" | "google" | "tiktok" | "linkedin") {
     const connected = integrations.some((i) => i.platform === p);
     if (!connected && !isAdmin) return;
     setSelectedPlatforms((prev) =>
@@ -148,7 +155,7 @@ export function HomeClient() {
     );
   }
 
-  function connectTo(platform: "meta" | "google" | "tiktok") {
+  function connectTo(platform: "meta" | "google" | "tiktok" | "linkedin") {
     const token = getToken();
     if (!token) return;
     let path = `/integrations/${platform}/connect?token=${encodeURIComponent(token)}`;
@@ -331,11 +338,16 @@ export function HomeClient() {
         {connectedParam === "google" && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Google connected. You can launch Google Ads campaigns below.</div>
         )}
+        {connectedParam === "linkedin" && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            LinkedIn connected. You can create LinkedIn draft campaigns; live publishing to LinkedIn from this app is not available yet—use Campaign Manager to go live.
+          </div>
+        )}
         {errorParam && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             <p>{decodeURIComponent(errorParam)}</p>
             <p className="mt-2 text-xs text-red-700">
-              If integrations sign-in keeps failing, check: you’re logged in, <strong>NEXT_PUBLIC_BACKEND_URL</strong> is set in the frontend (and redeployed on Vercel), backend has <strong>BACKEND_URL</strong>, <strong>FRONTEND_URL</strong>, and the platform’s app ID/secret (e.g. META_APP_ID, META_APP_SECRET). The redirect URI in Meta/Google/TikTok must match <strong>BACKEND_URL/integrations/meta/callback</strong> (or google/tiktok). See INTEGRATIONS_SIGNIN_TROUBLESHOOTING.md for details.
+              If integrations sign-in keeps failing, check: you’re logged in, <strong>NEXT_PUBLIC_BACKEND_URL</strong> is set in the frontend (and redeployed on Vercel), backend has <strong>BACKEND_URL</strong>, <strong>FRONTEND_URL</strong>, and the platform’s app ID/secret (e.g. META_APP_ID, LINKEDIN_CLIENT_ID). The redirect URI in the developer console must match <strong>BACKEND_URL/integrations/&lt;platform&gt;/callback</strong> (meta, google, tiktok, linkedin). See INTEGRATIONS_SIGNIN_TROUBLESHOOTING.md for details.
             </p>
           </div>
         )}

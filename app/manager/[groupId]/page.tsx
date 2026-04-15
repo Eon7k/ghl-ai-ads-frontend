@@ -14,6 +14,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   meta: "Meta (Facebook & Instagram)",
   google: "Google Ads",
   tiktok: "TikTok Ads",
+  linkedin: "LinkedIn Ads",
 };
 
 export default function ManagerCampaignPage() {
@@ -101,7 +102,7 @@ export default function ManagerCampaignPage() {
                     <div className="rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <IntegrationLogo platform={exp.platform as "meta" | "google" | "tiktok"} size={40} className="shrink-0 rounded-lg" />
+                          <IntegrationLogo platform={exp.platform as "meta" | "google" | "tiktok" | "linkedin"} size={40} className="shrink-0 rounded-lg" />
                           <div>
                             <p className="font-semibold text-zinc-900">{PLATFORM_NAMES[exp.platform] ?? exp.platform}</p>
                             <p className="text-sm text-zinc-500">

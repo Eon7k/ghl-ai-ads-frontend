@@ -3,7 +3,7 @@
  * These match the backend API spec (see BACKEND_API_SPEC.md).
  */
 
-export type Platform = "meta" | "google" | "tiktok";
+export type Platform = "meta" | "google" | "tiktok" | "linkedin";
 
 export type AdVariant = {
   id: string;
@@ -65,7 +65,7 @@ export type CreateExperimentBody = {
   /** Single platform (used if platforms not provided). */
   platform: string;
   /** Optional: run same campaign on multiple platforms; one experiment created per platform. */
-  platforms?: ("meta" | "google" | "tiktok")[];
+  platforms?: ("meta" | "google" | "tiktok" | "linkedin")[];
   totalDailyBudget: number;
   prompt: string;
   variantCount: number;

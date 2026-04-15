@@ -12,6 +12,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   meta: "Meta",
   google: "Google Ads",
   tiktok: "TikTok",
+  linkedin: "LinkedIn",
 };
 
 /** Group experiments by campaignGroupId; each group is one "campaign" in the manager. */
@@ -97,7 +98,7 @@ export default function ManagerPage() {
                         <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
                           {g.platforms.map((p) => (
                             <span key={p} className="flex items-center gap-1">
-                              <IntegrationLogo platform={p as "meta" | "google" | "tiktok"} size={16} className="rounded" />
+                              <IntegrationLogo platform={p as "meta" | "google" | "tiktok" | "linkedin"} size={16} className="rounded" />
                               {PLATFORM_NAMES[p] ?? p}
                             </span>
                           ))}

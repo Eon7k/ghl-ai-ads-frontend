@@ -36,8 +36,14 @@ async function request<T>(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = typeof data?.error === "string" ? data.error : `HTTP ${res.status}`;
-    const code = typeof (data as { code?: string })?.code === "string" ? (data as { code: string }).code : "";
+    const d = data as { error?: unknown; message?: string; code?: string };
+    const msg =
+      typeof d?.message === "string"
+        ? d.message
+        : typeof d?.error === "string"
+          ? d.error
+          : `HTTP ${res.status}`;
+    const code = typeof d?.code === "string" ? d.code : "";
     throw new Error(code ? `${msg} (${code})` : msg);
   }
   return data as T;
@@ -322,7 +328,7 @@ export const api = {
     },
   },
 
-  /** List connected ad accounts (Meta, TikTok, Google) */
+  /** List connected ad accounts (Meta, TikTok, Google, LinkedIn) */
   integrations: {
     list: () =>
       request<{ integrations: ConnectedIntegration[] }>("integrations").then((r) => r.integrations),
@@ -348,6 +354,10 @@ export const api = {
     /** Test Google token + developer token + list accessible customers. */
     testGoogleConnection: () =>
       request<{ ok: true; customerCount: number } | { ok: false; error: string }>("integrations/google/test"),
+    getLinkedInAdAccounts: () =>
+      request<{ adAccounts: MetaAdAccount[] }>("integrations/linkedin/ad-accounts").then((r) => r.adAccounts),
+    testLinkedInConnection: () =>
+      request<{ ok: true; adAccountCount: number } | { ok: false; error: string }>("integrations/linkedin/test"),
   },
 };
 
@@ -376,8 +386,86 @@ export type MetaAdAccount = {
 
 export type ConnectedIntegration = {
   id: string;
-  platform: "meta" | "tiktok" | "google";
+  platform: "meta" | "tiktok" | "google" | "linkedin";
   platformAccountId?: string;
   platformAccountName?: string;
   createdAt: string;
+};
+
+/** White-label branding (Module 1) — public resolve-brand shape */
+export type AgencyBrandingPublic = {
+  brandName: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  supportEmail: string | null;
+  supportUrl: string | null;
+  hidePoweredBy: boolean;
+  onboardingWelcomeMessage: string | null;
+};
+
+export type AgencyBrandingRecord = AgencyBrandingPublic & {
+  id: string;
+  userId: string;
+  customDomain: string | null;
+  customDomainVerified: boolean;
+  customDomainVerificationToken: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+async function expansionMultipart(
+  path: string,
+  formData: FormData
+): Promise<{ ok: boolean; logoUrl?: string; faviconUrl?: string }> {
+  const url = `${API_BASE}/${path.replace(/^\//, "")}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+    mode: "cors",
+    credentials: "omit",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const d = data as { message?: string; code?: string };
+    const msg = typeof d?.message === "string" ? d.message : `HTTP ${res.status}`;
+    const code = typeof d?.code === "string" ? d.code : "";
+    throw new Error(code ? `${msg} (${code})` : msg);
+  }
+  return data as { ok: boolean; logoUrl?: string; faviconUrl?: string };
+}
+
+/** Platform expansion API (proxied to backend `/api/*`). */
+export const expansion = {
+  resolveBrand: (domain: string) =>
+    request<{ branding: AgencyBrandingPublic | null }>(
+      `api/resolve-brand?domain=${encodeURIComponent(domain)}`,
+      { skipAuth: true }
+    ),
+  getAgencyBranding: () => request<{ branding: AgencyBrandingRecord | null }>("api/agency/branding"),
+  updateAgencyBranding: (body: Record<string, unknown>) =>
+    request<{ branding: AgencyBrandingRecord }>("api/agency/branding", { method: "PUT", body }),
+  uploadLogo: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return expansionMultipart("api/agency/branding/logo", fd);
+  },
+  uploadFavicon: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return expansionMultipart("api/agency/branding/favicon", fd);
+  },
+  initDomainVerify: (domain: string) =>
+    request<{ ok: boolean; txtHost: string; txtValue: string; instructions: string }>(
+      "api/agency/branding/domain/verify-init",
+      { method: "POST", body: { domain } }
+    ),
+  checkDomainVerify: () =>
+    request<{ ok: boolean; verified: boolean; message: string }>(
+      "api/agency/branding/domain/verify-check",
+      { method: "POST", body: {} }
+    ),
 };

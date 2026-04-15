@@ -72,6 +72,12 @@ export default function CampaignDetailPage() {
   const [googleTestResult, setGoogleTestResult] = useState<
     { ok: true; customerCount: number } | { ok: false; error: string } | null
   >(null);
+  const [linkedinAdAccounts, setLinkedinAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  const [selectedLinkedinAccountId, setSelectedLinkedinAccountId] = useState<string>("");
+  const [linkedinTestLoading, setLinkedinTestLoading] = useState(false);
+  const [linkedinTestResult, setLinkedinTestResult] = useState<
+    { ok: true; adAccountCount: number } | { ok: false; error: string } | null
+  >(null);
   const prevExperimentIdRef = useRef<string | null>(null);
   const [libraryCreatives, setLibraryCreatives] = useState<Creative[]>([]);
   const [libraryPick, setLibraryPick] = useState<Record<string, string>>({});
@@ -215,6 +221,14 @@ export default function CampaignDetailPage() {
       .getGoogleAdAccounts()
       .then(setGoogleAdAccounts)
       .catch(() => setGoogleAdAccounts([]));
+  }, [experiment?.id, experiment?.platform, experiment?.status]);
+
+  useEffect(() => {
+    if (!experiment || experiment.platform !== "linkedin" || experiment.status !== "draft") return;
+    api.integrations
+      .getLinkedInAdAccounts()
+      .then(setLinkedinAdAccounts)
+      .catch(() => setLinkedinAdAccounts([]));
   }, [experiment?.id, experiment?.platform, experiment?.status]);
 
   useEffect(() => {
@@ -529,6 +543,19 @@ export default function CampaignDetailPage() {
     }
   }
 
+  async function testLinkedInConnection() {
+    setLinkedinTestLoading(true);
+    setLinkedinTestResult(null);
+    try {
+      const result = await api.integrations.testLinkedInConnection();
+      setLinkedinTestResult(result);
+    } catch (e) {
+      setLinkedinTestResult({ ok: false, error: e instanceof Error ? e.message : "Request failed" });
+    } finally {
+      setLinkedinTestLoading(false);
+    }
+  }
+
   async function launch(dryRun: boolean) {
     if (!experiment || experiment.status === "launched") return;
     setLaunching(true);
@@ -590,7 +617,9 @@ export default function CampaignDetailPage() {
         ? "TikTok"
         : experiment.platform === "google"
           ? "Google Ads"
-          : "Meta";
+          : experiment.platform === "linkedin"
+            ? "LinkedIn"
+            : "Meta";
     const confirmed = window.confirm(
       `Are you sure you want to launch this campaign live? It will start running on ${platformLabel} and may incur spend.`
     );
@@ -1233,10 +1262,63 @@ export default function CampaignDetailPage() {
                   )}
                 </div>
               )}
+              {experiment.platform === "linkedin" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3">
+                  <p className="text-sm font-medium text-amber-950">LinkedIn Ads</p>
+                  <p className="mt-1 text-xs text-amber-900/90">
+                    This app does not publish to LinkedIn yet. Confirm your connection and ad accounts below, then use
+                    LinkedIn Campaign Manager to run ads with the copy and creatives you prepare here.
+                  </p>
+                  {linkedinAdAccounts === null ? (
+                    <p className="mt-2 text-xs text-zinc-600">Loading ad accounts…</p>
+                  ) : linkedinAdAccounts.length === 0 ? (
+                    <p className="mt-2 text-xs text-amber-800">
+                      No accounts returned. Ensure your LinkedIn app has Marketing API access and scopes such as{" "}
+                      <code className="rounded bg-amber-100 px-1">r_ads</code> /{" "}
+                      <code className="rounded bg-amber-100 px-1">rw_ads</code>, then reconnect.
+                    </p>
+                  ) : (
+                    <>
+                      <label className="mt-2 block text-xs font-medium text-zinc-700">Ad account (reference)</label>
+                      <select
+                        value={selectedLinkedinAccountId}
+                        onChange={(e) => setSelectedLinkedinAccountId(e.target.value)}
+                        className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                      >
+                        <option value="">— Select an account —</option>
+                        {linkedinAdAccounts.map((a) => (
+                          <option key={a.id} value={a.accountId || a.id}>
+                            {a.name} ({a.accountId || a.id})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={testLinkedInConnection}
+                          disabled={linkedinTestLoading}
+                          className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                        >
+                          {linkedinTestLoading ? "Testing…" : "Test LinkedIn API"}
+                        </button>
+                        {linkedinTestResult && (
+                          <span className={`text-xs ${linkedinTestResult.ok ? "text-green-700" : "text-red-700"}`}>
+                            {linkedinTestResult.ok
+                              ? `OK — ${linkedinTestResult.adAccountCount} ad account(s)`
+                              : linkedinTestResult.error}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
-                {(experiment.platform === "meta" && selectedMetaAdAccountId) ||
-                (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) ||
-                (experiment.platform === "google" && selectedGoogleCustomerId) ? (
+                {experiment.platform === "linkedin" ? (
+                  <p className="text-sm text-amber-900">Launch from this app is not available for LinkedIn yet.</p>
+                ) : (experiment.platform === "meta" && selectedMetaAdAccountId) ||
+                  (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) ||
+                  (experiment.platform === "google" && selectedGoogleCustomerId) ? (
                   <>
                     <button
                       type="button"
@@ -1288,11 +1370,13 @@ export default function CampaignDetailPage() {
                 <p className="mb-4 text-xs text-zinc-500">
                   {metrics.source === "meta"
                     ? `Metrics from Meta${metrics.datePreset ? ` (${metrics.datePreset})` : ""}. All values match what Meta tracks.`
-                    : experiment.platform === "tiktok" && experiment.tiktokCampaignId
-                      ? "TikTok reporting via API is not wired yet — use TikTok Ads Manager for spend and delivery. Values below are placeholders."
-                      : experiment.platform === "google" && experiment.googleCampaignId
-                        ? "Google Ads metrics are not pulled into this app yet — use Google Ads for delivery, spend, and approvals. Values below are placeholders."
-                        : "Connect the ad platform and launch to see live data. Values below are placeholders."}
+                    : experiment.platform === "linkedin"
+                      ? "LinkedIn reporting is not wired into this app yet — use LinkedIn Campaign Manager. Values below are placeholders."
+                      : experiment.platform === "tiktok" && experiment.tiktokCampaignId
+                        ? "TikTok reporting via API is not wired yet — use TikTok Ads Manager for spend and delivery. Values below are placeholders."
+                        : experiment.platform === "google" && experiment.googleCampaignId
+                          ? "Google Ads metrics are not pulled into this app yet — use Google Ads for delivery, spend, and approvals. Values below are placeholders."
+                          : "Connect the ad platform and launch to see live data. Values below are placeholders."}
                 </p>
                 <div className="mb-4">
                   <h3 className="mb-2 text-sm font-medium text-zinc-700">Spend &amp; reach</h3>
@@ -1358,8 +1442,8 @@ export default function CampaignDetailPage() {
             <h2 className="mb-2 text-lg font-semibold text-zinc-900">AI optimization (all platforms)</h2>
             <p className="mb-4 text-sm text-zinc-600">
               Choose how the assistant uses performance data. <strong>Meta</strong> campaigns can use live metrics from this app;
-              <strong> Google Ads</strong> and <strong>TikTok</strong> use the same AI review with placeholder metrics until native reporting is connected — the AI will still tailor advice to each platform.{" "}
-              <strong>Auto</strong> can update the <strong>Meta ad set daily budget</strong> only (±25% clamp) when you run a review and the model recommends a budget; Google/TikTok budgets stay manual in their own UIs.
+              <strong> Google Ads</strong>, <strong>TikTok</strong>, and <strong>LinkedIn</strong> use the same AI review with placeholder metrics until native reporting is connected — the AI will still tailor advice to each platform.{" "}
+              <strong>Auto</strong> can update the <strong>Meta ad set daily budget</strong> only (±25% clamp) when you run a review and the model recommends a budget; other platforms’ budgets stay manual in their own UIs.
             </p>
             <div className="mb-4 flex flex-wrap items-end gap-3">
               <div>

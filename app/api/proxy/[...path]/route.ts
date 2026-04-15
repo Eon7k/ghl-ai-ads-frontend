@@ -183,6 +183,49 @@ export async function POST(
   }
 }
 
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  try {
+    const base = getBackendUrl();
+    if (!base || base.startsWith("http://localhost")) {
+      return fail502(
+        "BACKEND_URL_NOT_SET",
+        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
+      );
+    }
+    const { path } = await params;
+    const url = buildUrl(path);
+    const body = await request.text();
+    const headers: HeadersInit = {};
+    const contentType = request.headers.get("content-type");
+    if (contentType) headers["Content-Type"] = contentType;
+    const auth = request.headers.get("authorization");
+    if (auth) headers["Authorization"] = auth;
+    const viewingAs = request.headers.get("x-viewing-as");
+    if (viewingAs) headers["X-Viewing-As"] = viewingAs;
+    const res = await fetch(url, {
+      method: "PUT",
+      body: body || undefined,
+      headers,
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
+    });
+    const data = await readBackendProxyBody(res);
+    return Response.json(data, { status: res.status });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error
+        ? err.cause instanceof Error
+          ? `${err.message}: ${err.cause.message}`
+          : err.message
+        : "Proxy request failed";
+    console.error("[proxy PUT]", err);
+    return fail502("BACKEND_UNREACHABLE", `Cannot reach backend: ${message}`);
+  }
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> }

@@ -3,6 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* White-label (Module 1) — overridden by BrandingHostBootstrap when custom domain resolves */
+  --brand-primary: #2563eb;
+  --brand-secondary: #64748b;
+  --brand-accent: #7c3aed;
+  --brand-name: "SkyVault AI Allocation";
 }
 
 @theme inline {
