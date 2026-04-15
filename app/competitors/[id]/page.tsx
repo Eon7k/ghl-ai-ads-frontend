@@ -43,7 +43,11 @@ function CompetitorDetailInner() {
     setLoadError(null);
     try {
       const { watch: w } = await expansion.competitor.getWatch(id);
-      setWatch(w);
+      setWatch({
+        ...w,
+        insights: Array.isArray(w.insights) ? w.insights : [],
+        ads: Array.isArray(w.ads) ? w.ads : [],
+      });
       setCompetitorName(w.competitorName);
       setWebsite(w.competitorWebsite ?? "");
       setFbId(w.competitorFacebookPageId ?? "");
@@ -101,7 +105,11 @@ function CompetitorDetailInner() {
     setActionError(null);
     try {
       const { watch: w } = await expansion.competitor.scanWatch(id);
-      setWatch(w);
+      setWatch({
+        ...w,
+        insights: Array.isArray(w.insights) ? w.insights : [],
+        ads: Array.isArray(w.ads) ? w.ads : [],
+      });
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Scan failed");
     } finally {
@@ -240,11 +248,11 @@ function CompetitorDetailInner() {
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-900">Insights</h2>
-          {watch.insights.length === 0 ? (
+          {(watch.insights ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">Run a scan to add the first insight snapshot.</p>
           ) : (
             <ul className="mt-4 space-y-3">
-              {watch.insights.map((ins) => (
+              {(watch.insights ?? []).map((ins) => (
                 <li key={ins.id} className="rounded-lg border border-zinc-200 bg-white p-4 text-sm shadow-sm">
                   <p className="text-xs text-zinc-500">{new Date(ins.generatedAt).toLocaleString()}</p>
                   <p className="mt-2 whitespace-pre-wrap text-zinc-800">{ins.summary}</p>
@@ -256,13 +264,13 @@ function CompetitorDetailInner() {
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-900">Ads captured</h2>
-          {watch.ads.length === 0 ? (
+          {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
               No ads stored yet. A future integration can populate this from Ad Library APIs.
             </p>
           ) : (
             <ul className="mt-4 space-y-2">
-              {watch.ads.map((ad) => (
+              {(watch.ads ?? []).map((ad) => (
                 <li key={ad.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm">
                   <p className="font-medium text-zinc-900">
                     {ad.platform} · {ad.adLibraryId}
