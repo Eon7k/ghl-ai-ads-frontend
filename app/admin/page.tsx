@@ -36,6 +36,7 @@ export default function AdminPage() {
   const [metaTestResult, setMetaTestResult] = useState<MetaPermissionTestsResponse | null>(null);
   const [metaTestError, setMetaTestError] = useState<string | null>(null);
   const [metaAdAccountInput, setMetaAdAccountInput] = useState("");
+  const [metaPageIdInput, setMetaPageIdInput] = useState("");
   const [productEditorUser, setProductEditorUser] = useState<AdminUser | null>(null);
   const [productEditorMode, setProductEditorMode] = useState<"all" | "custom">("custom");
   const [productEditorKeys, setProductEditorKeys] = useState<Set<string>>(new Set());
@@ -182,7 +183,7 @@ export default function AdminPage() {
                   <strong>pages_read_engagement</strong> fails with Meta error <strong>#10</strong>, your stored token is missing that scope — reconnecting fixes it (no code change on your side).
                 </li>
                 <li>
-                  <strong>Optional ad account field</strong> below: paste your <code className="rounded bg-zinc-100 px-1 text-xs">act_…</code> id if auto-detect is wrong.
+                  <strong>Optional fields</strong> below: <strong>Page id</strong> if the wrong Page is auto-selected (we pick the Page with <strong>ADVERTISE</strong> task first). <strong>Ad account</strong> as <code className="rounded bg-zinc-100 px-1 text-xs">act_…</code> if auto-detect is wrong.
                 </li>
                 <li>
                   Click <strong>Run all Meta permission tests</strong>. Wait until every row shows <strong>OK</strong> (or read the red error — fix roles, then reconnect, then run again).
@@ -199,8 +200,21 @@ export default function AdminPage() {
                 </li>
               </ol>
             </details>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="flex-1">
+            <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="min-w-0 flex-1">
+                <label htmlFor="meta-page" className="text-xs font-medium text-zinc-600">
+                  Page id (optional)
+                </label>
+                <input
+                  id="meta-page"
+                  type="text"
+                  placeholder="Numeric Page id from Meta (same as in Page settings URL)"
+                  value={metaPageIdInput}
+                  onChange={(e) => setMetaPageIdInput(e.target.value)}
+                  className="mt-1 w-full max-w-md rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
                 <label htmlFor="meta-act" className="text-xs font-medium text-zinc-600">
                   Ad account (optional)
                 </label>
@@ -221,9 +235,10 @@ export default function AdminPage() {
                   setMetaTestError(null);
                   setMetaTestResult(null);
                   try {
-                    const r = await api.admin.runMetaPermissionTests(
-                      metaAdAccountInput.trim() || undefined
-                    );
+                    const r = await api.admin.runMetaPermissionTests({
+                      metaAdAccountId: metaAdAccountInput.trim() || undefined,
+                      metaPageId: metaPageIdInput.trim() || undefined,
+                    });
                     setMetaTestResult(r);
                   } catch (e) {
                     setMetaTestError(e instanceof Error ? e.message : "Request failed");
@@ -242,7 +257,17 @@ export default function AdminPage() {
             {metaTestResult && (
               <div className="mt-4 space-y-3">
                 <p className="text-sm text-zinc-700">
-                  <span className="font-medium">Page id:</span> {metaTestResult.summary.pageId ?? "—"} ·{" "}
+                  {metaTestResult.summary.graphApiVersion != null && (
+                    <>
+                      <span className="font-medium">Graph API:</span> {metaTestResult.summary.graphApiVersion}
+                      {" · "}
+                    </>
+                  )}
+                  <span className="font-medium">Page id:</span> {metaTestResult.summary.pageId ?? "—"}
+                  {metaTestResult.summary.requestedPageId ? (
+                    <span className="text-zinc-500"> (requested: {metaTestResult.summary.requestedPageId})</span>
+                  ) : null}
+                  {" · "}
                   <span className="font-medium">Ad account:</span> {metaTestResult.summary.adAccountId ?? "—"} ·{" "}
                   <span className={metaTestResult.summary.allOk ? "font-medium text-green-700" : "font-medium text-amber-800"}>
                     {metaTestResult.summary.allOk ? "All calls succeeded" : "Some calls failed — see rows"}

@@ -95,6 +95,9 @@ export type MetaPermissionTestRow = {
 
 export type MetaPermissionTestsResponse = {
   summary: {
+    /** Graph API version used for these calls (from server META_GRAPH_API_VERSION, default v25.0). */
+    graphApiVersion?: string;
+    requestedPageId?: string | null;
     adAccountId: string | null;
     pageId: string | null;
     pageTasks?: string[];
@@ -152,11 +155,17 @@ export const api = {
         method: "DELETE",
       }),
     /** Run Graph API calls that map to Meta App Dashboard permission tests (admin’s connected Meta token). */
-    runMetaPermissionTests: (metaAdAccountId?: string) =>
-      request<MetaPermissionTestsResponse>("admin/meta-permission-tests", {
+    runMetaPermissionTests: (opts?: { metaAdAccountId?: string; metaPageId?: string }) => {
+      const metaAdAccountId = opts?.metaAdAccountId?.trim();
+      const metaPageId = opts?.metaPageId?.trim();
+      const body: { metaAdAccountId?: string; metaPageId?: string } = {};
+      if (metaAdAccountId) body.metaAdAccountId = metaAdAccountId;
+      if (metaPageId) body.metaPageId = metaPageId;
+      return request<MetaPermissionTestsResponse>("admin/meta-permission-tests", {
         method: "POST",
-        body: metaAdAccountId?.trim() ? { metaAdAccountId: metaAdAccountId.trim() } : {},
-      }),
+        body: Object.keys(body).length ? body : {},
+      });
+    },
   },
 
   /** Agency self-serve clients (agency account only) */
