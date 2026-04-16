@@ -139,7 +139,11 @@ export default function PrivacyPage() {
               <a href={`mailto:${SITE_CONTACT.email}`} className="font-medium text-blue-600 hover:underline">
                 {SITE_CONTACT.email}
               </a>
-              .
+              . For Meta/Facebook login and step-by-step removal instructions, see our{" "}
+              <Link href="/data-deletion" className="font-medium text-blue-600 hover:underline">
+                User data deletion
+              </Link>{" "}
+              page.
             </p>
           </section>
 
@@ -174,6 +178,10 @@ export default function PrivacyPage() {
         <p className="mt-10 text-center text-sm text-zinc-500">
           <Link href="/contact" className="font-medium text-blue-600 hover:underline">
             Contact us
+          </Link>
+          {" · "}
+          <Link href="/data-deletion" className="font-medium text-blue-600 hover:underline">
+            User data deletion
           </Link>
           {" · "}
           <Link href="/terms" className="font-medium text-blue-600 hover:underline">
