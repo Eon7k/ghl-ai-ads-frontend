@@ -74,6 +74,8 @@ export default function CampaignDetailPage() {
   >(null);
   const [linkedinAdAccounts, setLinkedinAdAccounts] = useState<MetaAdAccount[] | null>(null);
   const [selectedLinkedinAccountId, setSelectedLinkedinAccountId] = useState<string>("");
+  /** Company Page: numeric id or urn:li:organization:123 — required for UGC + creatives. */
+  const [linkedinOrgUrnInput, setLinkedinOrgUrnInput] = useState<string>("");
   const [linkedinTestLoading, setLinkedinTestLoading] = useState(false);
   const [linkedinTestResult, setLinkedinTestResult] = useState<
     { ok: true; adAccountCount: number } | { ok: false; error: string } | null
@@ -323,6 +325,7 @@ export default function CampaignDetailPage() {
     setBudgetUpdating(true);
     try {
       await api.updateCampaignBudget(experiment.id, num);
+      setExperiment((prev) => (prev ? { ...prev, totalDailyBudget: num } : null));
     } catch (e) {
       setBudgetError(e instanceof Error ? e.message : "Failed to update budget");
     } finally {
@@ -571,6 +574,8 @@ export default function CampaignDetailPage() {
       tiktokIdentityId?: string;
       tiktokIdentityType?: string;
       googleAdsCustomerId?: string;
+      linkedInSponsoredAccountId?: string;
+      linkedInOrganizationUrn?: string;
       landingPageUrl?: string;
       dryRun?: boolean;
       variantIds?: string[];
@@ -596,6 +601,17 @@ export default function CampaignDetailPage() {
     }
     if (experiment.platform === "google" && selectedGoogleCustomerId) {
       opts.googleAdsCustomerId = selectedGoogleCustomerId.replace(/\D/g, "");
+      if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
+      opts.dryRun = dryRun;
+      if (variantsSelectedForLaunch.size > 0) opts.variantIds = Array.from(variantsSelectedForLaunch);
+    }
+    if (
+      experiment.platform === "linkedin" &&
+      selectedLinkedinAccountId &&
+      linkedinOrgUrnInput.trim()
+    ) {
+      opts.linkedInSponsoredAccountId = selectedLinkedinAccountId.replace(/\D/g, "");
+      opts.linkedInOrganizationUrn = linkedinOrgUrnInput.trim();
       if (launchLandingPageUrl.trim()) opts.landingPageUrl = launchLandingPageUrl.trim();
       opts.dryRun = dryRun;
       if (variantsSelectedForLaunch.size > 0) opts.variantIds = Array.from(variantsSelectedForLaunch);
@@ -819,11 +835,14 @@ export default function CampaignDetailPage() {
   const launchableSelectedCount = variants.filter(
     (v) => (v.hasCreative || creativeUrls[v.id]) && variantsSelectedForLaunch.has(v.id)
   ).length;
-  const budgetPerVariant =
-    variants.length > 0
-      ? Math.round((experiment.totalDailyBudget / variants.length) * 100) / 100
-      : null;
-
+  const showPlatformLaunchControls =
+    (experiment.platform === "meta" && !!selectedMetaAdAccountId) ||
+    (experiment.platform === "tiktok" && !!selectedTiktokAdvertiserId) ||
+    (experiment.platform === "google" && !!selectedGoogleCustomerId) ||
+    (experiment.platform === "linkedin" &&
+      !!selectedLinkedinAccountId &&
+      !!linkedinOrgUrnInput.trim() &&
+      !!launchLandingPageUrl.trim());
   return (
     <>
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
@@ -852,11 +871,21 @@ export default function CampaignDetailPage() {
           <p className="text-zinc-600 text-sm mt-1">
             {experiment.platform.toUpperCase()} · ${experiment.totalDailyBudget}/day total
             {variants.length > 0 && ` · ${variants.length} variant${variants.length === 1 ? "" : "s"}`}
-            {budgetPerVariant != null && ` · $${budgetPerVariant}/day per variant`}
+            {experiment.platform === "meta" && variants.length > 0
+              ? ` — Meta: one ad set per variant (~$${(Math.round((experiment.totalDailyBudget / variants.length) * 100) / 100).toFixed(2)}/day each)`
+              : variants.length > 0
+                ? " — budget shared across live ads"
+                : ""}
             {experiment.status === "launched" && experiment.googleCampaignId && (
               <span className="block mt-1 text-xs text-zinc-500">
                 Google Ads campaign id {experiment.googleCampaignId}
                 {experiment.googleAdGroupId ? ` · ad group ${experiment.googleAdGroupId}` : ""}
+              </span>
+            )}
+            {experiment.status === "launched" && experiment.linkedinCampaignId && (
+              <span className="block mt-1 text-xs text-zinc-500">
+                LinkedIn campaign group {experiment.linkedinCampaignGroupId ?? "—"} · campaign{" "}
+                {experiment.linkedinCampaignId}
               </span>
             )}
           </p>
@@ -1263,23 +1292,27 @@ export default function CampaignDetailPage() {
                 </div>
               )}
               {experiment.platform === "linkedin" && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3">
-                  <p className="text-sm font-medium text-amber-950">LinkedIn Ads</p>
-                  <p className="mt-1 text-xs text-amber-900/90">
-                    This app does not publish to LinkedIn yet. Confirm your connection and ad accounts below, then use
-                    LinkedIn Campaign Manager to run ads with the copy and creatives you prepare here.
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
+                  <p className="mb-2 text-sm font-medium text-zinc-700">Launch to LinkedIn Ads</p>
+                  <p className="mb-2 text-[11px] text-zinc-500">
+                    Creates a sponsored updates / website visit campaign with one creative per selected variant. Posts and
+                    images are authored as your{" "}
+                    <strong>Company Page</strong> — use that Page&apos;s numeric id (or{" "}
+                    <code className="rounded bg-zinc-200 px-1">urn:li:organization:…</code>). If asset or post steps return
+                    403, add <code className="rounded bg-zinc-200 px-1">w_organization_social</code> to your LinkedIn app
+                    scopes and reconnect. Dry run creates structures in <strong>PAUSED</strong> (no spend).
                   </p>
                   {linkedinAdAccounts === null ? (
-                    <p className="mt-2 text-xs text-zinc-600">Loading ad accounts…</p>
+                    <p className="text-xs text-zinc-500">Loading ad accounts…</p>
                   ) : linkedinAdAccounts.length === 0 ? (
-                    <p className="mt-2 text-xs text-amber-800">
+                    <p className="text-xs text-amber-800">
                       No accounts returned. Ensure your LinkedIn app has Marketing API access and scopes such as{" "}
                       <code className="rounded bg-amber-100 px-1">r_ads</code> /{" "}
                       <code className="rounded bg-amber-100 px-1">rw_ads</code>, then reconnect.
                     </p>
                   ) : (
                     <>
-                      <label className="mt-2 block text-xs font-medium text-zinc-700">Ad account (reference)</label>
+                      <label className="block text-xs text-zinc-600">Sponsored ad account</label>
                       <select
                         value={selectedLinkedinAccountId}
                         onChange={(e) => setSelectedLinkedinAccountId(e.target.value)}
@@ -1292,6 +1325,28 @@ export default function CampaignDetailPage() {
                           </option>
                         ))}
                       </select>
+                      {selectedLinkedinAccountId && (
+                        <>
+                          <label className="mt-2 block text-xs text-zinc-600">
+                            Company Page id or URN (required — ads post as this organization)
+                          </label>
+                          <input
+                            type="text"
+                            value={linkedinOrgUrnInput}
+                            onChange={(e) => setLinkedinOrgUrnInput(e.target.value)}
+                            placeholder="e.g. 12345678 or urn:li:organization:12345678"
+                            className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                          />
+                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL (https, required)</label>
+                          <input
+                            type="url"
+                            value={launchLandingPageUrl}
+                            onChange={(e) => setLaunchLandingPageUrl(e.target.value)}
+                            placeholder="https://your-site.com/offer"
+                            className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                          />
+                        </>
+                      )}
                       <div className="mt-2 flex items-center gap-2">
                         <button
                           type="button"
@@ -1309,16 +1364,87 @@ export default function CampaignDetailPage() {
                           </span>
                         )}
                       </div>
+                      {selectedLinkedinAccountId &&
+                        sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
+                          <div className="mt-3">
+                            <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
+                            <p className="mb-2 text-[11px] text-zinc-500">
+                              Each selected variant becomes a sponsored creative (image + copy) in the campaign.
+                            </p>
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setVariantsSelectedForLaunch(
+                                    new Set(
+                                      sortedVariants
+                                        .filter((v) => v.hasCreative || creativeUrls[v.id])
+                                        .map((v) => v.id)
+                                    )
+                                  )
+                                }
+                                className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                Select all
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setVariantsSelectedForLaunch(new Set())}
+                                className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                Clear
+                              </button>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-zinc-500">Pick first</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={sortedVariants.length}
+                                  value={launchPickCount}
+                                  onChange={(e) => setLaunchPickCount(e.target.value)}
+                                  className="h-7 w-16 rounded border border-zinc-300 bg-white px-2 text-xs text-zinc-900"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => selectFirstNLaunchable(Number(launchPickCount) || 0)}
+                                  className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                                >
+                                  Apply
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                              {sortedVariants.map((v) => {
+                                const hasCreative = v.hasCreative || creativeUrls[v.id];
+                                if (!hasCreative) return null;
+                                return (
+                                  <label key={v.id} className="flex cursor-pointer items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={variantsSelectedForLaunch.has(v.id)}
+                                      onChange={(e) => {
+                                        setVariantsSelectedForLaunch((prev) => {
+                                          const next = new Set(prev);
+                                          if (e.target.checked) next.add(v.id);
+                                          else next.delete(v.id);
+                                          return next;
+                                        });
+                                      }}
+                                      className="rounded border-zinc-300"
+                                    />
+                                    <span className="text-sm text-zinc-800">Variant {v.index}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                     </>
                   )}
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-3">
-                {experiment.platform === "linkedin" ? (
-                  <p className="text-sm text-amber-900">Launch from this app is not available for LinkedIn yet.</p>
-                ) : (experiment.platform === "meta" && selectedMetaAdAccountId) ||
-                  (experiment.platform === "tiktok" && selectedTiktokAdvertiserId) ||
-                  (experiment.platform === "google" && selectedGoogleCustomerId) ? (
+                {showPlatformLaunchControls ? (
                   <>
                     <button
                       type="button"
@@ -1337,6 +1463,10 @@ export default function CampaignDetailPage() {
                       {launching ? "Launching…" : "Launch as dry run (no spend)"}
                     </button>
                   </>
+                ) : experiment.platform === "linkedin" ? (
+                  <p className="text-sm text-zinc-600">
+                    Select an ad account, Company Page id, and https landing URL to enable launch.
+                  </p>
                 ) : (
                   <button
                     type="button"
@@ -1535,27 +1665,36 @@ export default function CampaignDetailPage() {
                   </div>
                 )}
                 {experiment.metaAdSetId && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="text-sm font-medium text-zinc-700">
-                      Daily budget (Meta): $
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className="ml-1 w-20 rounded border border-zinc-300 px-2 py-1 text-zinc-900"
-                        value={budgetValue}
-                        onChange={(e) => setBudgetValue(e.target.value)}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleUpdateBudget}
-                      disabled={budgetUpdating}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {budgetUpdating ? "Saving…" : "Update budget"}
-                    </button>
-                    {budgetError && <p className="text-sm text-red-600">{budgetError}</p>}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="text-sm font-medium text-zinc-700">
+                        {experiment.metaAdSetId?.includes(",")
+                          ? "Total Meta daily budget (split across ad sets): $"
+                          : "Ad set daily budget (Meta): $"}
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          className="ml-1 w-20 rounded border border-zinc-300 px-2 py-1 text-zinc-900"
+                          value={budgetValue}
+                          onChange={(e) => setBudgetValue(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleUpdateBudget}
+                        disabled={budgetUpdating}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {budgetUpdating ? "Saving…" : "Update budget"}
+                      </button>
+                      {budgetError && <p className="text-sm text-red-600">{budgetError}</p>}
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      {experiment.metaAdSetId?.includes(",")
+                        ? `Total $${budgetValue}/day is split evenly across ${experiment.metaAdSetId.split(",").filter(Boolean).length} ad sets (one per variant).`
+                        : `One ad set daily cap; Meta splits delivery between creatives in that ad set.`}
+                    </p>
                   </div>
                 )}
               </>

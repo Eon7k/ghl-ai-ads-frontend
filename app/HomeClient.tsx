@@ -340,7 +340,7 @@ export function HomeClient() {
         )}
         {connectedParam === "linkedin" && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-            LinkedIn connected. You can create LinkedIn draft campaigns; live publishing to LinkedIn from this app is not available yet—use Campaign Manager to go live.
+            LinkedIn connected. Create a LinkedIn campaign, add creatives, then launch from the campaign page (Company Page id + landing URL required). You can still manage delivery in Campaign Manager.
           </div>
         )}
         {errorParam && (
@@ -629,7 +629,11 @@ export function HomeClient() {
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Daily budget: ${budget}</label>
+                    <label className="block text-sm font-medium text-zinc-700">Total daily budget: ${budget}</label>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      One cap for this campaign. All ad variants share it when launched (not ${budget} per variant). If you pick
+                      multiple platforms, the total is split evenly across them.
+                    </p>
                     <input type="range" min={5} max={500} step={5} value={budget} onChange={(e) => setBudget(e.target.value)} className="mt-1 h-2 w-full accent-blue-600" />
                   </div>
                   <div className="flex gap-3 pt-2">

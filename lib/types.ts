@@ -51,6 +51,9 @@ export type Experiment = {
   /** Set after launch via Google Ads API (Display campaign). */
   googleCampaignId?: string;
   googleAdGroupId?: string;
+  /** Set after launch via LinkedIn Marketing API. */
+  linkedinCampaignGroupId?: string;
+  linkedinCampaignId?: string;
   aiOptimizationMode?: AiOptimizationMode;
 }
 
