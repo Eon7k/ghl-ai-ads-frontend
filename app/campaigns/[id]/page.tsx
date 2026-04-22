@@ -73,6 +73,8 @@ export default function CampaignDetailPage() {
     { ok: true; customerCount: number } | { ok: false; error: string } | null
   >(null);
   const [linkedinAdAccounts, setLinkedinAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  /** When the ad-accounts request fails, we show this instead of the empty-list message. */
+  const [linkedinAdAccountsError, setLinkedinAdAccountsError] = useState<string | null>(null);
   const [selectedLinkedinAccountId, setSelectedLinkedinAccountId] = useState<string>("");
   /** Company Page: numeric id or urn:li:organization:123 — required for UGC + creatives. */
   const [linkedinOrgUrnInput, setLinkedinOrgUrnInput] = useState<string>("");
@@ -227,10 +229,17 @@ export default function CampaignDetailPage() {
 
   useEffect(() => {
     if (!experiment || experiment.platform !== "linkedin" || experiment.status !== "draft") return;
+    setLinkedinAdAccountsError(null);
     api.integrations
       .getLinkedInAdAccounts()
-      .then(setLinkedinAdAccounts)
-      .catch(() => setLinkedinAdAccounts([]));
+      .then((list) => {
+        setLinkedinAdAccounts(list);
+        setLinkedinAdAccountsError(null);
+      })
+      .catch((e) => {
+        setLinkedinAdAccounts([]);
+        setLinkedinAdAccountsError(e instanceof Error ? e.message : "Could not load LinkedIn ad accounts");
+      });
   }, [experiment?.id, experiment?.platform, experiment?.status]);
 
   useEffect(() => {
@@ -1304,11 +1313,18 @@ export default function CampaignDetailPage() {
                   </p>
                   {linkedinAdAccounts === null ? (
                     <p className="text-xs text-zinc-500">Loading ad accounts…</p>
+                  ) : linkedinAdAccountsError ? (
+                    <p className="text-xs text-red-800">
+                      <span className="font-medium">Could not load ad accounts.</span> {linkedinAdAccountsError} Check
+                      backend logs, then LinkedIn app → Marketing / Ads product, and reconnect LinkedIn in this app.
+                    </p>
                   ) : linkedinAdAccounts.length === 0 ? (
                     <p className="text-xs text-amber-800">
-                      No accounts returned. Ensure your LinkedIn app has Marketing API access and scopes such as{" "}
+                      No ad accounts in the response. The signed-in LinkedIn user must be able to access at least one
+                      Campaign Manager ad account, and the app needs Marketing API with scopes{" "}
                       <code className="rounded bg-amber-100 px-1">r_ads</code> /{" "}
-                      <code className="rounded bg-amber-100 px-1">rw_ads</code>, then reconnect.
+                      <code className="rounded bg-amber-100 px-1">rw_ads</code> (then disconnect and connect LinkedIn
+                      again so the new scopes apply).
                     </p>
                   ) : (
                     <>
