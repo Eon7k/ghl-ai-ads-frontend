@@ -1328,7 +1328,9 @@ export default function CampaignDetailPage() {
                     <strong>Company Page</strong> — use that Page&apos;s numeric id (or{" "}
                     <code className="rounded bg-zinc-200 px-1">urn:li:organization:…</code>). If asset or post steps return
                     403, add <code className="rounded bg-zinc-200 px-1">w_organization_social</code> to your LinkedIn app
-                    scopes and reconnect. Dry run creates structures in <strong>PAUSED</strong> (no spend).
+                    scopes and reconnect. Dry run creates without forcing <strong>ACTIVE</strong> (LinkedIn does not allow
+                    setting <code className="rounded bg-zinc-200 px-1">PAUSED</code> on create); review and activate or pause
+                    in Campaign Manager before spend.
                   </p>
                   {linkedinAdAccounts === null ? (
                     <p className="text-xs text-zinc-500">Loading ad accounts…</p>
