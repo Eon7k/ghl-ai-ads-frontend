@@ -106,7 +106,10 @@ export function HomeClient() {
   }, [integrations]);
   useEffect(() => {
     if (!integrations.some((i) => i.platform === "linkedin")) return;
-    api.integrations.getLinkedInAdAccounts().then(setLinkedinAdAccounts).catch(() => setLinkedinAdAccounts([]));
+    api.integrations
+      .getLinkedInAdAccounts()
+      .then((r) => setLinkedinAdAccounts(r.adAccounts))
+      .catch(() => setLinkedinAdAccounts([]));
   }, [integrations]);
 
   useEffect(() => {

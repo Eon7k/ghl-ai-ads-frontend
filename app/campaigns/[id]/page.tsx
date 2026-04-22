@@ -73,6 +73,20 @@ export default function CampaignDetailPage() {
     { ok: true; customerCount: number } | { ok: false; error: string } | null
   >(null);
   const [linkedinAdAccounts, setLinkedinAdAccounts] = useState<MetaAdAccount[] | null>(null);
+  /** When the list is empty, backend can return one row per API attempt (v2 + rest) for debugging. */
+  const [linkedinDiscovery, setLinkedinDiscovery] = useState<
+    | {
+        attempts: Array<{
+          url: string;
+          status: number;
+          elementCount: number;
+          topLevelKeys: string[];
+          message?: string;
+          sampleElementKeys?: string[];
+        }>;
+      }
+    | null
+  >(null);
   /** When the ad-accounts request fails, we show this instead of the empty-list message. */
   const [linkedinAdAccountsError, setLinkedinAdAccountsError] = useState<string | null>(null);
   const [selectedLinkedinAccountId, setSelectedLinkedinAccountId] = useState<string>("");
@@ -80,7 +94,9 @@ export default function CampaignDetailPage() {
   const [linkedinOrgUrnInput, setLinkedinOrgUrnInput] = useState<string>("");
   const [linkedinTestLoading, setLinkedinTestLoading] = useState(false);
   const [linkedinTestResult, setLinkedinTestResult] = useState<
-    { ok: true; adAccountCount: number } | { ok: false; error: string } | null
+    | { ok: true; adAccountCount: number; linkedInDiscovery?: { attempts: { url: string; status: number; elementCount: number; message?: string }[] } }
+    | { ok: false; error: string }
+    | null
   >(null);
   const prevExperimentIdRef = useRef<string | null>(null);
   const [libraryCreatives, setLibraryCreatives] = useState<Creative[]>([]);
@@ -230,14 +246,17 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (!experiment || experiment.platform !== "linkedin" || experiment.status !== "draft") return;
     setLinkedinAdAccountsError(null);
+    setLinkedinDiscovery(null);
     api.integrations
       .getLinkedInAdAccounts()
-      .then((list) => {
-        setLinkedinAdAccounts(list);
+      .then((r) => {
+        setLinkedinAdAccounts(r.adAccounts);
+        setLinkedinDiscovery(r.linkedInDiscovery ?? null);
         setLinkedinAdAccountsError(null);
       })
       .catch((e) => {
         setLinkedinAdAccounts([]);
+        setLinkedinDiscovery(null);
         setLinkedinAdAccountsError(e instanceof Error ? e.message : "Could not load LinkedIn ad accounts");
       });
   }, [experiment?.id, experiment?.platform, experiment?.status]);
@@ -1319,13 +1338,30 @@ export default function CampaignDetailPage() {
                       backend logs, then LinkedIn app → Marketing / Ads product, and reconnect LinkedIn in this app.
                     </p>
                   ) : linkedinAdAccounts.length === 0 ? (
-                    <p className="text-xs text-amber-800">
-                      No ad accounts in the response. The signed-in LinkedIn user must be able to access at least one
-                      Campaign Manager ad account, and the app needs Marketing API with scopes{" "}
-                      <code className="rounded bg-amber-100 px-1">r_ads</code> /{" "}
-                      <code className="rounded bg-amber-100 px-1">rw_ads</code> (then disconnect and connect LinkedIn
-                      again so the new scopes apply).
-                    </p>
+                    <div className="space-y-2 text-xs text-amber-800">
+                      <p>
+                        No ad accounts in the response. The LinkedIn member authorized in the browser (when you clicked
+                        Connect) must be the same one with access in Campaign Manager. The app also needs{" "}
+                        <code className="rounded bg-amber-100 px-1">r_ads</code> /{" "}
+                        <code className="rounded bg-amber-100 px-1">rw_ads</code> (reconnect after scopes change). If
+                        you see <strong>401</strong> in the details below, reconnect LinkedIn; <strong>403</strong> =
+                        app/product/scope issue on LinkedIn&apos;s side.
+                      </p>
+                      {linkedinDiscovery?.attempts && linkedinDiscovery.attempts.length > 0 && (
+                        <details className="rounded border border-amber-200 bg-amber-50/50 p-2 text-[11px] text-zinc-800">
+                          <summary className="cursor-pointer font-medium">LinkedIn API attempts (for support)</summary>
+                          <ul className="mt-2 list-inside list-disc space-y-1 font-mono text-[10px] text-zinc-700">
+                            {linkedinDiscovery.attempts.map((a, i) => (
+                              <li key={i}>
+                                {a.url} → HTTP {a.status}
+                                {a.elementCount > 0 ? `, elements: ${a.elementCount}` : ""}
+                                {a.message ? ` — ${a.message}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
                   ) : (
                     <>
                       <label className="block text-xs text-zinc-600">Sponsored ad account</label>

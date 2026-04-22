@@ -381,9 +381,35 @@ export const api = {
     testGoogleConnection: () =>
       request<{ ok: true; customerCount: number } | { ok: false; error: string }>("integrations/google/test"),
     getLinkedInAdAccounts: () =>
-      request<{ adAccounts: MetaAdAccount[] }>("integrations/linkedin/ad-accounts").then((r) => r.adAccounts),
+      request<{
+        adAccounts: MetaAdAccount[];
+        /** Present when the list is empty: HTTP status per LinkedIn API attempt (v2 + rest) for support. */
+        linkedInDiscovery?: {
+          attempts: Array<{
+            url: string;
+            status: number;
+            elementCount: number;
+            topLevelKeys: string[];
+            message?: string;
+            sampleElementKeys?: string[];
+          }>;
+        };
+      }>("integrations/linkedin/ad-accounts"),
     testLinkedInConnection: () =>
-      request<{ ok: true; adAccountCount: number } | { ok: false; error: string }>("integrations/linkedin/test"),
+      request<{
+        ok: true;
+        adAccountCount: number;
+        linkedInDiscovery?: {
+          attempts: Array<{
+            url: string;
+            status: number;
+            elementCount: number;
+            topLevelKeys: string[];
+            message?: string;
+            sampleElementKeys?: string[];
+          }>;
+        };
+      } | { ok: false; error: string }>("integrations/linkedin/test"),
   },
 };
 
