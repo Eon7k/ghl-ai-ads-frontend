@@ -3,7 +3,7 @@
  */
 export function userFacingError(e: unknown): string {
   if (!(e instanceof Error)) return "Something went wrong. Try again.";
-  const m = e.message;
+  let m = e.message;
   if (/failed to fetch|NetworkError|Load failed|fetch/i.test(m)) {
     return "We could not reach the server. Check your connection, then try again.";
   }
@@ -16,7 +16,14 @@ export function userFacingError(e: unknown): string {
   if (/\(404\)|NOT_FOUND|not found/i.test(m)) {
     return "We could not find that item. It may have been removed.";
   }
-  if (/\(5\d\d\)/.test(m) || /SERVER_ERROR|Internal/i.test(m)) {
+  // Our API often appends (SERVER_ERROR) to a human-readable message; show the message, not only a generic 5xx line.
+  {
+    const withoutAppCode = m.replace(/\s*\(SERVER_ERROR\)\s*$/i, "").trim();
+    if (withoutAppCode && withoutAppCode !== m) {
+      m = withoutAppCode;
+    }
+  }
+  if (/\(5\d\d\)/.test(m) || /^HTTP 5\d\d$/i.test(m.trim()) || /^Internal Server Error$/i.test(m.trim())) {
     return "The server had a problem. Wait a moment and try again, or check status with your team.";
   }
   return m;
