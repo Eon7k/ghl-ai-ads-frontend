@@ -74,14 +74,31 @@ function CompetitorsPageInner() {
         .split(/[,;\n]+/)
         .map((s) => s.trim())
         .filter(Boolean);
+      const fbRaw = facebookPageId.trim();
       const { watch } = await expansion.competitor.createWatch({
         competitorName: name,
         competitorWebsite: website.trim() || null,
+        competitorFacebookPageId: fbRaw || null,
         keywords: kw,
         platforms: ["meta", "google"],
       });
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `ghl-cw-prefill-${watch.id}`,
+            JSON.stringify({
+              website: website.trim() || undefined,
+              facebookRaw: fbRaw || undefined,
+              keywords: kw.length ? kw.join(", ") : undefined,
+            })
+          );
+        } catch {
+          // ignore
+        }
+      }
       setCompetitorName("");
       setWebsite("");
+      setFacebookPageId("");
       setKeywords("");
       router.push(`/competitors/${watch.id}`);
     } catch (err) {

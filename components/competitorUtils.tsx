@@ -1,5 +1,57 @@
 import type { ReactNode } from "react";
 
+export type YourCampaignIdea = {
+  title: string;
+  platform: string;
+  angle: string;
+  adCopy: string;
+  whyItWorks: string;
+};
+
+export type CompetitivePackParsed = {
+  theirPlaybook: string;
+  howToWin: string[];
+  yourCampaigns: YourCampaignIdea[];
+  theirAdTactics: { headline: string; tactic: string }[];
+};
+
+export function parseCompetitivePack(x: unknown): CompetitivePackParsed | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.theirPlaybook !== "string") return null;
+  const howToWin = Array.isArray(o.howToWin)
+    ? o.howToWin.filter((a): a is string => typeof a === "string").map((s) => s.trim())
+    : [];
+  const yourCampaigns: YourCampaignIdea[] = [];
+  if (Array.isArray(o.yourCampaigns)) {
+    for (const c of o.yourCampaigns) {
+      if (!c || typeof c !== "object") continue;
+      const w = c as Record<string, unknown>;
+      if (typeof w.title === "string" && typeof w.adCopy === "string") {
+        yourCampaigns.push({
+          title: w.title,
+          platform: typeof w.platform === "string" ? w.platform : "meta",
+          angle: typeof w.angle === "string" ? w.angle : "",
+          adCopy: w.adCopy,
+          whyItWorks: typeof w.whyItWorks === "string" ? w.whyItWorks : "",
+        });
+      }
+    }
+  }
+  const theirAdTactics: { headline: string; tactic: string }[] = [];
+  if (Array.isArray(o.theirAdTactics)) {
+    for (const t of o.theirAdTactics) {
+      if (t && typeof t === "object" && typeof (t as { headline?: string }).headline === "string") {
+        theirAdTactics.push({
+          headline: (t as { headline: string }).headline,
+          tactic: typeof (t as { tactic?: string }).tactic === "string" ? (t as { tactic: string }).tactic : "",
+        });
+      }
+    }
+  }
+  return { theirPlaybook: o.theirPlaybook, howToWin, yourCampaigns, theirAdTactics };
+}
+
 export function stringArrayFromJson(x: unknown, max = 8): string[] {
   if (!Array.isArray(x)) return [];
   return x

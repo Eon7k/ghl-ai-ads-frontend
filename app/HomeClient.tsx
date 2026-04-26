@@ -123,6 +123,34 @@ export function HomeClient() {
     if (searchParams.get("open") === "create") setCreateOpen(true);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return;
+    const raw = sessionStorage.getItem("ghl-campaign-prefill");
+    if (!raw) return;
+    try {
+      const p = JSON.parse(raw) as {
+        name?: string;
+        prompt?: string;
+        creativePrompt?: string;
+        selectedPlatforms?: unknown;
+      };
+      if (typeof p.name === "string" && p.name.trim()) setName(p.name.trim());
+      if (typeof p.prompt === "string" && p.prompt.trim()) setPrompt(p.prompt.trim());
+      if (typeof p.creativePrompt === "string" && p.creativePrompt.trim()) setCreativePrompt(p.creativePrompt.trim());
+      if (Array.isArray(p.selectedPlatforms) && p.selectedPlatforms.length) {
+        const allowed: ("meta" | "google" | "tiktok" | "linkedin")[] = ["meta", "google", "tiktok", "linkedin"];
+        const next = p.selectedPlatforms.filter(
+          (x): x is "meta" | "google" | "tiktok" | "linkedin" => typeof x === "string" && (allowed as string[]).includes(x)
+        );
+        if (next.length) setSelectedPlatforms(next);
+      }
+      setCreateOpen(true);
+    } catch {
+      // ignore invalid JSON
+    }
+    sessionStorage.removeItem("ghl-campaign-prefill");
+  }, [user]);
+
   // Business model questionnaire for the current scope (your account or the client you’re viewing as)
   useEffect(() => {
     if (loading || !user || !needsBusinessOnboarding) return;

@@ -5,7 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
-import { renderInsightSummaryText, stringArrayFromJson, strongestAdsFromJson } from "@/components/competitorUtils";
+import {
+  renderInsightSummaryText,
+  stringArrayFromJson,
+  strongestAdsFromJson,
+  parseCompetitivePack,
+  type YourCampaignIdea,
+} from "@/components/competitorUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { expansion, type CompetitorWatchDetail } from "@/lib/api";
 import { userFacingError } from "@/lib/userFacingError";
@@ -56,6 +62,18 @@ function CompetitorDetailInner() {
     setLoadError(null);
     try {
       const { watch: w } = await expansion.competitor.getWatch(id);
+      let pre: { website?: string; facebookRaw?: string; keywords?: string } | null = null;
+      if (typeof window !== "undefined") {
+        const raw = sessionStorage.getItem(`ghl-cw-prefill-${id}`);
+        if (raw) {
+          try {
+            pre = JSON.parse(raw) as { website?: string; facebookRaw?: string; keywords?: string };
+          } catch {
+            pre = null;
+          }
+          sessionStorage.removeItem(`ghl-cw-prefill-${id}`);
+        }
+      }
       setWatch({
         ...w,
         insights: Array.isArray(w.insights) ? w.insights : [],
@@ -63,10 +81,10 @@ function CompetitorDetailInner() {
       });
       if (w.lastScannedAt) setLastScanAt(w.lastScannedAt);
       setCompetitorName(w.competitorName);
-      setWebsite(w.competitorWebsite ?? "");
-      setFbId(w.competitorFacebookPageId ?? "");
+      setWebsite(pre?.website ?? w.competitorWebsite ?? "");
+      setFbId(pre?.facebookRaw ?? w.competitorFacebookPageId ?? "");
       setGoogleId(w.competitorGoogleAdvertiserId ?? "");
-      setKeywords(keywordsToString(w.keywords));
+      setKeywords(typeof pre?.keywords === "string" && pre.keywords.length ? pre.keywords : keywordsToString(w.keywords));
       setPlatforms(platformsToString(w.platforms) || "meta, google");
       setIsActive(w.isActive);
     } catch (e) {
@@ -200,9 +218,40 @@ function CompetitorDetailInner() {
     );
   }
 
-  const metaLibraryUrl = fbId.trim()
-    ? `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&is_targeted_country=false&view_all_page_id=${encodeURIComponent(fbId.replace(/\D/g, "") || fbId)}`
-    : null;
+  const pageIdForLibrary = fbId.replace(/\D/g, "");
+  const metaLibraryUrl =
+    fbId.trim() && (pageIdForLibrary.length >= 4 || /^\d+$/.test(fbId.trim()))
+      ? `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&is_targeted_country=false&view_all_page_id=${encodeURIComponent(
+          /^\d+$/.test(fbId.trim()) ? fbId.trim() : pageIdForLibrary
+        )}`
+      : null;
+
+  function goUseCampaign(idea: YourCampaignIdea) {
+    if (typeof window === "undefined") return;
+    const n = `${watch?.competitorName ?? "Competitor"} — ${idea.title}`.slice(0, 120);
+    const pLower = idea.platform.toLowerCase();
+    const selectedPlatforms: ("meta" | "google" | "tiktok" | "linkedin")[] = pLower.includes("google")
+      ? ["google"]
+      : pLower.includes("linkedin")
+        ? ["linkedin"]
+        : pLower.includes("tiktok")
+          ? ["tiktok"]
+          : ["meta"];
+    sessionStorage.setItem(
+      "ghl-campaign-prefill",
+      JSON.stringify({
+        name: n,
+        prompt: [idea.angle && `**Angle:** ${idea.angle}`, idea.adCopy, idea.whyItWorks && `**Why it can win:** ${idea.whyItWorks}`]
+          .filter(Boolean)
+          .join("\n\n"),
+        creativePrompt: pLower.includes("google")
+          ? "Match Google ad style: clear headline + CTA in description."
+          : "High-impact visual; match the angle above in the ad image or video.",
+        selectedPlatforms,
+      })
+    );
+    router.push("/?open=create");
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -365,6 +414,49 @@ function CompetitorDetailInner() {
           reads public data and saves to your account.
         </p>
 
+        <section className="mt-10" aria-label="Competitor ads from Meta Ad Library">
+          <h2 className="text-lg font-semibold text-zinc-900">What they are running (Meta Ad Library)</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            These are <strong>public creative snapshots</strong> for this Facebook Page, not a full list of ad campaigns in Ads
+            Manager. It is the closest live view to “what ads are they running right now” you can get without their account. Each run
+            refreshes the list.
+          </p>
+          {(watch.ads ?? []).length === 0 ? (
+            <p className="mt-2 text-sm text-zinc-600">
+              No ads in your workspace yet. Add a <strong>Facebook Page</strong> link in Watch settings, ensure the API has{" "}
+              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code>, then run a scan.
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-4">
+              {(watch.ads ?? []).map((ad) => (
+                <li key={ad.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm">
+                  <p className="text-xs font-medium uppercase text-zinc-500">Meta</p>
+                  <p className="mt-0.5 font-mono text-xs text-zinc-500">Library id: {ad.adLibraryId}</p>
+                  {ad.headline && <p className="mt-1 font-medium text-zinc-900">{ad.headline}</p>}
+                  {ad.bodyText && <p className="mt-1 text-zinc-700">{ad.bodyText}</p>}
+                  <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                    {ad.mediaUrl && (
+                      <a
+                        href={ad.mediaUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-violet-700 hover:underline"
+                      >
+                        Open Ad Library snapshot (preview) →
+                      </a>
+                    )}
+                    {ad.destinationUrl && (
+                      <a href={ad.destinationUrl} target="_blank" rel="noreferrer" className="text-violet-700 hover:underline">
+                        Destination URL →
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section id="competitor-insights" className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-900">Intelligence & history</h2>
           <p className="mt-1 text-sm text-zinc-500">Newest first. Each run is a full snapshot; compare over time to see shifts in messaging and ads.</p>
@@ -376,6 +468,7 @@ function CompetitorDetailInner() {
                 const themes = stringArrayFromJson(ins.topThemes);
                 const angles = stringArrayFromJson(ins.suggestedCounterAngles);
                 const strong = strongestAdsFromJson(ins.strongestAds);
+                const pack = parseCompetitivePack(ins.competitivePack);
                 return (
                   <li
                     key={ins.id}
@@ -386,6 +479,63 @@ function CompetitorDetailInner() {
                     </div>
                     <div className="p-4">
                       {renderInsightSummaryText(ins.summary)}
+                      {pack && (
+                        <div className="mt-6 space-y-5 border-t border-zinc-100 pt-5">
+                          <div>
+                            <h3 className="text-sm font-semibold text-zinc-900">What they do (marketing read)</h3>
+                            <p className="mt-2 text-sm text-zinc-700 whitespace-pre-wrap">{pack.theirPlaybook}</p>
+                          </div>
+                          {pack.howToWin.length > 0 && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-zinc-900">How to beat them</h3>
+                              <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-sm text-zinc-800">
+                                {pack.howToWin.map((h, i) => (
+                                  <li key={i}>{h}</li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
+                          {pack.theirAdTactics.length > 0 && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-zinc-900">What their ads are doing (tactics)</h3>
+                              <ul className="mt-2 space-y-2 text-sm text-zinc-800">
+                                {pack.theirAdTactics.map((a, j) => (
+                                  <li key={j} className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2">
+                                    <p className="font-medium text-amber-950">{a.headline}</p>
+                                    <p className="mt-0.5 text-amber-900/90">{a.tactic}</p>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {pack.yourCampaigns.length > 0 && (
+                            <div>
+                              <h3 className="text-sm font-semibold text-zinc-900">Campaigns you can run (starter copy)</h3>
+                              <p className="mt-1 text-xs text-zinc-500">Use a suggestion below — we will open <strong>Home</strong> with the text filled into a new campaign draft.</p>
+                              <ul className="mt-3 space-y-4">
+                                {pack.yourCampaigns.map((idea, k) => (
+                                  <li key={k} className="rounded-xl border border-violet-200 bg-violet-50/30 p-4">
+                                    <p className="font-semibold text-violet-950">{idea.title}</p>
+                                    <p className="mt-1 text-xs text-zinc-600">
+                                      Suggested: <span className="font-medium text-zinc-800">{idea.platform}</span>
+                                    </p>
+                                    {idea.angle && <p className="mt-2 text-sm text-zinc-800">{idea.angle}</p>}
+                                    <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800">{idea.adCopy}</p>
+                                    {idea.whyItWorks && <p className="mt-2 text-xs text-zinc-600">Why: {idea.whyItWorks}</p>}
+                                    <button
+                                      type="button"
+                                      onClick={() => goUseCampaign(idea)}
+                                      className="mt-3 rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700"
+                                    >
+                                      Use for new campaign on Home
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {themes.length > 0 && (
                         <div className="mt-4">
                           <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Themes</h3>
@@ -428,41 +578,6 @@ function CompetitorDetailInner() {
                   </li>
                 );
               })}
-            </ul>
-          )}
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold text-zinc-900">Meta ads in your workspace</h2>
-          {(watch.ads ?? []).length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">
-              No ads stored yet. Add a <strong>Meta page ID</strong> and set{" "}
-              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> (or
-              <code className="rounded bg-zinc-100 px-1"> META_AD_LIBRARY_TOKEN</code>) on the server, then run a scan.
-            </p>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {(watch.ads ?? []).map((ad) => (
-                <li
-                  key={ad.id}
-                  className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm"
-                >
-                  <p className="text-xs font-medium uppercase text-zinc-500">{ad.platform}</p>
-                  <p className="mt-0.5 font-mono text-xs text-zinc-500">ID: {ad.adLibraryId}</p>
-                  {ad.headline && <p className="mt-1 font-medium text-zinc-900">{ad.headline}</p>}
-                  {ad.bodyText && <p className="mt-1 line-clamp-3 text-zinc-700">{ad.bodyText}</p>}
-                  {ad.destinationUrl && (
-                    <a
-                      href={ad.destinationUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-block text-xs text-violet-700 hover:underline"
-                    >
-                      Destination →
-                    </a>
-                  )}
-                </li>
-              ))}
             </ul>
           )}
         </section>

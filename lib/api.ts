@@ -618,6 +618,7 @@ export type CompetitorInsightRow = {
   topThemes: unknown;
   suggestedCounterAngles: unknown;
   strongestAds: unknown;
+  competitivePack?: unknown;
   rawPromptUsed?: string | null;
 };
 
@@ -628,6 +629,8 @@ export type CompetitorAdRow = {
   adLibraryId: string;
   headline: string | null;
   bodyText: string | null;
+  /** Meta Ad Library snapshot preview, when the API returns it */
+  mediaUrl?: string | null;
   destinationUrl: string | null;
   lastSeenAt: string;
 };
