@@ -14,6 +14,9 @@ import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/im
 import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 import { PageGuide } from "@/components/PageGuide";
+import { SetupChecklist } from "@/components/SetupChecklist";
+import { hasExpansionProduct } from "@/lib/products";
+import { expansion } from "@/lib/api";
 import { PublicLanding } from "@/components/PublicLanding";
 
 const BACKEND_URL =
@@ -46,7 +49,7 @@ function CreativeThumbnail({ creativeId, className }: { creativeId: string; clas
 
 export function HomeClient() {
   const router = useRouter();
-  const { user, loading, isAdmin, accountType, clients, needsBusinessOnboarding } = useAuth();
+  const { user, loading, isAdmin, accountType, clients, needsBusinessOnboarding, enabledProductKeys } = useAuth();
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
@@ -75,6 +78,9 @@ export function HomeClient() {
   const [selectedCreativeIds, setSelectedCreativeIds] = useState<string[]>([]);
   const [uploadingCreative, setUploadingCreative] = useState(false);
   const [uploadCreativeError, setUploadCreativeError] = useState<string | null>(null);
+  const [competitorWatchCount, setCompetitorWatchCount] = useState(0);
+  const [landingPageCount, setLandingPageCount] = useState(0);
+  const [setupMetaLoaded, setSetupMetaLoaded] = useState(false);
 
   const searchParams = useSearchParams();
   const connectedParam = searchParams.get("connected");
@@ -136,6 +142,42 @@ export function HomeClient() {
     setCreativesLoading(true);
     api.creatives.list().then(setCreatives).catch(() => setCreatives([])).finally(() => setCreativesLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setSetupMetaLoaded(false);
+      return;
+    }
+    let cancel = false;
+    (async () => {
+      let cw = 0;
+      let lp = 0;
+      if (hasExpansionProduct(enabledProductKeys, "competitors")) {
+        try {
+          const r = await expansion.competitor.listWatches();
+          cw = r.watches.length;
+        } catch {
+          cw = 0;
+        }
+      }
+      if (hasExpansionProduct(enabledProductKeys, "landing_pages")) {
+        try {
+          const r = await expansion.landingPages.list();
+          lp = r.pages.length;
+        } catch {
+          lp = 0;
+        }
+      }
+      if (!cancel) {
+        setCompetitorWatchCount(cw);
+        setLandingPageCount(lp);
+        setSetupMetaLoaded(true);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [user, enabledProductKeys]);
 
   async function handleDisconnect(id: string) {
     setDisconnecting(id);
@@ -403,8 +445,19 @@ export function HomeClient() {
           ]}
         />
 
+        {setupMetaLoaded && !needsBusinessOnboarding && (
+          <SetupChecklist
+            hasIntegration={integrations.length > 0}
+            hasCampaign={campaigns.length > 0}
+            canCompetitors={hasExpansionProduct(enabledProductKeys, "competitors")}
+            hasCompetitorWatch={competitorWatchCount > 0}
+            canLandingPages={hasExpansionProduct(enabledProductKeys, "landing_pages")}
+            hasLandingPage={landingPageCount > 0}
+          />
+        )}
+
         {/* Integration bar — cards in a row at top */}
-        <section className="mb-8">
+        <section id="integrations-bar" className="mb-8 scroll-mt-4">
           <div className="flex flex-wrap gap-3">
             {PLATFORMS.map((p) => {
               const connected = integrations.some((i) => i.platform === p.id);

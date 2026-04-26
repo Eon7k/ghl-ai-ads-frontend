@@ -443,6 +443,15 @@ export const api = {
           }>;
         };
       } | { ok: false; error: string }>("integrations/linkedin/test"),
+    /**
+     * Publishes an **organic** post to the Company Page main feed (not a dark ad creative).
+     * Same LinkedIn connection as ads; `organizationUrn` = numeric Page id or `urn:li:organization:…`.
+     */
+    postLinkedInOrganic: (body: { organizationUrn: string; text: string; imageBase64?: string | null }) =>
+      request<{ ok: true; postUrn: string; message: string }>("integrations/linkedin/organic-post", {
+        method: "POST",
+        body,
+      }),
   },
 };
 
@@ -609,6 +618,7 @@ export type CompetitorInsightRow = {
   topThemes: unknown;
   suggestedCounterAngles: unknown;
   strongestAds: unknown;
+  rawPromptUsed?: string | null;
 };
 
 export type CompetitorAdRow = {

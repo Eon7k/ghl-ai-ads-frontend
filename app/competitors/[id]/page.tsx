@@ -5,8 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
+import { renderInsightSummaryText, stringArrayFromJson, strongestAdsFromJson } from "@/components/competitorUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import { expansion, type CompetitorWatchDetail } from "@/lib/api";
+import { userFacingError } from "@/lib/userFacingError";
 
 function keywordsToString(kw: unknown): string {
   if (!Array.isArray(kw)) return "";
@@ -16,6 +18,15 @@ function keywordsToString(kw: unknown): string {
 function platformsToString(pl: unknown): string {
   if (!Array.isArray(pl)) return "";
   return pl.filter((x): x is string => typeof x === "string").join(", ");
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className="h-8 w-48 animate-pulse rounded bg-zinc-200" />
+      <div className="h-40 animate-pulse rounded-xl bg-zinc-200" />
+    </div>
+  );
 }
 
 function CompetitorDetailInner() {
@@ -29,6 +40,8 @@ function CompetitorDetailInner() {
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lastScanAt, setLastScanAt] = useState<string | null>(null);
+  const [showSaved, setShowSaved] = useState(false);
 
   const [competitorName, setCompetitorName] = useState("");
   const [website, setWebsite] = useState("");
@@ -48,15 +61,16 @@ function CompetitorDetailInner() {
         insights: Array.isArray(w.insights) ? w.insights : [],
         ads: Array.isArray(w.ads) ? w.ads : [],
       });
+      if (w.lastScannedAt) setLastScanAt(w.lastScannedAt);
       setCompetitorName(w.competitorName);
       setWebsite(w.competitorWebsite ?? "");
       setFbId(w.competitorFacebookPageId ?? "");
       setGoogleId(w.competitorGoogleAdvertiserId ?? "");
       setKeywords(keywordsToString(w.keywords));
-      setPlatforms(platformsToString(w.platforms) || "meta");
+      setPlatforms(platformsToString(w.platforms) || "meta, google");
       setIsActive(w.isActive);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Could not load");
+      setLoadError(userFacingError(e));
       setWatch(null);
     }
   }, [id, user]);
@@ -73,6 +87,7 @@ function CompetitorDetailInner() {
     if (!id) return;
     setActionError(null);
     setSaving(true);
+    setShowSaved(false);
     try {
       const kw = keywords
         .split(/[,;\n]+/)
@@ -92,8 +107,10 @@ function CompetitorDetailInner() {
         isActive,
       });
       await load();
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 3_000);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Save failed");
+      setActionError(userFacingError(e));
     } finally {
       setSaving(false);
     }
@@ -110,8 +127,9 @@ function CompetitorDetailInner() {
         insights: Array.isArray(w.insights) ? w.insights : [],
         ads: Array.isArray(w.ads) ? w.ads : [],
       });
+      if (w.lastScannedAt) setLastScanAt(w.lastScannedAt);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Scan failed");
+      setActionError(userFacingError(e));
     } finally {
       setScanning(false);
     }
@@ -124,7 +142,7 @@ function CompetitorDetailInner() {
       await expansion.competitor.deleteWatch(id);
       router.push("/competitors");
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Delete failed");
+      setActionError(userFacingError(e));
     }
   }
 
@@ -136,37 +154,94 @@ function CompetitorDetailInner() {
     );
   }
 
-  if (loadError || !watch) {
+  if (user && !id) {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
-        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
-          <p className="text-red-600">{loadError || "Not found"}</p>
-          <Link href="/competitors" className="mt-4 inline-block text-violet-700 hover:underline">
-            ← Competitors
-          </Link>
+        <main className="mx-auto max-w-3xl px-4 py-8">
+          <p className="text-zinc-600">Invalid watch id.</p>
+          <Link href="/competitors" className="mt-2 inline-block text-violet-700 hover:underline">← All watches</Link>
         </main>
       </div>
     );
   }
 
+  if (loadError && !watch) {
+    return (
+      <div className="min-h-screen bg-zinc-50">
+        <AppNav />
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
+          <p className="text-red-600">{loadError}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+            >
+              Retry
+            </button>
+            <Link href="/competitors" className="inline-block text-violet-700 hover:underline">
+              ← All watches
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!watch) {
+    return (
+      <div className="min-h-screen bg-zinc-50">
+        <AppNav />
+        <main className="mx-auto max-w-3xl px-4 py-8">
+          <DetailSkeleton />
+        </main>
+      </div>
+    );
+  }
+
+  const metaLibraryUrl = fbId.trim()
+    ? `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&is_targeted_country=false&view_all_page_id=${encodeURIComponent(fbId.replace(/\D/g, "") || fbId)}`
+    : null;
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
       <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
-        <Link href="/competitors" className="text-sm text-violet-700 hover:underline">
-          ← All watches
-        </Link>
+        <p className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          <strong className="text-zinc-800">First time?</strong> Full env + verify + Page id steps are on the{" "}
+          <Link href="/competitors#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitors</Link>{" "}
+          (section &quot;How to use Competitor watch&quot;).
+        </p>
+
+        <div className="mt-3 flex flex-wrap gap-2 text-sm text-violet-700">
+          <Link href="/competitors" className="hover:underline">← All watches</Link>
+          <span className="text-zinc-300">·</span>
+          <Link href="/" className="hover:underline">Home</Link>
+          <span className="text-zinc-300">·</span>
+          <Link href="/content-strategy" className="hover:underline">Content strategy</Link>
+        </div>
+
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-          <h1 className="text-2xl font-bold text-zinc-900">{watch.competitorName}</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900">{watch.competitorName}</h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              {isActive ? (
+                <span className="text-emerald-700">Active watch</span>
+              ) : (
+                <span className="text-amber-700">Paused</span>
+              )}
+              {lastScanAt && ` · Last scan ${new Date(lastScanAt).toLocaleString()}`}
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => void runScan()}
               disabled={scanning}
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:opacity-50"
             >
-              {scanning ? "Scanning…" : "Run scan"}
+              {scanning ? "Scanning…" : "Run scan now"}
             </button>
             <button
               type="button"
@@ -174,7 +249,7 @@ function CompetitorDetailInner() {
               disabled={saving}
               className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving…" : "Save settings"}
             </button>
             <button
               type="button"
@@ -185,9 +260,22 @@ function CompetitorDetailInner() {
             </button>
           </div>
         </div>
-        {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
+
+        {actionError && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            {actionError}
+          </div>
+        )}
+        {showSaved && <p className="mt-2 text-sm text-emerald-700">Settings saved.</p>}
+
+        <p className="mt-2 text-sm text-zinc-600">
+          <strong>Run scan</strong> fetches the public website (if set), optional Meta Ad Library (Page ID + server token), and
+          stores an AI brief when OpenAI is configured. Draft vs live: this tool does <strong>not</strong> post anything — it
+          only reads public data and saves to your account.
+        </p>
 
         <div className="mt-8 space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-zinc-900">Watch settings</h2>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Competitor name</label>
             <input
@@ -201,12 +289,14 @@ function CompetitorDetailInner() {
             <input
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
+              placeholder="https://"
               className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
             />
+            <p className="form-hint mt-1 text-xs text-zinc-500">We fetch this URL from our servers (private IPs blocked).</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Meta page id (optional)</label>
+              <label className="block text-sm font-medium text-zinc-700">Meta page ID (for Ad Library)</label>
               <input
                 value={fbId}
                 onChange={(e) => setFbId(e.target.value)}
@@ -214,7 +304,7 @@ function CompetitorDetailInner() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700">Google advertiser id (optional)</label>
+              <label className="block text-sm font-medium text-zinc-700">Google advertiser ID (optional, future use)</label>
               <input
                 value={googleId}
                 onChange={(e) => setGoogleId(e.target.value)}
@@ -222,6 +312,16 @@ function CompetitorDetailInner() {
               />
             </div>
           </div>
+          {metaLibraryUrl && (
+            <a
+              href={metaLibraryUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-sm font-medium text-violet-700 hover:underline"
+            >
+              Open Meta Ad Library for this page →
+            </a>
+          )}
           <div>
             <label className="block text-sm font-medium text-zinc-700">Keywords</label>
             <textarea
@@ -242,48 +342,104 @@ function CompetitorDetailInner() {
           </div>
           <label className="flex items-center gap-2 text-sm text-zinc-800">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded" />
-            Active
+            Active (turn off to pause without deleting)
           </label>
         </div>
 
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold text-zinc-900">Insights</h2>
+        <section id="competitor-insights" className="mt-10">
+          <h2 className="text-lg font-semibold text-zinc-900">Intelligence & history</h2>
+          <p className="mt-1 text-sm text-zinc-500">Newest first. Each run is a full snapshot; compare over time to see shifts in messaging and ads.</p>
           {(watch.insights ?? []).length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">Run a scan to add the first insight snapshot.</p>
+            <p className="mt-2 text-sm text-zinc-600">Run a scan to generate the first brief.</p>
           ) : (
-            <ul className="mt-4 space-y-3">
-              {(watch.insights ?? []).map((ins) => (
-                <li key={ins.id} className="rounded-lg border border-zinc-200 bg-white p-4 text-sm shadow-sm">
-                  <p className="text-xs text-zinc-500">{new Date(ins.generatedAt).toLocaleString()}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-zinc-800">{ins.summary}</p>
-                </li>
-              ))}
+            <ul className="mt-4 space-y-6">
+              {(watch.insights ?? []).map((ins) => {
+                const themes = stringArrayFromJson(ins.topThemes);
+                const angles = stringArrayFromJson(ins.suggestedCounterAngles);
+                const strong = strongestAdsFromJson(ins.strongestAds);
+                return (
+                  <li
+                    key={ins.id}
+                    className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+                  >
+                    <div className="border-b border-zinc-100 bg-zinc-50/80 px-4 py-2">
+                      <p className="text-xs text-zinc-500">{new Date(ins.generatedAt).toLocaleString()}</p>
+                    </div>
+                    <div className="p-4">
+                      {renderInsightSummaryText(ins.summary)}
+                      {themes.length > 0 && (
+                        <div className="mt-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Themes</h3>
+                          <ul className="mt-2 flex flex-wrap gap-2">
+                            {themes.map((t) => (
+                              <li
+                                key={t}
+                                className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-900"
+                              >
+                                {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {angles.length > 0 && (
+                        <div className="mt-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Your counter-angles</h3>
+                          <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-sm text-zinc-800">
+                            {angles.map((a) => (
+                              <li key={a}>{a}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                      {strong.length > 0 && (
+                        <div className="mt-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Strongest ad signals</h3>
+                          <ul className="mt-2 space-y-2">
+                            {strong.map((s, j) => (
+                              <li key={j} className="rounded-lg border border-zinc-100 bg-zinc-50/50 px-3 py-2 text-sm text-zinc-800">
+                                <p className="font-medium text-zinc-900">{s.headline}</p>
+                                {s.note && <p className="mt-1 text-xs text-zinc-600">{s.note}</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
 
         <section className="mt-10">
-          <h2 className="text-lg font-semibold text-zinc-900">Ads captured</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">Meta ads in your workspace</h2>
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
-              No ads stored yet. A future integration can populate this from Ad Library APIs.
+              No ads stored yet. Add a <strong>Meta page ID</strong> and set{" "}
+              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> (or
+              <code className="rounded bg-zinc-100 px-1"> META_AD_LIBRARY_TOKEN</code>) on the server, then run a scan.
             </p>
           ) : (
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 space-y-3">
               {(watch.ads ?? []).map((ad) => (
-                <li key={ad.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm">
-                  <p className="font-medium text-zinc-900">
-                    {ad.platform} · {ad.adLibraryId}
-                  </p>
-                  {ad.headline && <p className="mt-1 text-zinc-700">{ad.headline}</p>}
+                <li
+                  key={ad.id}
+                  className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm"
+                >
+                  <p className="text-xs font-medium uppercase text-zinc-500">{ad.platform}</p>
+                  <p className="mt-0.5 font-mono text-xs text-zinc-500">ID: {ad.adLibraryId}</p>
+                  {ad.headline && <p className="mt-1 font-medium text-zinc-900">{ad.headline}</p>}
+                  {ad.bodyText && <p className="mt-1 line-clamp-3 text-zinc-700">{ad.bodyText}</p>}
                   {ad.destinationUrl && (
                     <a
                       href={ad.destinationUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 inline-block text-xs text-violet-700 hover:underline"
+                      className="mt-2 inline-block text-xs text-violet-700 hover:underline"
                     >
-                      Destination
+                      Destination →
                     </a>
                   )}
                 </li>

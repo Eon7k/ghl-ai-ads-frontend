@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { api, type ConnectedIntegration } from "@/lib/api";
 import { PageGuide } from "@/components/PageGuide";
+import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
 
 type Mode = "full" | "text_plus_prompts" | "ideas_only";
 type Horizon = "single" | "week" | "month";
@@ -20,11 +21,34 @@ export default function ContentStrategyPage() {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
+  const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
+  const [linkedinOrgUrn, setLinkedinOrgUrn] = useState("");
+  const [organicText, setOrganicText] = useState("");
+  const [organicImageDataUrl, setOrganicImageDataUrl] = useState<string | null>(null);
+  const [organicImageName, setOrganicImageName] = useState<string | null>(null);
+  const [organicLoading, setOrganicLoading] = useState(false);
+  const [organicError, setOrganicError] = useState<string | null>(null);
+  const [organicSuccess, setOrganicSuccess] = useState<string | null>(null);
 
   const profileSkipped = Boolean(
     businessModelProfile && (businessModelProfile as { skipped?: boolean }).skipped === true
   );
   const hasUsefulProfile = businessOnboardingComplete === true && !profileSkipped;
+  const linkedInConnected = integrations.some((i) => i.platform === "linkedin");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user) return;
+    const saved = window.sessionStorage.getItem("linkedinContentOrgUrn");
+    if (saved) setLinkedinOrgUrn(saved);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    api.integrations
+      .list()
+      .then((r) => setIntegrations(r))
+      .catch(() => setIntegrations([]));
+  }, [user]);
 
   async function generate() {
     setGenLoading(true);
@@ -41,6 +65,37 @@ export default function ContentStrategyPage() {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenLoading(false);
+    }
+  }
+
+  async function postToLinkedInOrganic() {
+    setOrganicError(null);
+    setOrganicSuccess(null);
+    setOrganicLoading(true);
+    try {
+      const textToSend =
+        organicText.trim() ||
+        (result || "")
+          .replace(/```[\s\S]*?```/g, " ")
+          .replace(/^#+\s.*/gm, " ")
+          .trim();
+      if (!textToSend) {
+        setOrganicError("Add post text, or generate content first so we can send it.");
+        return;
+      }
+      const r = await api.integrations.postLinkedInOrganic({
+        organizationUrn: linkedinOrgUrn.trim(),
+        text: textToSend,
+        imageBase64: organicImageDataUrl,
+      });
+      setOrganicSuccess(r.message);
+      if (typeof window !== "undefined" && linkedinOrgUrn.trim()) {
+        window.sessionStorage.setItem("linkedinContentOrgUrn", linkedinOrgUrn.trim());
+      }
+    } catch (e) {
+      setOrganicError(e instanceof Error ? e.message : "Could not post to LinkedIn");
+    } finally {
+      setOrganicLoading(false);
     }
   }
 
@@ -61,7 +116,7 @@ export default function ContentStrategyPage() {
         steps={[
           "This is for organic social content ideas and copy — not the same as launching a paid ad campaign. Paid ads are created from Home and edited on a campaign page.",
           "Type what you need (topic, time window, product launch, tone). Choose whether you want full posts, text plus a to-do list, or ideas only, and pick a time range.",
-          "Click Generate and wait. Copy the result into your own scheduler or document. Filling the business profile (link below) first gives the AI more context about your business.",
+          "If LinkedIn is connected, use the “Post to LinkedIn” section to publish to your Company Page, or still copy the result anywhere you like. The business profile (link below) gives the AI more context about your business.",
         ]}
       />
       {isClientContext && (
@@ -178,6 +233,81 @@ export default function ContentStrategyPage() {
           {genLoading ? "Generating with Claude…" : "Generate plan"}
         </button>
       </div>
+
+      {linkedInConnected && (
+        <section className="mt-10 rounded-2xl border border-sky-200 bg-sky-50/80 p-5 shadow-sm">
+          <h2 className="text-base font-semibold text-slate-900">Post to LinkedIn (Company Page feed)</h2>
+          <p className="form-hint mt-1 max-w-2xl">
+            Publishes a <strong>public</strong> post to your organization&apos;s <strong>main feed</strong>. This is separate
+            from <strong>ads</strong> (Home → campaign → Launch): those still create <strong>dark</strong> posts for
+            sponsored content. Same LinkedIn connection for both; use the same <strong>Company Page id</strong> as in the
+            campaign form.
+          </p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="text-sm font-medium text-zinc-800">Company Page (number or urn:li:organization:…)</label>
+              <input
+                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+                value={linkedinOrgUrn}
+                onChange={(e) => setLinkedinOrgUrn(e.target.value)}
+                placeholder="e.g. 1234567890"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-800">Post text (optional if you will use generated result)</label>
+              <textarea
+                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+                rows={5}
+                value={organicText}
+                onChange={(e) => setOrganicText(e.target.value)}
+                placeholder="Type here, or leave blank and we use the last generated result (text only, after stripping markdown a bit)."
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-zinc-800">Image (optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-1 block w-full text-sm"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) {
+                    setOrganicImageDataUrl(null);
+                    setOrganicImageName(null);
+                    return;
+                  }
+                  if (isHeicFile(f)) {
+                    setOrganicError("HEIC is not supported. Use JPG/PNG or convert on your phone first.");
+                    return;
+                  }
+                  if (!isLikelyImageFile(f)) {
+                    setOrganicError("Choose a JPG, PNG, WebP, or GIF.");
+                    return;
+                  }
+                  setOrganicError(null);
+                  const dataUrl = await fileToUploadableDataUrl(f);
+                  setOrganicImageDataUrl(dataUrl);
+                  setOrganicImageName(f.name);
+                }}
+              />
+              {organicImageName ? (
+                <p className="form-hint mt-1">Attached: {organicImageName}</p>
+              ) : null}
+            </div>
+            {organicError && <p className="text-sm text-red-700">{organicError}</p>}
+            {organicSuccess && <p className="text-sm text-green-800">{organicSuccess}</p>}
+            <button
+              type="button"
+              onClick={postToLinkedInOrganic}
+              disabled={organicLoading || !linkedinOrgUrn.trim()}
+              className="rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 disabled:opacity-50"
+            >
+              {organicLoading ? "Publishing…" : "Publish to LinkedIn now"}
+            </button>
+          </div>
+        </section>
+      )}
 
       {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
 

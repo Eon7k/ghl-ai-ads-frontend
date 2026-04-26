@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { hasExpansionProduct } from "@/lib/products";
 import { api } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 import { PageGuide } from "@/components/PageGuide";
@@ -34,7 +35,7 @@ function groupCampaigns(experiments: Experiment[]): { groupId: string; name: str
 }
 
 export default function ManagerPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin, enabledProductKeys } = useAuth();
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
   const [loadingList, setLoadingList] = useState(true);
 
@@ -45,6 +46,9 @@ export default function ManagerPage() {
   }, [user]);
 
   const groups = groupCampaigns(campaigns);
+  const launchedN = groups.filter((g) => g.status === "Active").length;
+  const draftN = groups.length - launchedN;
+  const canCompetitors = isAdmin || hasExpansionProduct(enabledProductKeys, "competitors");
 
   if (loading) {
     return (
@@ -84,6 +88,18 @@ export default function ManagerPage() {
               "For step-by-step help, open Help in the top navigation.",
             ]}
           />
+          {!loadingList && groups.length > 0 && (
+            <p className="mt-3 text-sm text-zinc-600">
+              <span className="font-medium text-zinc-800">At a glance:</span> {launchedN} live group{launchedN === 1 ? "" : "s"} · {draftN} draft{draftN === 1 ? "" : "s"}.{" "}
+              {canCompetitors ? (
+                <>
+                  Track positioning with{" "}
+                  <Link href="/competitors" className="text-violet-700 hover:underline">Competitor watch</Link>
+                  .
+                </>
+              ) : null}
+            </p>
+          )}
         </section>
 
         <section id="campaigns">
