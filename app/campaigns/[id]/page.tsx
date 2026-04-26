@@ -841,15 +841,18 @@ export default function CampaignDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <p className="text-zinc-600">Loading campaign...</p>
+      <div className="app-shell flex min-h-screen items-center justify-center p-6">
+        <div className="flex items-center gap-3 text-slate-600">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+          <p className="text-sm font-medium">Loading campaign…</p>
+        </div>
       </div>
     );
   }
 
   if (error || !experiment) {
     return (
-      <div className="p-6">
+      <div className="app-shell p-6">
         <Link href="/" className="text-blue-600 hover:underline text-sm block mb-2">
           ← Back to Campaigns
         </Link>
@@ -873,7 +876,7 @@ export default function CampaignDetailPage() {
       !!launchLandingPageUrl.trim());
   return (
     <>
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="app-shell mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-4">
           <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
             ← Back to Campaigns
@@ -895,8 +898,8 @@ export default function CampaignDetailPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{experiment.name}</h1>
-          <p className="text-zinc-600 text-sm mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{experiment.name}</h1>
+          <p className="mt-1 text-sm leading-relaxed text-zinc-600">
             {experiment.platform.toUpperCase()} · ${experiment.totalDailyBudget}/day total
             {variants.length > 0 && ` · ${variants.length} variant${variants.length === 1 ? "" : "s"}`}
             {experiment.platform === "meta" && variants.length > 0
@@ -905,13 +908,13 @@ export default function CampaignDetailPage() {
                 ? " — budget shared across live ads"
                 : ""}
             {experiment.status === "launched" && experiment.googleCampaignId && (
-              <span className="block mt-1 text-xs text-zinc-500">
+              <span className="form-hint mt-1 block">
                 Google Ads campaign id {experiment.googleCampaignId}
                 {experiment.googleAdGroupId ? ` · ad group ${experiment.googleAdGroupId}` : ""}
               </span>
             )}
             {experiment.status === "launched" && experiment.linkedinCampaignId && (
-              <span className="block mt-1 max-w-2xl space-y-1 text-xs text-zinc-500">
+              <span className="form-hint mt-1 block max-w-2xl space-y-1">
                 <span className="block">
                   LinkedIn campaign group {experiment.linkedinCampaignGroupId ?? "—"} · campaign{" "}
                   {experiment.linkedinCampaignId}
@@ -973,12 +976,12 @@ export default function CampaignDetailPage() {
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
                   <p className="mb-2 text-sm font-medium text-zinc-700">Launch to Meta (live)</p>
                   {metaAdAccounts === null ? (
-                    <p className="text-xs text-zinc-500">Loading ad accounts…</p>
+                    <p className="text-sm text-zinc-500">Loading ad accounts…</p>
                   ) : metaAdAccounts.length === 0 ? (
                     <p className="text-xs text-amber-700">Connect Meta in Integrations to launch to a real ad account.</p>
                   ) : (
                     <>
-                      <label className="block text-xs text-zinc-600">Ad account</label>
+                      <label className="form-label block">Ad account</label>
                       <select
                         value={selectedMetaAdAccountId}
                         onChange={(e) => setSelectedMetaAdAccountId(e.target.value)}
@@ -993,7 +996,7 @@ export default function CampaignDetailPage() {
                       </select>
                       {selectedMetaAdAccountId && (
                         <>
-                          <label className="mt-2 block text-xs text-zinc-600">
+                          <label className="mt-2 form-label block">
                             Landing page URL (used for ad destination and Meta ad set website promotion)
                           </label>
                           <input
@@ -1023,7 +1026,7 @@ export default function CampaignDetailPage() {
                           {sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
                             <div className="mt-3">
                               <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
-                              <p className="mb-2 text-[11px] text-zinc-500">Only selected variants will be included in the campaign. Only variants with creatives can be launched.</p>
+                              <p className="mb-2 form-hint">Only selected variants will be included in the campaign. Only variants with creatives can be launched.</p>
                               <div className="mb-2 flex flex-wrap items-center gap-2">
                                 <button
                                   type="button"
@@ -1040,7 +1043,7 @@ export default function CampaignDetailPage() {
                                   Clear
                                 </button>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[11px] text-zinc-500">Pick first</span>
+                                  <span className="form-hint">Pick first</span>
                                   <input
                                     type="number"
                                     min={1}
@@ -1094,12 +1097,12 @@ export default function CampaignDetailPage() {
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
                   <p className="mb-2 text-sm font-medium text-zinc-700">Launch to TikTok Ads</p>
                   {tiktokAdAccounts === null ? (
-                    <p className="text-xs text-zinc-500">Loading advertisers…</p>
+                    <p className="text-sm text-zinc-500">Loading advertisers…</p>
                   ) : tiktokAdAccounts.length === 0 ? (
                     <p className="text-xs text-amber-700">Connect TikTok in Integrations to launch to a real ad account.</p>
                   ) : (
                     <>
-                      <label className="block text-xs text-zinc-600">Advertiser (ad account)</label>
+                      <label className="form-label block">Advertiser (ad account)</label>
                       <select
                         value={selectedTiktokAdvertiserId}
                         onChange={(e) => setSelectedTiktokAdvertiserId(e.target.value)}
@@ -1114,11 +1117,11 @@ export default function CampaignDetailPage() {
                       </select>
                       {selectedTiktokAdvertiserId && (
                         <>
-                          <label className="mt-2 block text-xs text-zinc-600">
+                          <label className="mt-2 form-label block">
                             Posting identity (optional)
                           </label>
                           {tiktokIdentities === null && (
-                            <p className="mt-1 text-xs text-zinc-500">Loading identities…</p>
+                            <p className="mt-1 text-sm text-zinc-500">Loading identities…</p>
                           )}
                           <select
                             value={selectedTiktokIdentityKey}
@@ -1136,11 +1139,11 @@ export default function CampaignDetailPage() {
                               </option>
                             ))}
                           </select>
-                          <p className="mt-1 text-[11px] text-zinc-500">
+                          <p className="mt-1 form-hint">
                             If launch fails with an identity error, create or link a TikTok identity in TikTok Ads Manager
                             for this advertiser, then retry or pick it here.
                           </p>
-                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL</label>
+                          <label className="mt-2 form-label block">Landing page URL</label>
                           <input
                             type="url"
                             value={launchLandingPageUrl}
@@ -1151,7 +1154,7 @@ export default function CampaignDetailPage() {
                           {sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
                             <div className="mt-3">
                               <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
-                              <p className="mb-2 text-[11px] text-zinc-500">
+                              <p className="mb-2 form-hint">
                                 Only selected variants with creatives are pushed as TikTok ads (single-image format).
                               </p>
                               <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1174,7 +1177,7 @@ export default function CampaignDetailPage() {
                                   Clear
                                 </button>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[11px] text-zinc-500">Pick first</span>
+                                  <span className="form-hint">Pick first</span>
                                   <input
                                     type="number"
                                     min={1}
@@ -1227,20 +1230,20 @@ export default function CampaignDetailPage() {
               {experiment.platform === "google" && (
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
                   <p className="mb-2 text-sm font-medium text-zinc-700">Launch to Google Ads</p>
-                  <p className="mb-2 text-[11px] text-zinc-500">
+                  <p className="mb-2 form-hint">
                     Creates a <strong>Display</strong> campaign with responsive display ads (one ad per selected variant).
                     Backend needs <code className="rounded bg-zinc-200 px-1">GOOGLE_ADS_DEVELOPER_TOKEN</code> and a
                     valid OAuth refresh token. Dry run keeps everything paused in Google Ads.
                   </p>
                   {googleAdAccounts === null ? (
-                    <p className="text-xs text-zinc-500">Loading Google Ads accounts…</p>
+                    <p className="text-sm text-zinc-500">Loading Google Ads accounts…</p>
                   ) : googleAdAccounts.length === 0 ? (
                     <p className="text-xs text-amber-700">
                       Connect Google in Integrations and ensure the server has a developer token to list customer ids.
                     </p>
                   ) : (
                     <>
-                      <label className="block text-xs text-zinc-600">Customer account</label>
+                      <label className="form-label block">Customer account</label>
                       <select
                         value={selectedGoogleCustomerId}
                         onChange={(e) => setSelectedGoogleCustomerId(e.target.value)}
@@ -1255,7 +1258,7 @@ export default function CampaignDetailPage() {
                       </select>
                       {selectedGoogleCustomerId && (
                         <>
-                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL (required)</label>
+                          <label className="mt-2 form-label block">Landing page URL (required)</label>
                           <input
                             type="url"
                             value={launchLandingPageUrl}
@@ -1283,7 +1286,7 @@ export default function CampaignDetailPage() {
                           {sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
                             <div className="mt-3">
                               <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
-                              <p className="mb-2 text-[11px] text-zinc-500">
+                              <p className="mb-2 form-hint">
                                 Each selected variant becomes a responsive display ad in one ad group.
                               </p>
                               <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1310,7 +1313,7 @@ export default function CampaignDetailPage() {
                                   Clear
                                 </button>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[11px] text-zinc-500">Pick first</span>
+                                  <span className="form-hint">Pick first</span>
                                   <input
                                     type="number"
                                     min={1}
@@ -1363,7 +1366,7 @@ export default function CampaignDetailPage() {
               {experiment.platform === "linkedin" && (
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
                   <p className="mb-2 text-sm font-medium text-zinc-700">Launch to LinkedIn Ads</p>
-                  <p className="mb-2 text-[11px] text-zinc-500">
+                  <p className="mb-2 form-hint">
                     Creates a sponsored updates / website visit campaign with one creative per selected variant. Posts and
                     images are authored as your{" "}
                     <strong>Company Page</strong> — use that Page&apos;s numeric id (or{" "}
@@ -1378,7 +1381,7 @@ export default function CampaignDetailPage() {
                     and activate or pause in Campaign Manager before spend.
                   </p>
                   {linkedinAdAccounts === null ? (
-                    <p className="text-xs text-zinc-500">Loading ad accounts…</p>
+                    <p className="text-sm text-zinc-500">Loading ad accounts…</p>
                   ) : linkedinAdAccountsError ? (
                     <p className="text-xs text-red-800">
                       <span className="font-medium">Could not load ad accounts.</span> {linkedinAdAccountsError} Check
@@ -1395,7 +1398,7 @@ export default function CampaignDetailPage() {
                         app/product/scope issue on LinkedIn&apos;s side.
                       </p>
                       {linkedinDiscovery?.attempts && linkedinDiscovery.attempts.length > 0 && (
-                        <details className="rounded border border-amber-200 bg-amber-50/50 p-2 text-[11px] text-zinc-800">
+                        <details className="rounded-lg border border-amber-200 bg-amber-50/50 p-2 text-xs text-zinc-800">
                           <summary className="cursor-pointer font-medium">LinkedIn API attempts (for support)</summary>
                           <ul className="mt-2 list-inside list-disc space-y-1 font-mono text-[10px] text-zinc-700">
                             {linkedinDiscovery.attempts.map((a, i) => (
@@ -1411,7 +1414,7 @@ export default function CampaignDetailPage() {
                     </div>
                   ) : (
                     <>
-                      <label className="block text-xs text-zinc-600">Sponsored ad account</label>
+                      <label className="form-label block">Sponsored ad account</label>
                       <select
                         value={selectedLinkedinAccountId}
                         onChange={(e) => setSelectedLinkedinAccountId(e.target.value)}
@@ -1426,7 +1429,7 @@ export default function CampaignDetailPage() {
                       </select>
                       {selectedLinkedinAccountId && (
                         <>
-                          <label className="mt-2 block text-xs text-zinc-600">
+                          <label className="mt-2 form-label block">
                             Company Page id or URN (required — ads post as this organization)
                           </label>
                           <input
@@ -1436,7 +1439,7 @@ export default function CampaignDetailPage() {
                             placeholder="e.g. 12345678 or urn:li:organization:12345678"
                             className="mt-0.5 w-full max-w-md rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
                           />
-                          <label className="mt-2 block text-xs text-zinc-600">Landing page URL (https, required)</label>
+                          <label className="mt-2 form-label block">Landing page URL (https, required)</label>
                           <input
                             type="url"
                             value={launchLandingPageUrl}
@@ -1467,7 +1470,7 @@ export default function CampaignDetailPage() {
                         sortedVariants.some((v) => v.hasCreative || creativeUrls[v.id]) && (
                           <div className="mt-3">
                             <p className="mb-2 text-xs font-medium text-zinc-700">Variants to launch</p>
-                            <p className="mb-2 text-[11px] text-zinc-500">
+                            <p className="mb-2 form-hint">
                               Each selected variant becomes a sponsored creative (image + copy) in the campaign.
                             </p>
                             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1494,7 +1497,7 @@ export default function CampaignDetailPage() {
                                 Clear
                               </button>
                               <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-zinc-500">Pick first</span>
+                                <span className="form-hint">Pick first</span>
                                 <input
                                   type="number"
                                   min={1}
@@ -1590,13 +1593,13 @@ export default function CampaignDetailPage() {
       {/* Campaign Manager: metrics + adjustments — shown when launched */}
       {experiment.status === "launched" && (
         <>
-          <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <section className="mt-6 app-card">
             <h2 className="mb-4 text-lg font-semibold text-zinc-900">Campaign performance</h2>
             {metricsLoading ? (
               <p className="text-sm text-zinc-500">Loading metrics…</p>
             ) : metrics ? (
               <>
-                <p className="mb-4 text-xs text-zinc-500">
+                <p className="mb-4 text-sm text-zinc-500">
                   {metrics.source === "meta"
                     ? `Metrics from Meta${metrics.datePreset ? ` (${metrics.datePreset})` : ""}. All values match what Meta tracks.`
                     : experiment.platform === "linkedin"
@@ -1611,23 +1614,23 @@ export default function CampaignDetailPage() {
                   <h3 className="mb-2 text-sm font-medium text-zinc-700">Spend &amp; reach</h3>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Spend</p>
+                      <p className="text-xs font-medium text-zinc-600">Spend</p>
                       <p className="text-lg font-semibold text-zinc-900">${metrics.spend.toFixed(2)}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Impressions</p>
+                      <p className="text-xs font-medium text-zinc-600">Impressions</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.impressions.toLocaleString()}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Reach</p>
+                      <p className="text-xs font-medium text-zinc-600">Reach</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.reach.toLocaleString()}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Frequency</p>
+                      <p className="text-xs font-medium text-zinc-600">Frequency</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.frequency.toFixed(2)}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">CPM</p>
+                      <p className="text-xs font-medium text-zinc-600">CPM</p>
                       <p className="text-lg font-semibold text-zinc-900">${metrics.cpm.toFixed(2)}</p>
                     </div>
                   </div>
@@ -1636,27 +1639,27 @@ export default function CampaignDetailPage() {
                   <h3 className="mb-2 text-sm font-medium text-zinc-700">Clicks &amp; engagement</h3>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Clicks</p>
+                      <p className="text-xs font-medium text-zinc-600">Clicks</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.clicks.toLocaleString()}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Link clicks</p>
+                      <p className="text-xs font-medium text-zinc-600">Link clicks</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.linkClicks.toLocaleString()}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">CTR</p>
+                      <p className="text-xs font-medium text-zinc-600">CTR</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.ctr.toFixed(2)}%</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">CPC</p>
+                      <p className="text-xs font-medium text-zinc-600">CPC</p>
                       <p className="text-lg font-semibold text-zinc-900">${metrics.cpc.toFixed(2)}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Conversions</p>
+                      <p className="text-xs font-medium text-zinc-600">Conversions</p>
                       <p className="text-lg font-semibold text-zinc-900">{metrics.conversions.toLocaleString()}</p>
                     </div>
                     <div className="rounded-lg bg-zinc-50 p-3">
-                      <p className="text-xs font-medium text-zinc-500">Cost per conversion</p>
+                      <p className="text-xs font-medium text-zinc-600">Cost per conversion</p>
                       <p className="text-lg font-semibold text-zinc-900">${metrics.costPerConversion.toFixed(2)}</p>
                     </div>
                   </div>
@@ -1676,7 +1679,7 @@ export default function CampaignDetailPage() {
             </p>
             <div className="mb-4 flex flex-wrap items-end gap-3">
               <div>
-                <label className="block text-xs font-medium text-zinc-600">Optimization mode</label>
+                <label className="form-label block">Optimization mode</label>
                 <select
                   value={optimizationModeDraft}
                   onChange={(e) => setOptimizationModeDraft(e.target.value as AiOptimizationMode)}
@@ -1711,7 +1714,7 @@ export default function CampaignDetailPage() {
               {insightsError && <p className="mt-2 text-sm text-red-600">{insightsError}</p>}
               {insightsResult && (
                 <div className="mt-4 space-y-3 rounded-lg border border-violet-200 bg-white p-4 text-sm text-zinc-800">
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-sm text-zinc-500">
                     Data source: {insightsResult.metricsSource} · Platform: {insightsResult.platform}
                   </p>
                   <p className="font-medium text-zinc-900">{insightsResult.summary}</p>
@@ -1736,7 +1739,7 @@ export default function CampaignDetailPage() {
           </section>
 
           {/* Campaign controls: pause/activate and budget when linked to Meta */}
-          <section className="mt-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <section className="mt-4 app-card">
             <h2 className="mb-4 text-lg font-semibold text-zinc-900">Campaign controls</h2>
             {experiment.metaCampaignId || experiment.metaAdSetId ? (
               <>
@@ -1789,7 +1792,7 @@ export default function CampaignDetailPage() {
                       </button>
                       {budgetError && <p className="text-sm text-red-600">{budgetError}</p>}
                     </div>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-sm text-zinc-500">
                       {experiment.metaAdSetId?.includes(",")
                         ? `Total $${budgetValue}/day is split evenly across ${experiment.metaAdSetId.split(",").filter(Boolean).length} ad sets (one per variant).`
                         : `One ad set daily cap; Meta splits delivery between creatives in that ad set.`}
@@ -1805,20 +1808,20 @@ export default function CampaignDetailPage() {
       )}
 
         {experiment.prompt && (
-          <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <section className="mt-6 app-card">
             <p className="text-sm font-medium text-zinc-700">Ad idea / prompt</p>
             <p className="mt-1 text-sm text-zinc-600">{experiment.prompt}</p>
           </section>
         )}
 
-        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="mt-6 app-card">
           <h2 className="mb-1 text-lg font-semibold text-zinc-900">Creative direction for images</h2>
           <p className="mb-3 text-sm text-zinc-600">
             This prompt guides how the ad images look when you generate or redesign creatives. Edit and save, then use &quot;Redesign creatives&quot; below to apply to all or selected variants.
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <textarea
-              className="min-h-[72px] w-full max-w-xl rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="app-input min-h-[72px] w-full max-w-xl"
               value={creativePromptInput}
               onChange={(e) => setCreativePromptInput(e.target.value)}
               placeholder="e.g. Clean product shot, minimal background, bright lighting"
@@ -1835,7 +1838,7 @@ export default function CampaignDetailPage() {
         </section>
 
         {experiment.platform === "meta" && (
-          <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <section className="mt-6 app-card">
             <h2 className="mb-1 text-lg font-semibold text-zinc-900">Target audience (Meta)</h2>
             <p className="mb-3 text-sm text-zinc-600">
               Describe who should see this campaign in plain English. AI turns it into Meta ad set targeting
@@ -1845,7 +1848,7 @@ export default function CampaignDetailPage() {
             </p>
             <div className="flex flex-col gap-3">
               <textarea
-                className="min-h-[88px] w-full max-w-2xl rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="app-input min-h-[88px] w-full max-w-2xl"
                 value={targetAudienceInput}
                 onChange={(e) => setTargetAudienceInput(e.target.value)}
                 placeholder="e.g. Women 35–55 in Texas and Florida interested in home wellness; US English speakers."
@@ -1874,14 +1877,14 @@ export default function CampaignDetailPage() {
               {targetPreview && (
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-800">
                   <p className="mb-1 font-medium text-zinc-700">Resolved targeting (at preview time)</p>
-                  <pre className="whitespace-pre-wrap break-all font-mono text-[11px]">{JSON.stringify(targetPreview, null, 2)}</pre>
+                  <pre className="whitespace-pre-wrap break-all font-mono text-xs text-zinc-700">{JSON.stringify(targetPreview, null, 2)}</pre>
                 </div>
               )}
             </div>
           </section>
         )}
 
-        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="mt-6 app-card">
           <h2 className="mb-2 text-lg font-semibold text-zinc-900">Ad variants</h2>
           <p className="mb-4 text-sm text-zinc-600">
             {experiment.creativesSource === "own"
@@ -1895,7 +1898,7 @@ export default function CampaignDetailPage() {
             <>
               <div className="mb-4 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4">
                 <p className="mb-3 text-sm font-medium text-zinc-700">Redesign creatives</p>
-                <p className="mb-3 text-xs text-zinc-600">
+                <p className="form-hint mb-3">
                   Use the creative direction above. Select variants to regenerate their images, then click Redesign selected or Redesign all.
                 </p>
                 <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -2028,7 +2031,7 @@ export default function CampaignDetailPage() {
                 </div>
                 <div className="mb-3">
                   <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-zinc-500">Ad preview</p>
+                    <p className="text-xs font-medium text-zinc-600">Ad preview</p>
                     {(v.hasCreative || creativeUrls[v.id]) && (
                       <button
                         type="button"
@@ -2098,7 +2101,7 @@ export default function CampaignDetailPage() {
                   )}
                   {isDraft && (
                     <div className="mt-3 space-y-2 rounded-lg border border-zinc-200 bg-zinc-50/80 p-2">
-                      <p className="text-[11px] font-medium text-zinc-600">Attach creative</p>
+                      <p className="text-sm font-medium text-zinc-700">Attach creative</p>
                       <div className="flex flex-wrap items-stretch gap-2">
                         <select
                           value={libraryPick[v.id] ?? ""}
@@ -2163,7 +2166,7 @@ export default function CampaignDetailPage() {
                   )}
                 </div>
                 <textarea
-                  className="min-h-[80px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="app-input min-h-[80px] w-full resize-y"
                   value={variantCopies[v.id] ?? v.copy}
                   onChange={(e) =>
                     setVariantCopies((prev) => ({ ...prev, [v.id]: e.target.value }))

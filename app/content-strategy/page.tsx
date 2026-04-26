@@ -61,7 +61,7 @@ export default function ContentStrategyPage() {
           <Link className="font-medium text-violet-900 underline" href="/agency">Agency clients</Link>.
         </p>
       )}
-      <p className="mt-2 text-sm text-zinc-600">
+      <p className="form-hint mt-2 max-w-2xl">
         Claude uses the saved business model for this scope (if any) plus the notes below. Set{" "}
         <Link className="text-blue-700 underline" href="/onboarding/business?edit=1">
           the business profile

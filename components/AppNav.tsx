@@ -17,42 +17,42 @@ export default function AppNav() {
   const canUse = (productKey: string) => isAdmin || hasExpansionProduct(enabledProductKeys, productKey);
 
   return (
-    <nav className="border-b border-zinc-200 bg-white">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+    <nav className="app-nav">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-5">
         <div className="flex items-center gap-6">
           <Link
             href="/"
-            className="text-lg font-bold text-zinc-900 hover:text-zinc-700"
+            className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl"
           >
             SkyVault AI Allocation
           </Link>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-0.5">
             <Link
               href="/"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                 pathname === "/"
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                  : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
               }`}
             >
               Home
             </Link>
             <Link
               href="/content-strategy"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                 pathname?.startsWith("/content-strategy")
-                  ? "bg-violet-100 text-violet-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  ? "bg-violet-100 text-violet-900 ring-1 ring-violet-200/80"
+                  : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
               }`}
             >
               Content
             </Link>
             <Link
               href="/manager"
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                 pathname?.startsWith("/manager")
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                  : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
               }`}
             >
               Campaign Manager
@@ -60,10 +60,10 @@ export default function AppNav() {
             {accountType === "agency" && (
               <Link
                 href="/agency"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname === "/agency"
-                    ? "bg-violet-100 text-violet-900"
-                    : "text-violet-700 hover:bg-violet-50 hover:text-violet-900"
+                    ? "bg-violet-100 text-violet-900 ring-1 ring-violet-200/80"
+                    : "text-violet-700 hover:bg-violet-50/90 hover:text-violet-900"
                 }`}
               >
                 {viewingAsEmail ? "Switch client" : "Select client"}
@@ -72,7 +72,7 @@ export default function AppNav() {
             {pathname?.startsWith("/campaigns/") && (
               <Link
                 href="/"
-                className="rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100/80 hover:text-zinc-900"
               >
                 Back to Home
               </Link>
@@ -80,10 +80,10 @@ export default function AppNav() {
             {isAdmin && (
               <Link
                 href="/admin"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/admin")
-                    ? "bg-amber-100 text-amber-900"
-                    : "text-amber-700 hover:bg-amber-50 hover:text-amber-900"
+                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-200/80"
+                    : "text-amber-700 hover:bg-amber-50/90 hover:text-amber-900"
                 }`}
               >
                 Admin
@@ -92,10 +92,10 @@ export default function AppNav() {
             {accountType === "agency" && canUse("white_label") && (
               <Link
                 href="/settings/white-label"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/settings")
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    ? "bg-slate-200/80 text-slate-900"
+                    : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
                 White label
@@ -104,10 +104,10 @@ export default function AppNav() {
             {accountType === "agency" && canUse("kits") && (
               <Link
                 href="/kits"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname === "/kits"
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                    : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
                 Kits
@@ -116,10 +116,10 @@ export default function AppNav() {
             {accountType === "agency" && canUse("dfy") && (
               <Link
                 href="/dfy"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/dfy")
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                    : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
                 DFY
@@ -128,10 +128,10 @@ export default function AppNav() {
             {canUse("landing_pages") && (
               <Link
                 href="/landing-pages"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/landing-pages")
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                    : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
                 Landing pages
@@ -140,10 +140,10 @@ export default function AppNav() {
             {canUse("reports") && (
               <Link
                 href="/reports"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/reports")
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                    : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
                 Reports
@@ -152,10 +152,10 @@ export default function AppNav() {
             {canUse("competitors") && (
               <Link
                 href="/competitors"
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/competitors")
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                    ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"
+                    : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
                 }`}
               >
                 Competitors

@@ -337,7 +337,7 @@ export function HomeClient() {
   return (
     <>
       <AppNav />
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="app-shell mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         {/* OAuth callback banners */}
         {connectedParam === "meta" && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Meta connected. You can launch Meta campaigns below.</div>
@@ -371,7 +371,7 @@ export function HomeClient() {
               const expanded = expandedPlatform === p.id;
               const adAccounts = getAdAccounts(p.id);
               return (
-                <div key={p.id} className="min-w-[160px] flex-1 basis-0 rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+                <div key={p.id} className="min-w-[160px] flex-1 basis-0 overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm shadow-zinc-900/5">
                   <div
                     className="flex cursor-pointer items-center gap-3 p-4"
                     onClick={() => connected && setExpandedPlatform(expanded ? null : p.id)}
@@ -441,8 +441,8 @@ export function HomeClient() {
 
         {/* Creative library */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-zinc-900">Creative library</h2>
-          <p className="mt-0.5 text-sm text-zinc-500">
+          <h2 className="app-section-title">Creative library</h2>
+          <p className="form-hint mt-1 max-w-2xl">
             Store images here and attach them to campaigns when using your own creatives or a mix of AI and own.
           </p>
           <div className="mt-3 flex flex-wrap items-start gap-3">
@@ -496,10 +496,8 @@ export function HomeClient() {
 
         {/* Launch a campaign */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-zinc-900">Launch a campaign</h2>
-          <p className="mt-0.5 text-sm text-zinc-500">
-            Choose one or more platforms to run the same campaign on.
-          </p>
+          <h2 className="app-section-title">Launch a campaign</h2>
+          <p className="form-hint mt-1 max-w-2xl">Choose one or more platforms to run the same campaign on.</p>
 
           {/* Platform multi-select */}
           <div className="mt-3 flex flex-wrap gap-3">
@@ -545,26 +543,28 @@ export function HomeClient() {
                 if (!createOpen) resetCreateForm();
               }}
               disabled={connectedPlatforms.length === 0 && !isAdmin}
-              className="flex w-full items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4 text-left shadow-sm hover:border-zinc-300 hover:shadow-md disabled:opacity-60"
+              className={`flex w-full items-center justify-between border border-zinc-200/90 bg-white px-5 py-4 text-left shadow-sm shadow-zinc-900/5 transition hover:border-indigo-200/80 hover:shadow-md disabled:opacity-60 ${
+                createOpen ? "rounded-t-2xl rounded-b-none border-b-0" : "rounded-2xl"
+              }`}
             >
-              <span className="font-semibold text-zinc-900">New campaign</span>
+              <span className="text-lg font-semibold tracking-tight text-slate-900">New campaign</span>
               <svg className={`h-5 w-5 text-zinc-500 ${createOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {createOpen && (
-              <div className="mt-2 overflow-hidden rounded-b-xl border border-t-0 border-zinc-200 bg-white p-5 shadow-sm">
+              <div className="mt-0 overflow-hidden rounded-b-2xl border border-t-0 border-zinc-200/90 bg-white p-5 shadow-sm shadow-zinc-900/5 sm:p-6">
                 <form onSubmit={handleCreateSubmit} className="space-y-4">
                   {createError && (
                     <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{createError}</div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Campaign name</label>
-                    <input className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Sale" required />
+                    <label className="form-label block">Campaign name</label>
+                    <input className="app-input mt-1 w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Sale" required />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Creatives</label>
+                    <label className="form-label block">Creatives</label>
                     <div className="mt-1 flex flex-wrap gap-4">
                       <label className="flex cursor-pointer items-center gap-2">
                         <input type="radio" name="creativesSource" checked={creativesSource === "ai"} onChange={() => setCreativesSource("ai")} className="rounded" />
@@ -581,15 +581,15 @@ export function HomeClient() {
                     </div>
                     {creativesSource === "mix" && (
                       <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-3 py-2">
-                        <label className="block text-sm font-medium text-zinc-700">AI images % of variants: {aiCreativePercent}%</label>
+                        <label className="form-label block">AI images % of variants: {aiCreativePercent}%</label>
                         <input type="range" min={0} max={100} value={aiCreativePercent} onChange={(e) => setAiCreativePercent(Number(e.target.value))} className="mt-1 h-2 w-full accent-violet-600" />
                       </div>
                     )}
                   </div>
                   {(creativesSource === "ai" || creativesSource === "mix") && (
                     <div>
-                      <label className="block text-sm font-medium text-zinc-700">Ad copy AI</label>
-                      <select className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as "openai" | "anthropic" | "split")}>
+                      <label className="form-label block">Ad copy AI</label>
+                      <select className="app-input mt-1 w-full" value={aiProvider} onChange={(e) => setAiProvider(e.target.value as "openai" | "anthropic" | "split")}>
                         <option value="openai">OpenAI only</option>
                         <option value="anthropic">Anthropic only</option>
                         <option value="split">Split (half each)</option>
@@ -597,21 +597,21 @@ export function HomeClient() {
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Ad idea / prompt</label>
-                    <textarea className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai" || creativesSource === "mix"} />
+                    <label className="form-label block">Ad idea / prompt</label>
+                    <textarea className="app-input mt-1 min-h-[80px] w-full" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Pain-free dental implants, same-day results." required={creativesSource === "ai" || creativesSource === "mix"} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Variants</label>
-                    <input type="number" min={1} max={20} className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={variantCount} onChange={(e) => setVariantCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
+                    <label className="form-label block">Variants</label>
+                    <input type="number" min={1} max={20} className="app-input mt-1 w-full" value={variantCount} onChange={(e) => setVariantCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Creative description (optional)</label>
-                    <textarea className="mt-1 min-h-[60px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
+                    <label className="form-label block">Creative description (optional)</label>
+                    <textarea className="app-input mt-1 min-h-[60px] w-full" value={creativePrompt} onChange={(e) => setCreativePrompt(e.target.value)} placeholder="How the ad image should look" />
                   </div>
                   {(creativesSource === "own" || creativesSource === "mix") && (
                     <div>
-                      <label className="block text-sm font-medium text-zinc-700">Attach creatives from library</label>
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <label className="form-label block">Attach creatives from library</label>
+                      <p className="form-hint mt-1.5 max-w-2xl">
                         {creativesSource === "mix" ? "Selected creatives fill the remaining variants (after AI-generated %)." : "Select which stored creatives to use for this campaign."}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -639,15 +639,15 @@ export function HomeClient() {
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700">Total daily budget: ${budget}</label>
-                    <p className="mt-0.5 text-xs text-zinc-500">
+                    <label className="form-label block">Total daily budget: ${budget}</label>
+                    <p className="form-hint mt-1.5 max-w-2xl">
                       One cap for this campaign. All ad variants share it when launched (not ${budget} per variant). If you pick
                       multiple platforms, the total is split evenly across them.
                     </p>
                     <input type="range" min={5} max={500} step={5} value={budget} onChange={(e) => setBudget(e.target.value)} className="mt-1 h-2 w-full accent-blue-600" />
                   </div>
                   <div className="flex gap-3 pt-2">
-                    <button type="submit" disabled={createLoading || selectedPlatforms.length === 0} className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                    <button type="submit" disabled={createLoading || selectedPlatforms.length === 0} className="rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow-sm shadow-indigo-900/10 transition hover:bg-indigo-700 disabled:opacity-60">
                       {createLoading ? createStatus || "Creating…" : selectedPlatforms.length > 1 ? `Create on ${selectedPlatforms.length} platforms` : "Create campaign"}
                     </button>
                     <button type="button" onClick={() => setCreateOpen(false)} disabled={createLoading} className="rounded-lg border border-zinc-300 bg-white px-5 py-2.5 font-medium text-zinc-700 hover:bg-zinc-50">
@@ -662,7 +662,7 @@ export function HomeClient() {
 
         {/* Campaign list */}
         <section id="campaigns">
-          <h2 className="text-lg font-semibold text-zinc-900">Your campaigns</h2>
+          <h2 className="app-section-title">Your campaigns</h2>
           {campaignsLoading ? (
             <div className="mt-4 flex justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
@@ -673,7 +673,7 @@ export function HomeClient() {
             <ul className="mt-4 space-y-3">
               {campaigns.map((c) => (
                 <li key={c.id}>
-                  <Link href={`/campaigns/${c.id}`} className="block rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md">
+                  <Link href={`/campaigns/${c.id}`} className="block rounded-2xl border border-zinc-200/90 bg-white px-5 py-4 shadow-sm shadow-zinc-900/5 transition hover:border-indigo-200/80 hover:shadow-md">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-zinc-900">{c.name}</p>

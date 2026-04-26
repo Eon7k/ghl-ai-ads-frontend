@@ -1,13 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
   /* White-label (Module 1) — overridden by BrandingHostBootstrap when custom domain resolves */
   --brand-primary: #2563eb;
   --brand-secondary: #64748b;
   --brand-accent: #7c3aed;
   --brand-name: "SkyVault AI Allocation";
+  --app-ring: 99 102 241; /* indigo-500 for focus */
 }
 
 @theme inline {
@@ -17,15 +18,52 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* App is light-mode first; system dark theme kept close to light background so shells stay consistent. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #e2e8f0;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer components {
+  /** Readable helper / description under fields (replaces 11px zinc-500) */
+  .form-hint {
+    @apply text-sm leading-relaxed text-zinc-600;
+  }
+
+  .form-label {
+    @apply text-sm font-medium text-zinc-800;
+  }
+
+  /** Page shell: light gradient, works with white cards on top */
+  .app-shell {
+    @apply min-h-screen bg-gradient-to-b from-slate-100/95 via-slate-50/80 to-white;
+  }
+
+  /** Top navigation bar */
+  .app-nav {
+    @apply border-b border-zinc-200/80 bg-white/90 shadow-sm shadow-zinc-900/[0.04] backdrop-blur-md;
+  }
+
+  /** Primary surfaces */
+  .app-card {
+    @apply rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-sm shadow-zinc-900/[0.04];
+  }
+
+  .app-section-title {
+    @apply text-lg font-semibold tracking-tight text-slate-900;
+  }
+
+  .app-input {
+    @apply rounded-lg border border-zinc-300/90 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm;
+    @apply placeholder:text-zinc-400;
+    @apply focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;
+  }
 }
