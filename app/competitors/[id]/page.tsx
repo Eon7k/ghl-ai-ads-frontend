@@ -209,9 +209,10 @@ function CompetitorDetailInner() {
       <AppNav />
       <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <p className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          <strong className="text-zinc-800">First time?</strong> Full env + verify + Page id steps are on the{" "}
-          <Link href="/competitors#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitors</Link>{" "}
-          (section &quot;How to use Competitor watch&quot;).
+          <strong className="text-zinc-800">Add website + Facebook Page ID</strong> in{" "}
+          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a> below, then
+          save and run a scan. Full env help:{" "}
+          <Link href="/competitors#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitors</Link>.
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2 text-sm text-violet-700">
@@ -268,14 +269,14 @@ function CompetitorDetailInner() {
         )}
         {showSaved && <p className="mt-2 text-sm text-emerald-700">Settings saved.</p>}
 
-        <p className="mt-2 text-sm text-zinc-600">
-          <strong>Run scan</strong> fetches the public website (if set), optional Meta Ad Library (Page ID + server token), and
-          stores an AI brief when OpenAI is configured. Draft vs live: this tool does <strong>not</strong> post anything — it
-          only reads public data and saves to your account.
-        </p>
-
-        <div className="mt-8 space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-zinc-900">Watch settings</h2>
+        <div
+          id="competitor-watch-settings"
+          className="mt-6 space-y-4 scroll-mt-4 rounded-xl border-2 border-violet-200 bg-white p-6 shadow-sm"
+        >
+          <h2 className="text-base font-semibold text-zinc-900">Watch settings</h2>
+          <p className="text-sm text-zinc-600">
+            Include a <strong>Facebook Page ID</strong> to pull that Page&apos;s public ads on each scan. Use the Page (brand), not a person.
+          </p>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Competitor name</label>
             <input
@@ -294,23 +295,27 @@ function CompetitorDetailInner() {
             />
             <p className="form-hint mt-1 text-xs text-zinc-500">We fetch this URL from our servers (private IPs blocked).</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Meta page ID (for Ad Library)</label>
-              <input
-                value={fbId}
-                onChange={(e) => setFbId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Google advertiser ID (optional, future use)</label>
-              <input
-                value={googleId}
-                onChange={(e) => setGoogleId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700" htmlFor="competitor-facebook-page-id">
+              Facebook Page (link or id)
+            </label>
+            <textarea
+              id="competitor-facebook-page-id"
+              name="competitorFacebookPageId"
+              value={fbId}
+              onChange={(e) => setFbId(e.target.value)}
+              rows={2}
+              autoComplete="off"
+              placeholder="https://www.facebook.com/… or @PageName or 1234567890123456"
+              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+              aria-describedby="competitor-facebook-page-id-hint"
+            />
+            <p id="competitor-facebook-page-id-hint" className="form-hint mt-1 text-xs text-zinc-500">
+              Paste the <strong>Page</strong> URL from your address bar, or a single @handle, or the long number from Page
+              info/transparency. When you <strong>Save settings</strong>, the server looks up the Page id (requires{" "}
+              <code className="rounded bg-zinc-100 px-0.5">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-0.5">META_APP_SECRET</code> on the
+              API). The field will show the saved numeric id after save.
+            </p>
           </div>
           {metaLibraryUrl && (
             <a
@@ -322,6 +327,14 @@ function CompetitorDetailInner() {
               Open Meta Ad Library for this page →
             </a>
           )}
+          <div>
+            <label className="block text-sm font-medium text-zinc-700">Google advertiser ID (optional, future use)</label>
+            <input
+              value={googleId}
+              onChange={(e) => setGoogleId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Keywords</label>
             <textarea
@@ -345,6 +358,12 @@ function CompetitorDetailInner() {
             Active (turn off to pause without deleting)
           </label>
         </div>
+
+        <p className="mt-6 text-sm text-zinc-600">
+          <strong>Run scan</strong> fetches the public website (if set), optional Meta Ad Library (Facebook Page ID + server token on
+          the API), and stores an AI brief when OpenAI is configured. This tool <strong>does not</strong> post to Facebook — it only
+          reads public data and saves to your account.
+        </p>
 
         <section id="competitor-insights" className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-900">Intelligence & history</h2>

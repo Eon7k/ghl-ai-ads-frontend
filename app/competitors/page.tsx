@@ -30,6 +30,7 @@ function CompetitorsPageInner() {
 
   const [competitorName, setCompetitorName] = useState("");
   const [website, setWebsite] = useState("");
+  const [facebookPageId, setFacebookPageId] = useState("");
   const [keywords, setKeywords] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -154,6 +155,22 @@ function CompetitorsPageInner() {
               placeholder="https://…"
               className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700">Facebook Page (optional)</label>
+            <textarea
+              value={facebookPageId}
+              onChange={(e) => setFacebookPageId(e.target.value)}
+              rows={2}
+              autoComplete="off"
+              placeholder="https://www.facebook.com/TheirPage  — or paste the numeric id"
+              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              Easiest: paste the competitor&apos;s <strong>Facebook Page</strong> address from the browser. We look up the Page id
+              on the server. You can also use <code className="rounded bg-zinc-100 px-0.5">@PageUsername</code> or the digits only
+              (from Page info) if you prefer.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Keywords (comma or newline)</label>

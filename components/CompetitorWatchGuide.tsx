@@ -50,8 +50,9 @@ export function CompetitorWatchGuide() {
         </li>
         <li>
           <strong>In the app</strong> — <Link href="/competitors" className="text-violet-700 underline">Competitors</Link> → create
-          a watch → on the detail page set <strong>Website</strong> (https), <strong>Meta page id</strong> (numeric Page id), and{" "}
-          <strong>Keywords</strong> → <strong>Save settings</strong> → <strong>Run scan now</strong>.
+          a watch → set <strong>Website</strong> (https) and the competitor&apos;s <strong>Facebook Page</strong> (paste the
+          facebook.com/… link or the id) and <strong>Keywords</strong> → <strong>Save settings</strong> → <strong>Run scan
+          now</strong>. The server turns links into a Page id using Graph.
         </li>
         <li>
           <strong>Success</strong> — New rows under <strong>Intelligence &amp; history</strong>; optional ads under{" "}
