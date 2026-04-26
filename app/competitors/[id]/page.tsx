@@ -423,8 +423,20 @@ function CompetitorDetailInner() {
           </p>
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
-              No ads in your workspace yet. Add a <strong>Facebook Page</strong> link in Watch settings, ensure the API has{" "}
-              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code>, then run a scan.
+              No ads in your workspace yet. Add a <strong>Facebook Page</strong> (or numeric Page id) in Watch settings, set{" "}
+              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> or{" "}
+              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> on the
+              server, and run a scan. If you see their ads in{" "}
+              <a
+                className="font-medium text-violet-700 hover:underline"
+                href="https://www.facebook.com/ads/library"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Meta&apos;s public Ad Library
+              </a>{" "}
+              but not here, ask your team to set optional <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_COUNTRIES</code> to the regions
+              their ads target (e.g. <code className="rounded bg-zinc-100 px-0.5">US,GB,DE</code>).
             </p>
           ) : (
             <ul className="mt-4 space-y-4">
