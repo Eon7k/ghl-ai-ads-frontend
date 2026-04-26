@@ -58,6 +58,11 @@ export type MeResponse = {
   clients?: { id: string; email: string }[];
   /** null = all expansion products (legacy). [] = none. Else allowlist of product keys. */
   enabledProductKeys?: string[] | null;
+  /** null = pre–business-model user (treat as onboarded). false = show onboarding. true = done or skipped. */
+  businessOnboardingComplete?: boolean | null;
+  businessModelProfile?: Record<string, unknown> | null;
+  /** Email of the user row whose business profile is shown (agency account vs. client when viewing as). */
+  businessProfileForEmail?: string;
 };
 
 export type AdminOverview = {
@@ -115,6 +120,25 @@ export const api = {
     login: (email: string, password: string) =>
       request<LoginResponse>("auth/login", { method: "POST", body: { email, password }, skipAuth: true }),
     me: () => request<MeResponse>("auth/me"),
+    patchBusinessModel: (body: {
+      profile?: Record<string, unknown>;
+      markComplete?: boolean;
+      skip?: boolean;
+    }) =>
+      request<{
+        ok: boolean;
+        businessModelProfile: unknown;
+        businessOnboardingComplete: boolean | null;
+      }>("auth/business-model", { method: "PATCH", body }),
+  },
+
+  /** Claude-powered plan (ANTHROPIC_API_KEY on backend; optional ANTHROPIC_CONTENT_STRATEGY_MODEL). */
+  contentStrategy: {
+    generate: (body: {
+      userPrompt?: string;
+      mode: "full" | "text_plus_prompts" | "ideas_only";
+      horizon: "single" | "week" | "month";
+    }) => request<{ markdown: string }>("content-strategy/generate", { method: "POST", body }),
   },
 
   /** Admin-only: overview, AI performance, users, and agency clients. */
@@ -171,11 +195,20 @@ export const api = {
   /** Agency self-serve clients (agency account only) */
   agency: {
     listClients: () =>
-      request<{ clients: { id: string; email: string; loginDisabled: boolean; createdAt: string }[] }>("agency/clients").then(
-        (r) => r.clients
-      ),
+      request<{
+        clients: {
+          id: string;
+          email: string;
+          loginDisabled: boolean;
+          createdAt: string;
+          businessOnboardingComplete: boolean | null;
+        }[];
+      }>("agency/clients").then((r) => r.clients),
     addClient: (email: string, allowLogin: boolean) =>
-      request<{ client: { id: string; email: string; loginDisabled: boolean }; tempPassword?: string }>("agency/clients", {
+      request<{
+        client: { id: string; email: string; loginDisabled: boolean; businessOnboardingComplete: boolean | null };
+        tempPassword?: string;
+      }>("agency/clients", {
         method: "POST",
         body: { email, allowLogin },
       }),

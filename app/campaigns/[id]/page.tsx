@@ -911,9 +911,50 @@ export default function CampaignDetailPage() {
               </span>
             )}
             {experiment.status === "launched" && experiment.linkedinCampaignId && (
-              <span className="block mt-1 text-xs text-zinc-500">
-                LinkedIn campaign group {experiment.linkedinCampaignGroupId ?? "—"} · campaign{" "}
-                {experiment.linkedinCampaignId}
+              <span className="block mt-1 max-w-2xl space-y-1 text-xs text-zinc-500">
+                <span className="block">
+                  LinkedIn campaign group {experiment.linkedinCampaignGroupId ?? "—"} · campaign{" "}
+                  {experiment.linkedinCampaignId}
+                  {experiment.linkedinSponsoredAccountId ? (
+                    <>
+                      {" "}
+                      · ad account <span className="font-mono">{experiment.linkedinSponsoredAccountId}</span>
+                    </>
+                  ) : null}
+                </span>
+                {experiment.linkedinSponsoredAccountId ? (
+                  <span className="block text-zinc-600">
+                    <a
+                      className="text-blue-700 underline"
+                      href={`https://www.linkedin.com/campaignmanager/accounts/${encodeURIComponent(experiment.linkedinSponsoredAccountId)}`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Open this ad account in Campaign Manager
+                    </a>
+                    . The site-wide Campaign Manager home often opens a <strong>different</strong> default account than the
+                    one the API used—if the URL does not show{" "}
+                    <span className="font-mono">…/accounts/{experiment.linkedinSponsoredAccountId}</span>, switch accounts
+                    (top) or use this link, then set the campaign list to <strong>Draft</strong> or <strong>All</strong> (not
+                    Active only). Dry runs are <strong>DRAFT</strong> group and campaign. Creatives use{" "}
+                    <strong>direct sponsored (dark) posts</strong> — they are not the Page’s organic feed.
+                  </span>
+                ) : (
+                  <span className="block text-zinc-600">
+                    In{" "}
+                    <a
+                      className="text-blue-700 underline"
+                      href="https://www.linkedin.com/campaignmanager"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Campaign Manager
+                    </a>
+                    , open the <strong>same sponsored ad account</strong> you selected at launch, then set the campaign list
+                    filter to <strong>Draft</strong> or <strong>All</strong>. Relaunch with a current backend to store the
+                    ad account id and show a direct link here.
+                  </span>
+                )}
               </span>
             )}
           </p>
@@ -1328,9 +1369,12 @@ export default function CampaignDetailPage() {
                     <strong>Company Page</strong> — use that Page&apos;s numeric id (or{" "}
                     <code className="rounded bg-zinc-200 px-1">urn:li:organization:…</code>). If asset or post steps return
                     403, add <code className="rounded bg-zinc-200 px-1">w_organization_social</code> to your LinkedIn app
-                    scopes and reconnect. Dry run creates the <strong>campaign group</strong> and <strong>campaign</strong> as{" "}
-                    <code className="rounded bg-zinc-200 px-1">DRAFT</code>; <strong>creatives</strong> are created <code className="rounded bg-zinc-200 px-1">ACTIVE</code> (LinkedIn does not
-                    allow <code className="rounded bg-zinc-200 px-1">PAUSED</code> on new creatives until review is approved). Review
+                    scopes and reconnect. Dry run creates the <strong>campaign group</strong> and <strong>campaign</strong>{" "}
+                    as <code className="rounded bg-zinc-200 px-1">DRAFT</code> under the{" "}
+                    <strong>selected ad account</strong> — in Campaign Manager you must open that same account (after launch
+                    we show a direct link) or drafts can look empty. <strong>Creatives</strong> are created{" "}
+                    <code className="rounded bg-zinc-200 px-1">ACTIVE</code> (LinkedIn does not allow{" "}
+                    <code className="rounded bg-zinc-200 px-1">PAUSED</code> on new creatives until review is approved). Review
                     and activate or pause in Campaign Manager before spend.
                   </p>
                   {linkedinAdAccounts === null ? (

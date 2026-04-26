@@ -54,6 +54,10 @@ export type Experiment = {
   /** Set after launch via LinkedIn Marketing API. */
   linkedinCampaignGroupId?: string;
   linkedinCampaignId?: string;
+  /** Numeric sponsored ad account id — use in Campaign Manager account switcher / URL. */
+  linkedinSponsoredAccountId?: string;
+  /** Present on launch API response if launch used dry run (not persisted; refresh may clear). */
+  dryRun?: boolean;
   aiOptimizationMode?: AiOptimizationMode;
 }
 

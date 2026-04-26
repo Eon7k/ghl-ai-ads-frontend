@@ -38,6 +38,16 @@ export default function AppNav() {
               Home
             </Link>
             <Link
+              href="/content-strategy"
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pathname?.startsWith("/content-strategy")
+                  ? "bg-violet-100 text-violet-900"
+                  : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+              }`}
+            >
+              Content
+            </Link>
+            <Link
               href="/manager"
               className={`rounded-md px-3 py-2 text-sm font-medium ${
                 pathname?.startsWith("/manager")
@@ -155,7 +165,10 @@ export default function AppNav() {
         </div>
         <div className="flex items-center gap-3">
           {accountType === "agency" && viewingAsEmail && (
-            <span className="rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800">
+            <span
+              className="max-w-[16rem] truncate rounded bg-violet-100 px-2 py-1 text-xs font-medium text-violet-800"
+              title="Campaigns, integrations, and business profile are for this client’s account."
+            >
               Viewing as: {viewingAsEmail}
             </span>
           )}

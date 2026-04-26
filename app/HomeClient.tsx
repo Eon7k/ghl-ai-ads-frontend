@@ -45,7 +45,7 @@ function CreativeThumbnail({ creativeId, className }: { creativeId: string; clas
 
 export function HomeClient() {
   const router = useRouter();
-  const { user, loading, isAdmin, accountType, clients } = useAuth();
+  const { user, loading, isAdmin, accountType, clients, needsBusinessOnboarding } = useAuth();
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
@@ -116,13 +116,20 @@ export function HomeClient() {
     if (searchParams.get("open") === "create") setCreateOpen(true);
   }, [searchParams]);
 
-  // Agency: must select a client before seeing home data
+  // Business model questionnaire for the current scope (your account or the client you’re viewing as)
+  useEffect(() => {
+    if (loading || !user || !needsBusinessOnboarding) return;
+    router.replace("/onboarding/business");
+  }, [loading, user, needsBusinessOnboarding, router]);
+
+  // Agency: after your own profile is set, pick a client to work in their account (integrations, campaigns, their profile)
   useEffect(() => {
     if (loading || !user || accountType !== "agency") return;
+    if (needsBusinessOnboarding) return;
     if (clients.length > 0 && !getViewingAs()) {
       router.replace("/agency");
     }
-  }, [loading, user, accountType, clients.length, router]);
+  }, [loading, user, accountType, clients.length, needsBusinessOnboarding, router]);
 
   useEffect(() => {
     if (!user) return;

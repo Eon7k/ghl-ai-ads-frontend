@@ -9,10 +9,12 @@ import { setViewingAs } from "@/lib/viewingAs";
 import AppNav from "@/components/AppNav";
 
 export default function AgencyPage() {
-  const { user, accountType, loading } = useAuth();
+  const { user, accountType, loading, refreshUser } = useAuth();
   const router = useRouter();
   const [selecting, setSelecting] = useState<string | null>(null);
-  const [clients, setClients] = useState<{ id: string; email: string; loginDisabled?: boolean }[]>([]);
+  const [clients, setClients] = useState<
+    { id: string; email: string; loginDisabled?: boolean; businessOnboardingComplete: boolean | null }[]
+  >([]);
   const [clientsLoading, setClientsLoading] = useState(false);
   const [createEmail, setCreateEmail] = useState("");
   const [allowLogin, setAllowLogin] = useState(true);
@@ -37,10 +39,27 @@ export default function AgencyPage() {
       .finally(() => setClientsLoading(false));
   }, [loading, user, accountType]);
 
-  function selectClient(clientId: string) {
+  async function selectClient(clientId: string) {
     setSelecting(clientId);
+    try {
+      setViewingAs(clientId);
+      await refreshUser();
+      router.push("/");
+    } finally {
+      setSelecting(null);
+    }
+  }
+
+  async function goToAgencyOwnBusinessProfile() {
+    setViewingAs(null);
+    await refreshUser();
+    router.push("/onboarding/business?edit=1");
+  }
+
+  async function goToClientBusinessProfile(clientId: string) {
     setViewingAs(clientId);
-    router.push("/");
+    await refreshUser();
+    router.push("/onboarding/business");
   }
 
   async function createClient(e: React.FormEvent) {
@@ -55,7 +74,15 @@ export default function AgencyPage() {
       setClients((prev) => {
         const exists = prev.some((c) => c.id === res.client.id);
         if (exists) return prev;
-        return [{ id: res.client.id, email: res.client.email, loginDisabled: res.client.loginDisabled }, ...prev];
+        return [
+          {
+            id: res.client.id,
+            email: res.client.email,
+            loginDisabled: res.client.loginDisabled,
+            businessOnboardingComplete: res.client.businessOnboardingComplete,
+          },
+          ...prev,
+        ];
       });
       setCreateEmail("");
       if (res.tempPassword) setTempPassword(res.tempPassword);
@@ -86,7 +113,25 @@ export default function AgencyPage() {
       <AppNav />
       <main className="mx-auto max-w-2xl px-4 py-12">
         <h1 className="text-2xl font-bold text-zinc-900">Agency clients</h1>
-        <p className="mt-1 text-sm text-zinc-600">Add clients, choose whether they can log in, then select who you’re viewing.</p>
+        <p className="mt-1 text-sm text-zinc-600">
+          Add clients, then use <strong>View as client</strong> to work in their ad accounts and{" "}
+          <strong>their</strong> business profile. Your agency has its own profile (separate from each client).
+        </p>
+
+        <section className="mt-6 rounded-xl border border-violet-200 bg-violet-50/50 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-violet-950">Your agency account</h2>
+          <p className="mt-1 text-sm text-violet-900/90">
+            Logged in as <span className="font-medium">{user?.email}</span>. Business model and content strategy can be
+            set for this agency user independently of any client.
+          </p>
+          <button
+            type="button"
+            onClick={goToAgencyOwnBusinessProfile}
+            className="mt-3 rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100"
+          >
+            Set or edit your agency’s business profile
+          </button>
+        </section>
 
         <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-zinc-900">Add a client</h2>
@@ -149,9 +194,16 @@ export default function AgencyPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium text-zinc-900">{c.email}</p>
-                      <p className="mt-0.5 text-xs text-zinc-500">{c.loginDisabled ? "Client login: disabled" : "Client login: enabled"}</p>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        {c.loginDisabled ? "Client login: disabled" : "Client login: enabled"} ·{" "}
+                        {c.businessOnboardingComplete === false
+                          ? "Business profile: not completed"
+                          : c.businessOnboardingComplete === true
+                            ? "Business profile: set or skipped"
+                            : "Business profile: not prompted (before update)"}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => selectClient(c.id)}
@@ -160,6 +212,16 @@ export default function AgencyPage() {
                       >
                         {selecting === c.id ? "Opening…" : "View as client"}
                       </button>
+                      {c.businessOnboardingComplete === false && (
+                        <button
+                          type="button"
+                          onClick={() => goToClientBusinessProfile(c.id)}
+                          disabled={selecting !== null}
+                          className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm font-medium text-violet-900 hover:bg-violet-50 disabled:opacity-50"
+                        >
+                          Client business profile
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={removingId !== null}
