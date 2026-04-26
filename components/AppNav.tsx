@@ -38,6 +38,16 @@ export default function AppNav() {
               Home
             </Link>
             <Link
+              href="/help"
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                pathname === "/help" || pathname?.startsWith("/help/")
+                  ? "bg-sky-50 text-sky-900 ring-1 ring-sky-200/80"
+                  : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900"
+              }`}
+            >
+              Help
+            </Link>
+            <Link
               href="/content-strategy"
               className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                 pathname?.startsWith("/content-strategy")
@@ -174,6 +184,22 @@ export default function AppNav() {
           )}
           {user && (
             <>
+              {accountType === "single" && !viewingAsEmail && (
+                <span
+                  className="hidden rounded-md border border-zinc-200 bg-zinc-100/80 px-2 py-0.5 text-xs font-medium text-zinc-700 sm:inline"
+                  title="Solo: one business and your ad accounts. Switch to an agency plan if you manage clients in-app."
+                >
+                  Solo
+                </span>
+              )}
+              {accountType === "agency" && !viewingAsEmail && (
+                <span
+                  className="hidden rounded-md border border-violet-200 bg-violet-100/60 px-2 py-0.5 text-xs font-medium text-violet-900 sm:inline"
+                  title="Agency: add clients and use Select client to work in their accounts."
+                >
+                  Agency
+                </span>
+              )}
               <span className="text-sm text-zinc-500">{user.email}</span>
               <button
                 type="button"

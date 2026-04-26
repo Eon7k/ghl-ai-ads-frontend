@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import AppNav from "@/components/AppNav";
+import { PageGuide } from "@/components/PageGuide";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment } from "@/lib/types";
 
@@ -57,7 +58,7 @@ export default function ManagerPage() {
     return (
       <div className="min-h-screen bg-zinc-50 font-sans">
         <AppNav />
-        <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        <main id="main-content" className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <p className="text-zinc-600">Sign in to view Campaign Manager.</p>
           <Link href="/login" className="mt-4 inline-block text-blue-600 hover:underline">Log in</Link>
         </main>
@@ -68,12 +69,21 @@ export default function ManagerPage() {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans">
       <AppNav />
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <main id="main-content" className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-zinc-900">Campaign Manager</h2>
           <p className="mt-0.5 text-sm text-zinc-500">
             View your active and past campaigns. Create new campaigns from <Link href="/" className="text-blue-600 hover:underline">Home</Link>.
           </p>
+          <PageGuide
+            className="mt-4"
+            title="How to use this list"
+            steps={[
+              "This page groups campaigns you created, sometimes across more than one platform. Click a row to open the grouped view and then open a specific platform’s campaign to edit it.",
+              "To start something new, go to Home (link above), connect your ad accounts, and use “Launch a campaign / New campaign” — you cannot create a brand-new campaign from this page alone.",
+              "For step-by-step help, open Help in the top navigation.",
+            ]}
+          />
         </section>
 
         <section id="campaigns">

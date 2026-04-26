@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { PageGuide } from "@/components/PageGuide";
 
 type Mode = "full" | "text_plus_prompts" | "ideas_only";
 type Horizon = "single" | "week" | "month";
@@ -54,6 +55,15 @@ export default function ContentStrategyPage() {
   return (
     <div className="mx-auto max-w-3xl p-6 pb-20">
       <h1 className="text-2xl font-bold text-zinc-900">Content strategy</h1>
+      <PageGuide
+        className="mt-4"
+        title="How to use this page"
+        steps={[
+          "This is for organic social content ideas and copy — not the same as launching a paid ad campaign. Paid ads are created from Home and edited on a campaign page.",
+          "Type what you need (topic, time window, product launch, tone). Choose whether you want full posts, text plus a to-do list, or ideas only, and pick a time range.",
+          "Click Generate and wait. Copy the result into your own scheduler or document. Filling the business profile (link below) first gives the AI more context about your business.",
+        ]}
+      />
       {isClientContext && (
         <p className="mt-2 rounded-md border border-violet-200 bg-violet-50/80 px-2 py-1.5 text-sm text-violet-950">
           Plans use the <strong>client</strong> profile and context for <span className="font-mono text-xs">{subject}</span>.{" "}

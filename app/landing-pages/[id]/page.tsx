@@ -134,7 +134,7 @@ function LandingPageEditorPageInner() {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
           <p className="text-red-600">{loadError || "Not found"}</p>
           <Link href="/landing-pages" className="mt-4 inline-block text-violet-700 hover:underline">
             ← Back to landing pages
@@ -147,7 +147,7 @@ function LandingPageEditorPageInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <Link href="/landing-pages" className="text-sm text-violet-700 hover:underline">
           ← All landing pages
         </Link>

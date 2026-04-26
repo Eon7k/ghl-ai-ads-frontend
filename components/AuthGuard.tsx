@@ -21,7 +21,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!allowed) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center p-6">
+      <div
+        className="flex min-h-[40vh] items-center justify-center p-6"
+        role="status"
+        aria-live="polite"
+        aria-label="Verifying sign-in"
+      >
         <p className="text-zinc-600">Checking login…</p>
       </div>
     );

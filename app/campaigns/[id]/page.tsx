@@ -8,6 +8,7 @@ import AdPreview from "@/components/AdPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Experiment, AdVariant, Creative, AiOptimizationMode } from "@/lib/types";
 import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
+import { PageGuide } from "@/components/PageGuide";
 
 import type { CampaignMetricsResponse } from "@/lib/api";
 
@@ -876,7 +877,7 @@ export default function CampaignDetailPage() {
       !!launchLandingPageUrl.trim());
   return (
     <>
-      <main className="app-shell mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <main id="main-content" className="app-shell mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-4">
           <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
             ← Back to Campaigns
@@ -895,6 +896,17 @@ export default function CampaignDetailPage() {
             </button>
           </div>
         )}
+
+        <PageGuide
+          className="mb-5"
+          title="What to do on this campaign page (simplest path)"
+          steps={[
+            "Scroll the page top to bottom once so you see every section: creative direction, target audience (Meta), ad variants, then the Launch area at the bottom.",
+            "For each ad “variant,” add or generate an image and write or edit the ad text, then use Save for that card so nothing is lost.",
+            "In the Launch section, pick the ad account that will spend money and fill every field the page asks for (for LinkedIn, that includes Company Page and a landing page URL). Select which variants to send.",
+            "Use dry run or test options when shown if you want to see what would be created before spending. When ready, use Launch. If something fails, read the first sentence of the error and fix the field it names, or open the Help page for platform notes.",
+          ]}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -1544,6 +1556,13 @@ export default function CampaignDetailPage() {
                     </>
                   )}
                 </div>
+              )}
+              {showPlatformLaunchControls && (
+                <p className="form-hint mb-3 max-w-2xl">
+                  <strong>Live</strong> sends real ads to the ad network and can spend when your account and platform rules
+                  allow. <strong>Dry run</strong> (when offered) creates draft or test objects with little or no spend
+                  (depends on the platform) — use it to confirm structure and targeting before you go live.
+                </p>
               )}
               <div className="flex flex-wrap items-center gap-3">
                 {showPlatformLaunchControls ? (

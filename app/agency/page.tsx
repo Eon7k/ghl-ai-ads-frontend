@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { setViewingAs } from "@/lib/viewingAs";
 import AppNav from "@/components/AppNav";
+import { PageGuide } from "@/components/PageGuide";
 
 export default function AgencyPage() {
   const { user, accountType, loading, refreshUser } = useAuth();
@@ -111,12 +112,22 @@ export default function AgencyPage() {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans">
       <AppNav />
-      <main className="mx-auto max-w-2xl px-4 py-12">
+      <main id="main-content" className="mx-auto max-w-2xl px-4 py-12">
         <h1 className="text-2xl font-bold text-zinc-900">Agency clients</h1>
         <p className="mt-1 text-sm text-zinc-600">
           Add clients, then use <strong>View as client</strong> to work in their ad accounts and{" "}
           <strong>their</strong> business profile. Your agency has its own profile (separate from each client).
         </p>
+
+        <PageGuide
+          className="mt-5"
+          title="Agency: what to do here"
+          steps={[
+            "Add a client with their real email. If you show a temporary password, copy it and give it to the client through a secure channel — you will not see it again.",
+            "Click View as client to switch your workspace. Home, integrations, campaigns, and business onboarding then apply to that client until you switch back or clear the selection from the top bar (Select client / Switch client).",
+            "To edit your agency’s own business profile (not a client’s), use the “Your agency account” block below, or go there from Help → Agency & clients. Client profiles are set while you are viewing as that client and open the business questionnaire from Home if prompted or from the Content page link.",
+          ]}
+        />
 
         <section className="mt-6 rounded-xl border border-violet-200 bg-violet-50/50 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-violet-950">Your agency account</h2>

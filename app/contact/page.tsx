@@ -20,7 +20,7 @@ export default function ContactPage() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 className="text-3xl font-bold">Contact us</h1>
         <p className="mt-3 text-sm leading-relaxed text-zinc-600 sm:text-base">
           Questions about our services, your data, or your account? Use any of the options below and we will get back to you

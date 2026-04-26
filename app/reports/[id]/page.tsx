@@ -125,7 +125,7 @@ function ReportsDetailInner() {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
           <p className="text-red-600">{loadError || "Not found"}</p>
           <Link href="/reports" className="mt-4 inline-block text-violet-700 hover:underline">
             ← Reports
@@ -138,7 +138,7 @@ function ReportsDetailInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <Link href="/reports" className="text-sm text-violet-700 hover:underline">
           ← All report configs
         </Link>

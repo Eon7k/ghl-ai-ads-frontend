@@ -9,6 +9,8 @@ import {
   type MetaPermissionTestsResponse,
 } from "@/lib/api";
 import { EXPANSION_PRODUCTS } from "@/lib/products";
+import AppNav from "@/components/AppNav";
+import { PageGuide } from "@/components/PageGuide";
 
 type AdminUser = {
   id: string;
@@ -146,7 +148,18 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="min-h-screen bg-zinc-50 font-sans">
+      <AppNav />
+      <div id="main-content" tabIndex={-1} className="mx-auto max-w-4xl px-4 py-8 outline-none">
+        <PageGuide
+          className="mb-6"
+          title="Admin (operators only)"
+          steps={[
+            "This page is for internal or trusted operators — not for end clients. Use it to view users, agency trees, and optional product flags (kits, white label, and similar).",
+            "The Help page in the top bar is written for your customers; send them there for day-to-day campaign steps.",
+            "If you are only testing ads as yourself, you rarely need this screen — use Home and campaigns instead.",
+          ]}
+        />
       <h1 className="text-2xl font-bold text-zinc-900">Admin dashboard</h1>
       <p className="mt-1 text-sm text-zinc-500">Extra metrics and AI performance (admin only).</p>
 
@@ -759,6 +772,7 @@ export default function AdminPage() {
           </section>
         </div>
       )}
+      </div>
     </div>
   );
 }

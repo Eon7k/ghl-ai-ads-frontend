@@ -3,6 +3,7 @@
 import Link from "next/link";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
+import { PageGuide } from "@/components/PageGuide";
 import { useAuth } from "@/contexts/AuthContext";
 
 function KitsPageInner() {
@@ -20,7 +21,7 @@ function KitsPageInner() {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
           <p className="text-zinc-600">Vertical kits are available to agency accounts.</p>
           <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
             Home
@@ -33,16 +34,27 @@ function KitsPageInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <Link href="/" className="text-sm text-blue-600 hover:underline">
           ← Home
         </Link>
         <h1 className="mt-4 text-2xl font-bold text-zinc-900">Vertical kits</h1>
         <p className="mt-2 text-sm text-zinc-600">
-          Backend routes <code className="rounded bg-zinc-200 px-1">GET /api/agency/kits</code> and{" "}
-          <code className="rounded bg-zinc-200 px-1">POST /api/agency/kits/:kitId/install</code> are live. Super-admins can
-          manage kits via <code className="rounded bg-zinc-200 px-1">GET/POST /api/admin/vertical-kits</code>. A full
-          marketplace UI will list assigned kits here next.
+          Pre-built vertical playbooks and assets will appear here when your team assigns them to your agency. The list and
+          install experience are still being finished in this UI.
+        </p>
+        <PageGuide
+          className="mt-5"
+          title="What this will be (coming soon)"
+          steps={[
+            "Your admin assigns “kits” to your agency (for example, by industry or offer type).",
+            "You will open this page, see each kit, and install one to copy templates, prompts, and settings into this workspace — without leaving the app.",
+            "Until the marketplace is available, use Home and the Help page to run paid campaigns. Ask your account owner or SkyVault for timing if this feature is part of your contract.",
+          ]}
+        />
+        <p className="form-hint mt-4 text-xs text-zinc-500">
+          Technical note: API routes for listing and installing kits exist on the server; the browser UI to browse and
+          install is what is still in progress. See Help → Extra features for the big picture.
         </p>
       </main>
     </div>

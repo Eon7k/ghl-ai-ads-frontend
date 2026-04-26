@@ -38,7 +38,7 @@ export default function BackendCheckPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-6 font-sans">
+    <main id="main-content" className="min-h-screen bg-zinc-50 p-6 font-sans">
       <div className="mx-auto max-w-lg">
         <Link
           href="/"
@@ -129,6 +129,6 @@ export default function BackendCheckPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

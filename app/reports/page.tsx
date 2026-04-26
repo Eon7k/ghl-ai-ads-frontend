@@ -90,7 +90,7 @@ function ReportsPageInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <Link href="/" className="text-sm text-violet-700 hover:underline">
           ← Home
         </Link>

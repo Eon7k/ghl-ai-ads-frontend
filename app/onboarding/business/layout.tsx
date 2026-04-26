@@ -5,7 +5,9 @@ export default function BusinessOnboardingLayout({ children }: { children: React
   return (
     <AuthGuard>
       <AppNav />
-      {children}
+      <div id="main-content" tabIndex={-1} className="outline-none">
+        {children}
+      </div>
     </AuthGuard>
   );
 }

@@ -67,3 +67,10 @@ body {
     @apply focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;
   }
 }
+
+/* Loading spinners: stay visible but stop rotation when the user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none !important;
+  }
+}

@@ -43,6 +43,12 @@ export function PublicLanding() {
               Contact
             </Link>
             <Link
+              href="/help"
+              className="inline-flex rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
+            >
+              Help
+            </Link>
+            <Link
               href="/login"
               className="rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
             >
@@ -58,7 +64,7 @@ export function PublicLanding() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         <section className="mx-auto max-w-5xl px-4 pb-16 pt-14 sm:px-6 sm:pt-20">
           <p className="text-center text-sm font-medium uppercase tracking-wide text-blue-600">Campaign workflow</p>
           <h1 className="mt-3 text-center text-4xl font-bold tracking-tight text-zinc-900 sm:text-5xl">

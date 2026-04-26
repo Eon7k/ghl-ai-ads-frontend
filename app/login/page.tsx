@@ -26,9 +26,16 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans">
-      <main className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
+      <main id="main-content" className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-zinc-900">Log in</h1>
         <p className="mt-1 text-zinc-600">Use your account to access campaigns.</p>
+        <p className="form-hint mt-3 text-sm text-zinc-600">
+          New here? After you sign in, connect an ad account on Home, then create a campaign. See the full guide on{" "}
+          <Link href="/help" className="font-medium text-blue-600 underline">
+            Help
+          </Link>
+          .
+        </p>
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           {error && (
             <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>

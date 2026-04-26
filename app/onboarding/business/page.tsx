@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import { PageGuide } from "@/components/PageGuide";
 
 const PRIMARY_MODELS: { value: string; label: string }[] = [
   { value: "b2b_saas", label: "B2B / SaaS" },
@@ -146,10 +147,22 @@ export default function BusinessOnboardingPage() {
         </div>
       ) : null}
       <p className="mt-2 text-sm text-zinc-600">
-        We use this to tailor campaigns, the content strategy tool, and future features. You can{" "}
-        <Link className="text-blue-700 underline" href="/">return home</Link> or{" "}
-        <Link className="text-blue-700 underline" href="/content-strategy">open content strategy</Link>.
+        We use this to tailor campaigns, the content strategy tool, and future features. Most people finish in about two
+        minutes. You can skip and complete this later from{" "}
+        <Link className="text-blue-700 underline" href="/">Home</Link> or{" "}
+        <Link className="text-blue-700 underline" href="/content-strategy">Content strategy</Link>. The full app guide
+        is on <Link className="text-blue-700 underline" href="/help">Help</Link>.
       </p>
+
+      <PageGuide
+        className="mt-6"
+        title="How to finish this form"
+        steps={[
+          "Answer in plain language — you do not need to sound “corporate.” Short phrases are fine.",
+          "The dropdowns help us categorize you; if nothing fits exactly, pick the closest option and explain in the text boxes.",
+          "Use Save and continue (or the primary save button) when you are done. You can return later with “edit” from Home or the link in the Content page if you need to change answers.",
+        ]}
+      />
 
       <div className="mt-8 space-y-4">
         <div>

@@ -21,7 +21,7 @@ export default function DataDeletionPage() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 className="text-3xl font-bold">User data deletion</h1>
         <p className="mt-2 text-sm text-zinc-600">
           How to stop our access to your Meta (Facebook) data and ask us to delete information we hold about you.

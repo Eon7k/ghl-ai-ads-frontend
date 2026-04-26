@@ -13,6 +13,7 @@ import type { Experiment, Creative } from "@/lib/types";
 import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
 import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
+import { PageGuide } from "@/components/PageGuide";
 import { PublicLanding } from "@/components/PublicLanding";
 
 const BACKEND_URL =
@@ -122,14 +123,13 @@ export function HomeClient() {
     router.replace("/onboarding/business");
   }, [loading, user, needsBusinessOnboarding, router]);
 
-  // Agency: after your own profile is set, pick a client to work in their account (integrations, campaigns, their profile)
+  const [hideAgencyClientBanner, setHideAgencyClientBanner] = useState(false);
   useEffect(() => {
-    if (loading || !user || accountType !== "agency") return;
-    if (needsBusinessOnboarding) return;
-    if (clients.length > 0 && !getViewingAs()) {
-      router.replace("/agency");
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("hideAgencyClientHomeBanner") === "1") {
+      setHideAgencyClientBanner(true);
     }
-  }, [loading, user, accountType, clients.length, needsBusinessOnboarding, router]);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -337,7 +337,37 @@ export function HomeClient() {
   return (
     <>
       <AppNav />
-      <main className="app-shell mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <main id="main-content" className="app-shell mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        {accountType === "agency" && clients.length > 0 && !getViewingAs() && !hideAgencyClientBanner && !needsBusinessOnboarding && (
+          <div
+            className="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50/90 px-4 py-3 text-sm text-violet-950 shadow-sm"
+            role="status"
+          >
+            <p className="min-w-0 max-w-2xl">
+              <span className="font-semibold">You have {clients.length} client{clients.length === 1 ? "" : "s"}.</span> To work in a
+              client&apos;s ad accounts and their business profile, choose them on the agency page. You can also stay here to
+              manage your <strong>agency</strong> workspace.
+            </p>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link
+                href="/agency"
+                className="rounded-lg bg-violet-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-800"
+              >
+                Select a client
+              </Link>
+              <button
+                type="button"
+                className="rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-sm font-medium text-violet-900 hover:bg-violet-100/80"
+                onClick={() => {
+                  if (typeof window !== "undefined") sessionStorage.setItem("hideAgencyClientHomeBanner", "1");
+                  setHideAgencyClientBanner(true);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
         {/* OAuth callback banners */}
         {connectedParam === "meta" && (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Meta connected. You can launch Meta campaigns below.</div>
@@ -361,6 +391,17 @@ export function HomeClient() {
             </p>
           </div>
         )}
+
+        <PageGuide
+          className="mb-6"
+          title="If you have never used this app before, do this in order"
+          steps={[
+            "Use Connect on each platform you actually advertise on (Meta, Google, TikTok, or LinkedIn) and complete sign-in in the window that opens. Keep this site open in the original tab.",
+            "Optional: add images to the Creative library so you can use your own or mixed images when you create a campaign.",
+            "Open “Launch a campaign” below, name it, set how many ad texts you want, describe your offer in plain English, and create it. We open the campaign page so you can finish images and press launch when ready.",
+            "Need a full walkthrough? Open Help in the top bar.",
+          ]}
+        />
 
         {/* Integration bar — cards in a row at top */}
         <section className="mb-8">
@@ -495,7 +536,7 @@ export function HomeClient() {
         </section>
 
         {/* Launch a campaign */}
-        <section className="mb-8">
+        <section className="mb-8" id="launch-campaign">
           <h2 className="app-section-title">Launch a campaign</h2>
           <p className="form-hint mt-1 max-w-2xl">Choose one or more platforms to run the same campaign on.</p>
 
@@ -668,7 +709,31 @@ export function HomeClient() {
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" />
             </div>
           ) : campaigns.length === 0 ? (
-            <p className="mt-4 text-sm text-zinc-500">No campaigns yet. Use “New campaign” above to create one.</p>
+            <div className="app-card mt-4">
+              <h3 className="text-base font-semibold text-slate-900">No campaigns yet</h3>
+              <ol className="form-hint mt-2 list-decimal space-y-1.5 pl-5">
+                <li>Connect at least one ad platform in the section above (if you have not already).</li>
+                <li>Open <strong>New campaign</strong>, fill in a name, your offer, and create.</li>
+                <li>We open the campaign so you can add images, then launch (or use a dry run when available).</li>
+              </ol>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateOpen(true);
+                    if (typeof document !== "undefined") {
+                      document.getElementById("launch-campaign")?.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+                >
+                  Open new campaign
+                </button>
+                <Link href="/help#campaign" className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+                  Read help: one campaign
+                </Link>
+              </div>
+            </div>
           ) : (
             <ul className="mt-4 space-y-3">
               {campaigns.map((c) => (

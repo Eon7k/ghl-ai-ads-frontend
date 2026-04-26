@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import AppNav from "@/components/AppNav";
+import { PageGuide } from "@/components/PageGuide";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment } from "@/lib/types";
 import type { CampaignMetricsResponse } from "@/lib/api";
@@ -61,7 +62,7 @@ export default function ManagerCampaignPage() {
     return (
       <div className="min-h-screen bg-zinc-50 font-sans">
         <AppNav />
-        <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+        <main id="main-content" className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
           <p className="text-zinc-600">Sign in to view this campaign.</p>
           <Link href="/login" className="mt-4 inline-block text-blue-600 hover:underline">Log in</Link>
         </main>
@@ -74,12 +75,22 @@ export default function ManagerCampaignPage() {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans">
       <AppNav />
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <main id="main-content" className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Link href="/manager" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
             ← Campaign Manager
           </Link>
         </div>
+
+        <PageGuide
+          className="mb-6"
+          title="This grouped campaign view"
+          steps={[
+            "If you created one idea across more than one platform, they appear as separate rows here. Click a platform to open the full campaign detail page to edit and launch there.",
+            "Use ← Campaign Manager to go back to the full list. New campaigns are created from Home, not on this page.",
+            "For instructions that apply to every part of the app, use Help in the top bar.",
+          ]}
+        />
 
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-zinc-900">{campaignName}</h2>

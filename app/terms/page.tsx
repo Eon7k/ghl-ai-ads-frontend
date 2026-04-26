@@ -20,7 +20,7 @@ export default function TermsPage() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 className="text-3xl font-bold">Terms of Service</h1>
         <p className="mt-2 text-sm text-zinc-600">
           <strong>Effective date:</strong> April 7, 2026

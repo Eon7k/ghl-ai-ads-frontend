@@ -113,7 +113,7 @@ function WhiteLabelSettingsPageInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <Link href="/" className="text-sm text-blue-600 hover:underline">
           ← Home
         </Link>

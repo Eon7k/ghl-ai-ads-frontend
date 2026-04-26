@@ -140,7 +140,7 @@ function CompetitorDetailInner() {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
           <p className="text-red-600">{loadError || "Not found"}</p>
           <Link href="/competitors" className="mt-4 inline-block text-violet-700 hover:underline">
             ← Competitors
@@ -153,7 +153,7 @@ function CompetitorDetailInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <Link href="/competitors" className="text-sm text-violet-700 hover:underline">
           ← All watches
         </Link>

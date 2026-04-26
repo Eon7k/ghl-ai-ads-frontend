@@ -20,7 +20,7 @@ function DfyPlaceholderInner() {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
           <p className="text-zinc-600">DFY dashboard is for agency accounts.</p>
           <Link href="/" className="mt-4 inline-block text-blue-600 hover:underline">
             Home
@@ -33,7 +33,7 @@ function DfyPlaceholderInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <Link href="/" className="text-sm text-blue-600 hover:underline">
           ← Home
         </Link>

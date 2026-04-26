@@ -5,7 +5,9 @@ export default function ContentStrategyLayout({ children }: { children: React.Re
   return (
     <AuthGuard>
       <AppNav />
-      {children}
+      <div id="main-content" tabIndex={-1} className="outline-none">
+        {children}
+      </div>
     </AuthGuard>
   );
 }
