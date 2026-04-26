@@ -754,9 +754,11 @@ export const expansion = {
       request<{ watch: CompetitorWatchRow }>(`api/agency/competitor/watches/${id}`, { method: "PATCH", body }),
     deleteWatch: (id: string) => request<{ ok: boolean }>(`api/agency/competitor/watches/${id}`, { method: "DELETE" }),
     scanWatch: (id: string, summary?: string) =>
-      request<{ watch: CompetitorWatchDetail; insight: CompetitorInsightRow }>(
-        `api/agency/competitor/watches/${id}/scan`,
-        { method: "POST", body: summary ? { summary } : {} }
-      ),
+      request<{
+        watch: CompetitorWatchDetail;
+        insight: CompetitorInsightRow;
+        /** What the server did during the scan (website, Meta, etc.) — not secrets. Omitted on older API builds. */
+        diagnostics?: { scanNotes: string[] } | null;
+      }>(`api/agency/competitor/watches/${id}/scan`, { method: "POST", body: summary ? { summary } : {} }),
   },
 };
