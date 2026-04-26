@@ -46,6 +46,8 @@ function CompetitorDetailInner() {
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lastScanLog, setLastScanLog] = useState<string[] | null>(null);
+  const [lastScanLogAdsCount, setLastScanLogAdsCount] = useState<number | null>(null);
   const [lastScanAt, setLastScanAt] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
 
@@ -139,15 +141,21 @@ function CompetitorDetailInner() {
     setScanning(true);
     setActionError(null);
     try {
-      const { watch: w } = await expansion.competitor.scanWatch(id);
+      const res = await expansion.competitor.scanWatch(id);
+      const { watch: w, diagnostics } = res;
       setWatch({
         ...w,
         insights: Array.isArray(w.insights) ? w.insights : [],
         ads: Array.isArray(w.ads) ? w.ads : [],
       });
       if (w.lastScannedAt) setLastScanAt(w.lastScannedAt);
+      const log = diagnostics?.scanNotes ?? null;
+      setLastScanLog(log);
+      setLastScanLogAdsCount(Array.isArray(w.ads) ? w.ads.length : 0);
     } catch (e) {
       setActionError(userFacingError(e));
+      setLastScanLog(null);
+      setLastScanLogAdsCount(null);
     } finally {
       setScanning(false);
     }
@@ -316,6 +324,36 @@ function CompetitorDetailInner() {
             {actionError}
           </div>
         )}
+
+        {lastScanLog && lastScanLog.length > 0 && (
+          <div
+            className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+              lastScanLogAdsCount === 0
+                ? "border-amber-300 bg-amber-50/90 text-amber-950"
+                : "border-zinc-200 bg-white text-zinc-800"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <p className="font-semibold text-zinc-900">
+              {lastScanLogAdsCount === 0
+                ? "Scan finished — no Meta ads were stored"
+                : `Scan finished — ${lastScanLogAdsCount} ad(s) in this watch`}
+            </p>
+            <p className="mt-1 text-xs text-zinc-600">
+              This is the server&rsquo;s step-by-step log (not an error from your browser). If you expected ads, read the list below, then
+              check <code className="rounded bg-zinc-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> / env on the API host.
+            </p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-zinc-800">
+              {lastScanLog.map((line, i) => (
+                <li key={i} className="leading-snug">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {showSaved && <p className="mt-2 text-sm text-emerald-700">Settings saved.</p>}
 
         <div
