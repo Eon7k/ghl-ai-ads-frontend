@@ -56,6 +56,8 @@ function CompetitorDetailInner() {
   const [fbWebCandidates, setFbWebCandidates] = useState<
     { pageId: string; pageUrl: string; source: "ad_library" | "direct" | "graph" }[] | null
   >(null);
+  const [adLibIdForResolve, setAdLibIdForResolve] = useState("");
+  const [resolvingAdLib, setResolvingAdLib] = useState(false);
 
   const [competitorName, setCompetitorName] = useState("");
   const [website, setWebsite] = useState("");
@@ -153,7 +155,9 @@ function CompetitorDetailInner() {
     setFbResolveMsg(null);
     setFbWebCandidates(null);
     try {
-      const r = await expansion.competitor.discoverFacebookPageFromWebsite(w);
+      const r = await expansion.competitor.discoverFacebookPageFromWebsite(w, {
+        companyName: competitorName.trim() || undefined,
+      });
       if (r.candidates.length === 0) {
         setActionError(r.message ?? "No Facebook Page id could be derived from the website.");
         if (r.foundLinks.length > 0) {
@@ -165,15 +169,49 @@ function CompetitorDetailInner() {
       }
       setFbId(r.candidates[0]!.pageId);
       setFbWebCandidates(r.candidates);
-      setFbResolveMsg(
+      const n = r.crawledPageCount;
+      const scanLine =
+        n > 0
+          ? `Scanned ${n} public page(s) on their site (same host, up to a limit). `
+          : "";
+      let done =
         r.candidates.length > 1
-          ? `Found ${r.candidates.length} possible Pages in their HTML — the first is selected. Use the dropdown to switch, then Save settings.`
-          : `Page id from their site: ${r.candidates[0]!.pageId}. Click Save settings to keep it.`
-      );
+          ? `${scanLine}Found ${r.candidates.length} possible Facebook Pages in HTML — the first is selected. Use the dropdown, then Save settings.`
+          : `${scanLine}Page id from their site: ${r.candidates[0]!.pageId}. Click Save settings to keep it.`;
+      if (r.googlePlace?.googleMapsUri) {
+        done += ` Google Maps: ${r.googlePlace.googleMapsUri}`;
+      } else if (r.googlePlace?.note && !r.googlePlace.googleMapsUri) {
+        done += ` ${r.googlePlace.note}`;
+      }
+      setFbResolveMsg(done);
     } catch (e) {
       setActionError(userFacingError(e));
     } finally {
       setDiscoveringFromWeb(false);
+    }
+  }
+
+  async function resolvePageFromAdLibraryId() {
+    const raw = adLibIdForResolve.trim();
+    if (!raw) {
+      setActionError("Paste one numeric Meta Ad Library ad id (the id field on an ad, or from Graph /ads_archive).");
+      return;
+    }
+    setResolvingAdLib(true);
+    setActionError(null);
+    setFbResolveMsg(null);
+    try {
+      const r = await expansion.competitor.resolvePageFromAdLibraryId(raw);
+      setFbId(r.pageId);
+      setAdLibIdForResolve(r.adLibraryId);
+      setFbWebCandidates(null);
+      setFbResolveMsg(
+        `From ad id → Page “${r.pageName || r.pageId}” (page_id ${r.pageId}). Save settings, then run a scan to pull their other public ads.`
+      );
+    } catch (e) {
+      setActionError(userFacingError(e));
+    } finally {
+      setResolvingAdLib(false);
     }
   }
 
@@ -418,17 +456,29 @@ function CompetitorDetailInner() {
               </p>
               <p className="mt-1 text-xs text-zinc-600">
                 This is the server&rsquo;s step-by-step log (not an error from your browser). If you expected ads, read the list below, then
-                check <code className="rounded bg-zinc-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> / env on the API host.
+                check <code className="rounded bg-zinc-100/80 px-0.5">META_APP_ID</code> +{" "}
+                <code className="rounded bg-zinc-100/80 px-0.5">META_APP_SECRET</code> (app access) on the API host; optional{" "}
+                <code className="rounded bg-zinc-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> only if you use a separate long-lived token.
               </p>
               {adLibPermissionDenied && (
                 <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs text-violet-950">
                   <p className="font-medium text-violet-900">What this usually means</p>
                   <p className="mt-1 leading-relaxed text-violet-900/90">
-                    Meta&rsquo;s <code className="rounded bg-violet-100/80 px-0.5">ads_archive</code> call often
-                    <strong> rejects app-only tokens</strong> (APP_ID|APP_SECRET). You need a <strong>user access token</strong> (or
-                    system user token) from an app that has the right <strong>Ad Library / Marketing API</strong> product access, then put
-                    that value in <code className="rounded bg-violet-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> on the server and restart
-                    the API. Official:{" "}
+                    Meta&rsquo;s <code className="rounded bg-violet-100/80 px-0.5">ads_archive</code> request must use a token from an app
+                    that has the right <strong>Ad Library API</strong> access in{" "}
+                    <a
+                      href="https://developers.facebook.com/apps/"
+                      className="font-medium text-violet-800 underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Meta for Developers
+                    </a>
+                    . The backend prefers <code className="rounded bg-violet-100/80 px-0.5">META_APP_ID</code> +{" "}
+                    <code className="rounded bg-violet-100/80 px-0.5">META_APP_SECRET</code> (built as{" "}
+                    <code className="rounded bg-violet-100/80 px-0.5">APP_ID|APP_SECRET</code>). If your app is approved but you still get
+                    permission errors, you can set <code className="rounded bg-violet-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> to a
+                    long-lived token with the needed permissions and restart the API. Official:{" "}
                     <a
                       href="https://www.facebook.com/ads/library/api/"
                       className="font-medium text-violet-800 underline"
@@ -447,7 +497,7 @@ function CompetitorDetailInner() {
                       Graph API Explorer
                     </a>{" "}
                     with a <code className="rounded bg-violet-100/80 px-0.5">GET</code> to{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">/v22.0/ads_archive</code> and the same
+                    <code className="rounded bg-violet-100/80 px-0.5">/v25.0/ads_archive</code> and the same
                     query params your server uses, until you get 200 and <code className="rounded bg-violet-100/80 px-0.5">data</code> not
                     empty.
                   </p>
@@ -533,6 +583,33 @@ function CompetitorDetailInner() {
               </button>
               {fbResolveMsg && <span className="text-sm text-emerald-800">{fbResolveMsg}</span>}
             </div>
+            <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2">
+              <p className="text-xs font-medium text-zinc-700">Test: Page id from one Ad Library <strong>ad</strong> id</p>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                Paste the numeric <code className="rounded bg-zinc-100 px-0.5">id</code> of a single ad (same as Graph Archived Ad). The
+                server calls <code className="rounded bg-zinc-100 px-0.5">GET /&#123;id&#125;?fields=page_id</code> then fills the Page id
+                above for scans.
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={adLibIdForResolve}
+                  onChange={(e) => setAdLibIdForResolve(e.target.value)}
+                  placeholder="Ad Library ad id (digits)"
+                  className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                  aria-label="Meta Ad Library ad id"
+                />
+                <button
+                  type="button"
+                  onClick={() => void resolvePageFromAdLibraryId()}
+                  disabled={resolvingAdLib}
+                  className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {resolvingAdLib ? "Resolving…" : "Get Page id from ad id"}
+                </button>
+              </div>
+            </div>
             {fbWebCandidates && fbWebCandidates.length > 1 && (
               <div className="mt-2 max-w-lg">
                 <label className="block text-xs font-medium text-zinc-600" htmlFor="fb-pick-website-candidate">
@@ -553,13 +630,13 @@ function CompetitorDetailInner() {
               </div>
             )}
             <p id="competitor-facebook-page-id-hint" className="form-hint mt-1 text-xs text-zinc-500">
-              <strong>Automated (recommended):</strong> set <strong>Website</strong> above, then <strong>Find Page id from website
-              </strong> — we download their public homepage and look for a Facebook Page in the header/footer. Meta does
-              not offer a &quot;search brand name → Page id&quot; API, so that path avoids opening the Ad Library when their site
-              already links the Page. <strong>Look up Page id (paste text)</strong> is for a Page URL, Ad Library
-              <code className="mx-0.5 rounded bg-zinc-100 px-0.5">view_all_page_id</code> link, <code className="rounded bg-zinc-100 px-0.5">@handle</code>, or
-              digits (needs server <code className="rounded bg-zinc-100 px-0.5">META_APP_ID</code> for Graph if not in the
-              text). Then <strong>Save settings</strong>.
+              <strong>Find Page id from website</strong> walks many same-domain pages (not only the home page), up to a
+              time/size cap, and looks for <code className="rounded bg-zinc-100 px-0.5">facebook.com</code> in the HTML. With{" "}
+              <code className="rounded bg-zinc-100 px-0.5">GOOGLE_PLACES_API_KEY</code> on the API, we also run Google Places
+              (New) for the <strong>competitor name</strong> to find an official website + Google Maps link — Google does
+              <strong> not</strong> return Facebook in that API, but the listed website is fetched once for extra
+              social links. <strong>Look up (paste text)</strong> is for a Page URL, Ad Library link, or @handle. Then{" "}
+              <strong>Save settings</strong>.
             </p>
           </div>
           {metaLibraryUrl && (
@@ -620,8 +697,8 @@ function CompetitorDetailInner() {
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
               No ads in your workspace yet. Add a <strong>Facebook Page</strong> (or numeric Page id) in Watch settings, set{" "}
-              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> or{" "}
-              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> on the
+              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> (or optional{" "}
+              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code>) on the
               server, and run a scan. If you see their ads in{" "}
               <a
                 className="font-medium text-violet-700 hover:underline"

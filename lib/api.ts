@@ -760,6 +760,13 @@ export const expansion = {
         /** What the server did during the scan (website, Meta, etc.) — not secrets. Omitted on older API builds. */
         diagnostics?: { scanNotes: string[] } | null;
       }>(`api/agency/competitor/watches/${id}/scan`, { method: "POST", body: summary ? { summary } : {} }),
+    /** One Meta Ad Library ad id (from ads_archive `id`) → Facebook Page id for that advertiser. */
+    resolvePageFromAdLibraryId: (adLibraryId: string) =>
+      request<{
+        pageId: string;
+        pageName: string | null;
+        adLibraryId: string;
+      }>("api/agency/competitor/resolve-page-from-ad-library-id", { method: "POST", body: { adLibraryId } }),
     /** Resolve a Page to numeric id (Ad Library “View all” link, page URL, @handle, or id). */
     resolveFacebookPage: (input: string) =>
       request<{
@@ -768,11 +775,31 @@ export const expansion = {
         message?: string;
       }>("api/agency/competitor/resolve-facebook-page", { method: "POST", body: { input } }),
     /** Fetch the competitor’s public homepage and look for Facebook Page links (footer, etc.), then resolve to Page ids. */
-    discoverFacebookPageFromWebsite: (website: string) =>
+    discoverFacebookPageFromWebsite: (
+      website: string,
+      options?: {
+        companyName?: string;
+        locationHint?: string;
+        crawlEntireSite?: boolean;
+        includeGooglePlace?: boolean;
+      }
+    ) =>
       request<{
         foundLinks: string[];
         candidates: { pageUrl: string; pageId: string; source: "ad_library" | "direct" | "graph" }[];
         message?: string;
-      }>("api/agency/competitor/discover-facebook-page-from-website", { method: "POST", body: { website } }),
+        crawledPageCount: number;
+        crawlEntireSite: boolean;
+        googlePlace?: {
+          textQuery: string;
+          displayName: string | null;
+          websiteUri: string | null;
+          googleMapsUri: string | null;
+          note: string;
+        };
+      }>("api/agency/competitor/discover-facebook-page-from-website", {
+        method: "POST",
+        body: { website, ...options },
+      }),
   },
 };

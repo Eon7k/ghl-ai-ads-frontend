@@ -39,6 +39,8 @@ function CompetitorsPageInner() {
   const [fbWebCandidates, setFbWebCandidates] = useState<
     { pageId: string; pageUrl: string; source: "ad_library" | "direct" | "graph" }[] | null
   >(null);
+  const [adLibIdForResolve, setAdLibIdForResolve] = useState("");
+  const [resolvingAdLib, setResolvingAdLib] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -80,7 +82,9 @@ function CompetitorsPageInner() {
     setFbResolveMsg(null);
     setFbWebCandidates(null);
     try {
-      const r = await expansion.competitor.discoverFacebookPageFromWebsite(w);
+      const r = await expansion.competitor.discoverFacebookPageFromWebsite(w, {
+        companyName: competitorName.trim() || undefined,
+      });
       if (r.candidates.length === 0) {
         setError(r.message ?? "No Facebook Page id could be derived from the website.");
         if (r.foundLinks.length > 0) {
@@ -92,15 +96,39 @@ function CompetitorsPageInner() {
       }
       setFacebookPageId(r.candidates[0]!.pageId);
       setFbWebCandidates(r.candidates);
-      setFbResolveMsg(
+      const scan = r.crawledPageCount > 0 ? `Scanned ${r.crawledPageCount} page(s). ` : "";
+      let msg =
         r.candidates.length > 1
-          ? `Found ${r.candidates.length} Pages in their HTML — first selected; use the list to switch.`
-          : `Page id from their site: ${r.candidates[0]!.pageId}.`
-      );
+          ? `${scan}Found ${r.candidates.length} Pages in HTML — first selected; use the list to switch.`
+          : `${scan}Page id: ${r.candidates[0]!.pageId}.`;
+      if (r.googlePlace?.googleMapsUri) msg += ` Maps: ${r.googlePlace.googleMapsUri}`;
+      setFbResolveMsg(msg);
     } catch (err) {
       setError(userFacingError(err));
     } finally {
       setDiscoveringFromWeb(false);
+    }
+  }
+
+  async function resolvePageFromAdLibraryId() {
+    const raw = adLibIdForResolve.trim();
+    if (!raw) {
+      setError("Paste one numeric Meta Ad Library ad id.");
+      return;
+    }
+    setResolvingAdLib(true);
+    setError(null);
+    setFbResolveMsg(null);
+    try {
+      const r = await expansion.competitor.resolvePageFromAdLibraryId(raw);
+      setFacebookPageId(r.pageId);
+      setAdLibIdForResolve(r.adLibraryId);
+      setFbWebCandidates(null);
+      setFbResolveMsg(`Page id ${r.pageId}${r.pageName ? ` (${r.pageName})` : ""} from ad id.`);
+    } catch (err) {
+      setError(userFacingError(err));
+    } finally {
+      setResolvingAdLib(false);
     }
   }
 
@@ -305,10 +333,29 @@ function CompetitorsPageInner() {
                 </select>
               </div>
             )}
+            <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2">
+              <p className="text-xs font-medium text-zinc-700">Or: one Ad Library ad id → Page id</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  value={adLibIdForResolve}
+                  onChange={(e) => setAdLibIdForResolve(e.target.value)}
+                  placeholder="Ad id (from ads_archive or library)"
+                  className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => void resolvePageFromAdLibraryId()}
+                  disabled={resolvingAdLib}
+                  className="shrink-0 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {resolvingAdLib ? "Resolving…" : "Get Page from ad id"}
+                </button>
+              </div>
+            </div>
             <p className="mt-1 text-xs text-zinc-500">
               <strong>First try:</strong> add <strong>Website</strong> and use <strong>Find Page id from website
               </strong> — no Ad Library, no manual search, when their footer links a Page. If that returns nothing, paste
-              a Page or Ad Library URL and use <strong>Look up Page id (paste text)</strong>.
+              a Page or Ad Library URL and use <strong>Look up Page id (paste text)</strong>, or a single <strong>ad id</strong> as above.
             </p>
           </div>
           <div>
