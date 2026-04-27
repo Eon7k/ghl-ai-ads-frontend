@@ -124,7 +124,11 @@ function CompetitorsPageInner() {
       setFacebookPageId(r.pageId);
       setAdLibIdForResolve(r.adLibraryId);
       setFbWebCandidates(null);
-      setFbResolveMsg(`Page id ${r.pageId}${r.pageName ? ` (${r.pageName})` : ""} from ad id.`);
+      setFbResolveMsg(
+        r.resolvedVia === "page_id"
+          ? `That number is a Facebook Page id, not a single Library ad id. Using Page ${r.pageId}${r.pageName ? ` (${r.pageName})` : ""} — save, then you can add a watch. For a true ad id, use the id from a scan or ads_archive.`
+          : `Page id ${r.pageId}${r.pageName ? ` (${r.pageName})` : ""} from ad id.`
+      );
     } catch (err) {
       setError(userFacingError(err));
     } finally {

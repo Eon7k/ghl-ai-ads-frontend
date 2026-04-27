@@ -766,6 +766,7 @@ export const expansion = {
         pageId: string;
         pageName: string | null;
         adLibraryId: string;
+        resolvedVia?: "archived_ad" | "page_id";
       }>("api/agency/competitor/resolve-page-from-ad-library-id", { method: "POST", body: { adLibraryId } }),
     /** Resolve a Page to numeric id (Ad Library “View all” link, page URL, @handle, or id). */
     resolveFacebookPage: (input: string) =>

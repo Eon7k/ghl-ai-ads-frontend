@@ -205,9 +205,15 @@ function CompetitorDetailInner() {
       setFbId(r.pageId);
       setAdLibIdForResolve(r.adLibraryId);
       setFbWebCandidates(null);
-      setFbResolveMsg(
-        `From ad id → Page “${r.pageName || r.pageId}” (page_id ${r.pageId}). Save settings, then run a scan to pull their other public ads.`
-      );
+      if (r.resolvedVia === "page_id") {
+        setFbResolveMsg(
+          `That number is a Facebook Page id (not a single Library ad id). We set the Page to “${r.pageName || r.pageId}” (page_id ${r.pageId}). Save settings, then run a scan. If you have a true ad id, use the id field on an ad from a scan or ads_archive.`
+        );
+      } else {
+        setFbResolveMsg(
+          `From ad id → Page “${r.pageName || r.pageId}” (page_id ${r.pageId}). Save settings, then run a scan to pull their other public ads.`
+        );
+      }
     } catch (e) {
       setActionError(userFacingError(e));
     } finally {
