@@ -760,5 +760,19 @@ export const expansion = {
         /** What the server did during the scan (website, Meta, etc.) — not secrets. Omitted on older API builds. */
         diagnostics?: { scanNotes: string[] } | null;
       }>(`api/agency/competitor/watches/${id}/scan`, { method: "POST", body: summary ? { summary } : {} }),
+    /** Resolve a Page to numeric id (Ad Library “View all” link, page URL, @handle, or id). */
+    resolveFacebookPage: (input: string) =>
+      request<{
+        pageId: string | null;
+        source: "ad_library" | "direct" | "graph" | null;
+        message?: string;
+      }>("api/agency/competitor/resolve-facebook-page", { method: "POST", body: { input } }),
+    /** Fetch the competitor’s public homepage and look for Facebook Page links (footer, etc.), then resolve to Page ids. */
+    discoverFacebookPageFromWebsite: (website: string) =>
+      request<{
+        foundLinks: string[];
+        candidates: { pageUrl: string; pageId: string; source: "ad_library" | "direct" | "graph" }[];
+        message?: string;
+      }>("api/agency/competitor/discover-facebook-page-from-website", { method: "POST", body: { website } }),
   },
 };

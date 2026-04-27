@@ -33,6 +33,12 @@ function CompetitorsPageInner() {
   const [facebookPageId, setFacebookPageId] = useState("");
   const [keywords, setKeywords] = useState("");
   const [creating, setCreating] = useState(false);
+  const [resolvingFb, setResolvingFb] = useState(false);
+  const [fbResolveMsg, setFbResolveMsg] = useState<string | null>(null);
+  const [discoveringFromWeb, setDiscoveringFromWeb] = useState(false);
+  const [fbWebCandidates, setFbWebCandidates] = useState<
+    { pageId: string; pageUrl: string; source: "ad_library" | "direct" | "graph" }[] | null
+  >(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -62,6 +68,72 @@ function CompetitorsPageInner() {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, []);
+
+  async function discoverPageFromCompetitorWebsite() {
+    const w = website.trim();
+    if (!w) {
+      setError("Add a website URL first — we scan that page for Facebook links.");
+      return;
+    }
+    setDiscoveringFromWeb(true);
+    setError(null);
+    setFbResolveMsg(null);
+    setFbWebCandidates(null);
+    try {
+      const r = await expansion.competitor.discoverFacebookPageFromWebsite(w);
+      if (r.candidates.length === 0) {
+        setError(r.message ?? "No Facebook Page id could be derived from the website.");
+        if (r.foundLinks.length > 0) {
+          setFbResolveMsg(
+            `Found link(s) but could not resolve. Try “Look up Page id” on: ${r.foundLinks[0]!.slice(0, 100)}…`
+          );
+        }
+        return;
+      }
+      setFacebookPageId(r.candidates[0]!.pageId);
+      setFbWebCandidates(r.candidates);
+      setFbResolveMsg(
+        r.candidates.length > 1
+          ? `Found ${r.candidates.length} Pages in their HTML — first selected; use the list to switch.`
+          : `Page id from their site: ${r.candidates[0]!.pageId}.`
+      );
+    } catch (err) {
+      setError(userFacingError(err));
+    } finally {
+      setDiscoveringFromWeb(false);
+    }
+  }
+
+  async function resolveFacebookPageId() {
+    const raw = facebookPageId.trim();
+    if (!raw) {
+      setFbResolveMsg(null);
+      setError("Paste a Facebook Page URL, Meta Ad Library “View all” link, @handle, or id first.");
+      return;
+    }
+    setResolvingFb(true);
+    setError(null);
+    setFbResolveMsg(null);
+    try {
+      const r = await expansion.competitor.resolveFacebookPage(raw);
+      if (!r.pageId) {
+        setError(r.message ?? "Could not resolve a Facebook Page id.");
+        return;
+      }
+      setFacebookPageId(r.pageId);
+      const how =
+        r.source === "ad_library"
+          ? "from the Ad Library URL"
+          : r.source === "graph"
+            ? "via Meta lookup"
+            : "numeric id";
+      setFbResolveMsg(`Page id ${r.pageId} (${how}).`);
+    } catch (err) {
+      setError(userFacingError(err));
+    } finally {
+      setResolvingFb(false);
+    }
+  }
 
   async function createWatch(e: React.FormEvent) {
     e.preventDefault();
@@ -141,8 +213,13 @@ function CompetitorsPageInner() {
               rejected).
             </li>
             <li>
-              Optional: <strong>Meta Page ID</strong> (numeric) to pull public ads. Find it: Page → &quot;About&quot; → Page
-              transparency, or the URL <code className="rounded bg-white/80 px-1">facebook.com/profile.php?id=…</code>.
+              Optional: <strong>Meta Page ID</strong> to pull public ads. Easiest: in{" "}
+              <a className="font-medium text-violet-800 underline" href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer">
+                Ad Library
+              </a>{" "}
+              → open a brand ad → <strong>View all ads</strong> → copy the URL (it has{" "}
+              <code className="rounded bg-white/80 px-1">view_all_page_id=…</code>) and use <strong>Look up Page id</strong> in the
+              form below, or paste that URL in the field.
             </li>
             <li>
               <strong>Keywords</strong> you care about — we count how often they show up on the page.
@@ -168,7 +245,10 @@ function CompetitorsPageInner() {
             <label className="block text-sm font-medium text-zinc-700">Website (strongly recommended)</label>
             <input
               value={website}
-              onChange={(e) => setWebsite(e.target.value)}
+              onChange={(e) => {
+                setWebsite(e.target.value);
+                setFbWebCandidates(null);
+              }}
               placeholder="https://…"
               className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
             />
@@ -177,16 +257,58 @@ function CompetitorsPageInner() {
             <label className="block text-sm font-medium text-zinc-700">Facebook Page (optional)</label>
             <textarea
               value={facebookPageId}
-              onChange={(e) => setFacebookPageId(e.target.value)}
+              onChange={(e) => {
+                setFacebookPageId(e.target.value);
+                setFbResolveMsg(null);
+              }}
               rows={2}
               autoComplete="off"
-              placeholder="https://www.facebook.com/TheirPage  — or paste the numeric id"
+              placeholder="Ad Library “View all” URL, or https://www.facebook.com/TheirPage, or @handle"
               className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
             />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void discoverPageFromCompetitorWebsite()}
+                disabled={discoveringFromWeb}
+                className="rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-1.5 text-sm font-medium text-emerald-950 hover:bg-emerald-100 disabled:opacity-50"
+                title="Loads the site you entered above and looks for a Facebook link in the page HTML."
+              >
+                {discoveringFromWeb ? "Scanning site…" : "Find Page id from website"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void resolveFacebookPageId()}
+                disabled={resolvingFb}
+                className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+              >
+                {resolvingFb ? "Looking up…" : "Look up Page id (paste text)"}
+              </button>
+              {fbResolveMsg && <span className="text-sm text-emerald-800">{fbResolveMsg}</span>}
+            </div>
+            {fbWebCandidates && fbWebCandidates.length > 1 && (
+              <div className="mt-2 max-w-lg">
+                <label className="block text-xs font-medium text-zinc-600" htmlFor="new-watch-fb-candidate">
+                  Multiple Facebook links found — pick the Page to track:
+                </label>
+                <select
+                  id="new-watch-fb-candidate"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                  value={facebookPageId}
+                  onChange={(e) => setFacebookPageId(e.target.value)}
+                >
+                  {fbWebCandidates.map((c) => (
+                    <option key={c.pageId} value={c.pageId}>
+                      {c.pageId} — {c.pageUrl.replace(/^https?:\/\//, "").slice(0, 80)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <p className="mt-1 text-xs text-zinc-500">
-              Easiest: paste the competitor&apos;s <strong>Facebook Page</strong> address from the browser. We look up the Page id
-              on the server. You can also use <code className="rounded bg-zinc-100 px-0.5">@PageUsername</code> or the digits only
-              (from Page info) if you prefer.
+              <strong>First try:</strong> add <strong>Website</strong> and use <strong>Find Page id from website
+              </strong> — no Ad Library, no manual search, when their footer links a Page. If that returns nothing, paste
+              a Page or Ad Library URL and use <strong>Look up Page id (paste text)</strong>.
             </p>
           </div>
           <div>
