@@ -139,6 +139,23 @@ export const api = {
       mode: "full" | "text_plus_prompts" | "ideas_only";
       horizon: "single" | "week" | "month";
     }) => request<{ markdown: string }>("content-strategy/generate", { method: "POST", body }),
+    /** Structured posts + Basic CSV for Go High Level Social Planner. */
+    generateForGhl: (body: {
+      userPrompt?: string;
+      mode: "full" | "text_plus_prompts" | "ideas_only";
+      horizon: "single" | "week" | "month";
+    }) =>
+      request<{
+        posts: {
+          postAtSpecificTime: string;
+          content: string;
+          link?: string;
+          imageUrls?: string;
+          gifUrl?: string;
+          videoUrls?: string;
+        }[];
+        csv: string;
+      }>("content-strategy/generate-for-ghl", { method: "POST", body }),
   },
 
   /** Admin-only: overview, AI performance, users, and agency clients. */
@@ -190,6 +207,36 @@ export const api = {
         body: Object.keys(body).length ? body : {},
       });
     },
+    /** Go High Level Social Planner tokens — admin sets per portal user (client row). */
+    getUserGhlSocialPlanner: (userId: string) =>
+      request<
+        | { configured: false; userId: string; email: string }
+        | {
+            configured: true;
+            userId: string;
+            email: string;
+            locationId: string;
+            label: string | null;
+            tokenLast4: string;
+          }
+      >(`admin/users/${encodeURIComponent(userId)}/ghl-social-planner`),
+    saveUserGhlSocialPlanner: (
+      userId: string,
+      body: {
+        locationId: string;
+        /** Omit to keep existing token when updating location only. */
+        privateIntegrationToken?: string;
+        label?: string | null;
+      }
+    ) =>
+      request<{ ok: boolean }>(`admin/users/${encodeURIComponent(userId)}/ghl-social-planner`, {
+        method: "PUT",
+        body,
+      }),
+    deleteUserGhlSocialPlanner: (userId: string) =>
+      request<{ ok: boolean }>(`admin/users/${encodeURIComponent(userId)}/ghl-social-planner`, {
+        method: "DELETE",
+      }),
   },
 
   /** Agency self-serve clients (agency account only) */
@@ -452,6 +499,25 @@ export const api = {
         method: "POST",
         body,
       }),
+    /** Go High Level Social Planner — read-only: whether credentials exist for this workspace (tokens managed in Admin). */
+    getGhlSocialPlanner: () =>
+      request<
+        | { configured: false }
+        | {
+            configured: true;
+            locationId: string;
+            label: string | null;
+            tokenLast4: string;
+          }
+      >("integrations/ghl/social-planner"),
+    pushGhlSocialPlannerCsv: (csv: string) =>
+      request<{
+        ok: boolean;
+        status: number;
+        csvImportId: string | null;
+        response: unknown;
+        message: string;
+      }>("integrations/ghl/social-planner/push", { method: "POST", body: { csv } }),
   },
 };
 

@@ -39,6 +39,16 @@ export default function AdminPage() {
   const [metaTestError, setMetaTestError] = useState<string | null>(null);
   const [metaAdAccountInput, setMetaAdAccountInput] = useState("");
   const [metaPageIdInput, setMetaPageIdInput] = useState("");
+  const [ghlAdminUserId, setGhlAdminUserId] = useState("");
+  const [ghlAdminLocationId, setGhlAdminLocationId] = useState("");
+  const [ghlAdminPit, setGhlAdminPit] = useState("");
+  const [ghlAdminLabel, setGhlAdminLabel] = useState("");
+  const [ghlAdminTokenLast4, setGhlAdminTokenLast4] = useState<string | null>(null);
+  const [ghlAdminLoadingCred, setGhlAdminLoadingCred] = useState(false);
+  const [ghlAdminSaving, setGhlAdminSaving] = useState(false);
+  const [ghlAdminDeleting, setGhlAdminDeleting] = useState(false);
+  const [ghlAdminErr, setGhlAdminErr] = useState<string | null>(null);
+  const [ghlAdminOk, setGhlAdminOk] = useState<string | null>(null);
   const [productEditorUser, setProductEditorUser] = useState<AdminUser | null>(null);
   const [productEditorMode, setProductEditorMode] = useState<"all" | "custom">("custom");
   const [productEditorKeys, setProductEditorKeys] = useState<Set<string>>(new Set());
@@ -65,6 +75,45 @@ export default function AdminPage() {
       return next;
     });
   }
+
+  useEffect(() => {
+    if (!ghlAdminUserId.trim()) {
+      setGhlAdminLocationId("");
+      setGhlAdminLabel("");
+      setGhlAdminPit("");
+      setGhlAdminTokenLast4(null);
+      setGhlAdminErr(null);
+      return;
+    }
+    let cancelled = false;
+    setGhlAdminLoadingCred(true);
+    setGhlAdminErr(null);
+    setGhlAdminOk(null);
+    api.admin
+      .getUserGhlSocialPlanner(ghlAdminUserId.trim())
+      .then((r) => {
+        if (cancelled) return;
+        if (r.configured) {
+          setGhlAdminLocationId(r.locationId);
+          setGhlAdminLabel(r.label ?? "");
+          setGhlAdminTokenLast4(r.tokenLast4);
+        } else {
+          setGhlAdminLocationId("");
+          setGhlAdminLabel("");
+          setGhlAdminTokenLast4(null);
+        }
+        setGhlAdminPit("");
+      })
+      .catch((e) => {
+        if (!cancelled) setGhlAdminErr(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!cancelled) setGhlAdminLoadingCred(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ghlAdminUserId]);
 
   const filteredUsers = userSearch.trim()
     ? adminUsers.filter((u) => u.email.toLowerCase().includes(userSearch.trim().toLowerCase()))
@@ -155,7 +204,7 @@ export default function AdminPage() {
           className="mb-6"
           title="Admin (operators only)"
           steps={[
-            "This page is for internal or trusted operators — not for end clients. Use it to view users, agency trees, and optional product flags (kits, white label, and similar).",
+            "This page is for internal or trusted operators — not for end clients. Use it to view users, agency trees, optional product flags (kits, white label, and similar), and Go High Level Social Planner credentials per portal user.",
             "The Help page in the top bar is written for your customers; send them there for day-to-day campaign steps.",
             "If you are only testing ads as yourself, you rarely need this screen — use Home and campaigns instead.",
           ]}
@@ -347,6 +396,160 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </section>
+
+          <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-emerald-950">Go High Level — Social Planner (per portal user)</h2>
+            <p className="mt-1 text-sm text-emerald-900/90">
+              Store each workspace&apos;s HighLevel <strong>Sub-account Location id</strong> and{" "}
+              <strong>Private Integration Token</strong> (Social Planner scopes). Content strategy uses these for{" "}
+              <strong>Push to Go High Level</strong>; clients never enter secrets themselves.
+            </p>
+            <p className="mt-2 text-xs text-emerald-800/90">
+              Pick the portal account row (usually the <strong>client</strong> user for agency setups — match Agency → Manage clients).
+              Docs:{" "}
+              <a
+                href="https://help.gohighlevel.com/support/solutions/articles/155000005411-prerequisite-for-bulk-csv-basic-and-advance-csv"
+                className="underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Bulk CSV prerequisites
+              </a>
+              .
+            </p>
+
+            <div className="mt-4 max-w-xl">
+              <label htmlFor="ghl-user" className="text-xs font-medium text-emerald-950">
+                Portal user
+              </label>
+              <select
+                id="ghl-user"
+                value={ghlAdminUserId}
+                onChange={(e) => setGhlAdminUserId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-zinc-900"
+              >
+                <option value="">Select user…</option>
+                {adminUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.email} ({u.accountType || "single"})
+                  </option>
+                ))}
+              </select>
+              {ghlAdminLoadingCred && ghlAdminUserId ? (
+                <p className="mt-1 text-xs text-emerald-800">Loading saved credential…</p>
+              ) : null}
+            </div>
+
+            {ghlAdminUserId ? (
+              <div className="mt-4 grid max-w-xl gap-3">
+                <div>
+                  <label className="text-xs font-medium text-emerald-950">Location id</label>
+                  <input
+                    type="text"
+                    value={ghlAdminLocationId}
+                    onChange={(e) => setGhlAdminLocationId(e.target.value)}
+                    placeholder="HighLevel location / sub-account id"
+                    autoComplete="off"
+                    className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-emerald-950">
+                    Private Integration Token{" "}
+                    {ghlAdminTokenLast4 ? (
+                      <span className="font-normal text-zinc-600">(saved …{ghlAdminTokenLast4})</span>
+                    ) : null}
+                  </label>
+                  <input
+                    type="password"
+                    value={ghlAdminPit}
+                    onChange={(e) => setGhlAdminPit(e.target.value)}
+                    placeholder="Leave blank to keep existing token when updating location only"
+                    autoComplete="new-password"
+                    className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-emerald-950">Label (optional)</label>
+                  <input
+                    type="text"
+                    value={ghlAdminLabel}
+                    onChange={(e) => setGhlAdminLabel(e.target.value)}
+                    placeholder="e.g. Client brand name"
+                    autoComplete="off"
+                    className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                {ghlAdminErr ? (
+                  <p className="rounded border border-red-200 bg-red-50 px-2 py-1.5 text-sm text-red-800">{ghlAdminErr}</p>
+                ) : null}
+                {ghlAdminOk ? (
+                  <p className="rounded border border-emerald-200 bg-emerald-100/80 px-2 py-1.5 text-sm text-emerald-900">
+                    {ghlAdminOk}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={ghlAdminSaving || !ghlAdminLocationId.trim()}
+                    onClick={async () => {
+                      setGhlAdminSaving(true);
+                      setGhlAdminErr(null);
+                      setGhlAdminOk(null);
+                      try {
+                        await api.admin.saveUserGhlSocialPlanner(ghlAdminUserId.trim(), {
+                          locationId: ghlAdminLocationId.trim(),
+                          ...(ghlAdminPit.trim() ? { privateIntegrationToken: ghlAdminPit.trim() } : {}),
+                          label: ghlAdminLabel.trim() || null,
+                        });
+                        setGhlAdminOk("Saved.");
+                        setGhlAdminPit("");
+                        const r = await api.admin.getUserGhlSocialPlanner(ghlAdminUserId.trim());
+                        if (r.configured) setGhlAdminTokenLast4(r.tokenLast4);
+                      } catch (e) {
+                        setGhlAdminErr(e instanceof Error ? e.message : "Save failed");
+                      } finally {
+                        setGhlAdminSaving(false);
+                      }
+                    }}
+                    className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+                  >
+                    {ghlAdminSaving ? "Saving…" : "Save credentials"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={ghlAdminDeleting || !ghlAdminUserId.trim()}
+                    onClick={async () => {
+                      if (
+                        typeof window !== "undefined" &&
+                        !window.confirm("Remove Go High Level credentials for this user? Push will stop working until you save again.")
+                      ) {
+                        return;
+                      }
+                      setGhlAdminDeleting(true);
+                      setGhlAdminErr(null);
+                      setGhlAdminOk(null);
+                      try {
+                        await api.admin.deleteUserGhlSocialPlanner(ghlAdminUserId.trim());
+                        setGhlAdminOk("Removed.");
+                        setGhlAdminLocationId("");
+                        setGhlAdminLabel("");
+                        setGhlAdminPit("");
+                        setGhlAdminTokenLast4(null);
+                      } catch (e) {
+                        setGhlAdminErr(e instanceof Error ? e.message : "Remove failed");
+                      } finally {
+                        setGhlAdminDeleting(false);
+                      }
+                    }}
+                    className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {ghlAdminDeleting ? "Removing…" : "Remove credentials"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           {/* All users – search and change account type */}

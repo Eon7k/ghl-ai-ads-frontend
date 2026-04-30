@@ -11,7 +11,7 @@ type Mode = "full" | "text_plus_prompts" | "ideas_only";
 type Horizon = "single" | "week" | "month";
 
 export default function ContentStrategyPage() {
-  const { businessModelProfile, businessOnboardingComplete, loading, user, accountType, businessProfileForEmail } =
+  const { businessModelProfile, businessOnboardingComplete, loading, user, accountType, businessProfileForEmail, isAdmin } =
     useAuth();
   const subject = businessProfileForEmail || user?.email || "";
   const isClientContext = accountType === "agency" && user?.email && subject && subject !== user.email;
@@ -29,6 +29,12 @@ export default function ContentStrategyPage() {
   const [organicLoading, setOrganicLoading] = useState(false);
   const [organicError, setOrganicError] = useState<string | null>(null);
   const [organicSuccess, setOrganicSuccess] = useState<string | null>(null);
+
+  const [ghlConfigured, setGhlConfigured] = useState<boolean | null>(null);
+  const [ghlCsv, setGhlCsv] = useState<string | null>(null);
+  const [ghlGenLoading, setGhlGenLoading] = useState(false);
+  const [ghlPushLoading, setGhlPushLoading] = useState(false);
+  const [ghlPushMsg, setGhlPushMsg] = useState<string | null>(null);
 
   const profileSkipped = Boolean(
     businessModelProfile && (businessModelProfile as { skipped?: boolean }).skipped === true
@@ -50,6 +56,16 @@ export default function ContentStrategyPage() {
       .catch(() => setIntegrations([]));
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    api.integrations
+      .getGhlSocialPlanner()
+      .then((r) => {
+        setGhlConfigured(r.configured);
+      })
+      .catch(() => setGhlConfigured(false));
+  }, [user]);
+
   async function generate() {
     setGenLoading(true);
     setError(null);
@@ -65,6 +81,53 @@ export default function ContentStrategyPage() {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenLoading(false);
+    }
+  }
+
+  async function generateForGhl() {
+    setGhlGenLoading(true);
+    setError(null);
+    setGhlPushMsg(null);
+    setGhlCsv(null);
+    try {
+      const r = await api.contentStrategy.generateForGhl({
+        userPrompt,
+        mode,
+        horizon,
+      });
+      setGhlCsv(r.csv);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "CSV generation failed");
+    } finally {
+      setGhlGenLoading(false);
+    }
+  }
+
+  function downloadGhlCsv() {
+    if (!ghlCsv) return;
+    const blob = new Blob([ghlCsv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ghl-social-planner-basic.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function pushGhlCsv() {
+    if (!ghlCsv?.trim()) {
+      setError("Generate CSV for Go High Level first (or paste CSV server-side flow expects Basic template).");
+      return;
+    }
+    setGhlPushLoading(true);
+    setError(null);
+    setGhlPushMsg(null);
+    try {
+      const r = await api.integrations.pushGhlSocialPlannerCsv(ghlCsv);
+      setGhlPushMsg(r.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Push to Go High Level failed");
+    } finally {
+      setGhlPushLoading(false);
     }
   }
 
@@ -116,6 +179,7 @@ export default function ContentStrategyPage() {
         steps={[
           "This is for organic social content ideas and copy — not the same as launching a paid ad campaign. Paid ads are created from Home and edited on a campaign page.",
           "Type what you need (topic, time window, product launch, tone). Choose whether you want full posts, text plus a to-do list, or ideas only, and pick a time range.",
+          "For Go High Level: an administrator saves Location id + Private Integration token per portal account (Admin tab). Then generate CSV here and Push or download — Marketing → Social Planner.",
           "If LinkedIn is connected, use the “Post to LinkedIn” section to publish to your Company Page, or still copy the result anywhere you like. The business profile (link below) gives the AI more context about your business.",
         ]}
       />
@@ -233,6 +297,76 @@ export default function ContentStrategyPage() {
           {genLoading ? "Generating with Claude…" : "Generate plan"}
         </button>
       </div>
+
+      <section className="mt-10 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-emerald-950">Go High Level — Social Planner CSV</h2>
+        <p className="form-hint mt-1 max-w-2xl text-emerald-950/90">
+          Claude builds rows matching HighLevel&apos;s <strong>Basic CSV</strong> (scheduled time + caption + optional links).
+          Only an <strong>administrator</strong> can attach each workspace&apos;s Location id and Private Integration token (
+          <Link href="/admin" className="font-medium text-emerald-900 underline">
+            Admin → Go High Level
+          </Link>
+          ). Then use <strong>Push</strong> here or download and import under{" "}
+          <span className="font-medium">Marketing → Social Planner → Upload from CSV</span>.
+        </p>
+        <p className="mt-2 text-xs text-emerald-900/90">
+          Docs:{" "}
+          <a
+            href="https://help.gohighlevel.com/support/solutions/articles/155000005411-prerequisite-for-bulk-csv-basic-and-advance-csv"
+            className="font-medium underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Bulk CSV prerequisites (HighLevel)
+          </a>
+          {" · "}
+          Private Integration needs Social Planner–related scopes (HighLevel → Settings → Integrations → API).
+        </p>
+
+        <div className="mt-6 flex flex-wrap gap-3 border-t border-emerald-200/80 pt-4">
+          <button
+            type="button"
+            onClick={() => void generateForGhl()}
+            disabled={ghlGenLoading}
+            className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-950 shadow-sm ring-1 ring-emerald-300 hover:bg-emerald-100/80 disabled:opacity-50"
+          >
+            {ghlGenLoading ? "Building CSV rows…" : "Generate for Go High Level (CSV)"}
+          </button>
+          <button
+            type="button"
+            onClick={downloadGhlCsv}
+            disabled={!ghlCsv}
+            className="rounded-lg border border-emerald-600 bg-transparent px-4 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100/60 disabled:opacity-50"
+          >
+            Download CSV file
+          </button>
+          <button
+            type="button"
+            onClick={() => void pushGhlCsv()}
+            disabled={ghlPushLoading || !ghlCsv || ghlConfigured !== true}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {ghlPushLoading ? "Uploading to HighLevel…" : "Push to Go High Level"}
+          </button>
+        </div>
+        {ghlConfigured === false ? (
+          <p className="mt-2 text-xs text-amber-900">
+            Push is unavailable until an admin saves Go High Level credentials for{" "}
+            {isClientContext ? "this client workspace" : "your account"}
+            . You can still <strong>Download CSV</strong> and upload it manually in HighLevel.
+          </p>
+        ) : null}
+        {isAdmin && (
+          <p className="mt-2 text-xs text-emerald-900">
+            Admin: configure tokens per user in{" "}
+            <Link href="/admin" className="font-medium underline">
+              Admin → Go High Level (Social Planner)
+            </Link>
+            .
+          </p>
+        )}
+        {ghlPushMsg ? <p className="mt-2 text-sm text-emerald-900">{ghlPushMsg}</p> : null}
+      </section>
 
       {linkedInConnected && (
         <section className="mt-10 rounded-2xl border border-sky-200 bg-sky-50/80 p-5 shadow-sm">
