@@ -969,8 +969,13 @@ export const expansion = {
         body: { searchTerm },
       }),
     /** Keyword-first harvest: sweep Ad Library, store ads by advertiser Page for later brand search & AI report. */
-    createMetaHarvestRun: (body: { keywords: string[]; label?: string }) =>
+    createMetaHarvestRun: (body: { keywords: string[]; label?: string; intentPrompt?: string | null }) =>
       request<{ run: MetaAdHarvestRunRow }>("api/agency/competitor/meta-harvest-runs", { method: "POST", body }),
+    suggestMetaHarvestCollectionKeywords: (body: { intentPrompt: string }) =>
+      request<{ keywords: string[]; rationale: string }>(
+        "api/agency/competitor/meta-harvest-suggest-collection-keywords",
+        { method: "POST", body }
+      ),
     listMetaHarvestRuns: () => request<{ runs: MetaAdHarvestRunRow[] }>("api/agency/competitor/meta-harvest-runs"),
     getMetaHarvestRun: (id: string) =>
       request<{ run: MetaAdHarvestRunRow & { ads: MetaAdHarvestAdRow[] } }>(`api/agency/competitor/meta-harvest-runs/${id}`),

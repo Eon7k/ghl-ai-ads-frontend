@@ -287,6 +287,9 @@ function HarvestInner() {
   const [tab, setTab] = useState<HarvestTab>("collect");
 
   const [kwInput, setKwInput] = useState("cryotherapy, cold therapy spa, wellness studio");
+  const [collectIntentPrompt, setCollectIntentPrompt] = useState("");
+  const [collectionKwSuggestBusy, setCollectionKwSuggestBusy] = useState(false);
+  const [collectionKwRationale, setCollectionKwRationale] = useState<string | null>(null);
   const [label, setLabel] = useState("");
   const [harvestBusy, setHarvestBusy] = useState(false);
   const [runs, setRuns] = useState<MetaAdHarvestRunRow[]>([]);
@@ -360,6 +363,10 @@ function HarvestInner() {
   useEffect(() => {
     if (user) void loadRuns();
   }, [user, loadRuns]);
+
+  useEffect(() => {
+    setCollectionKwRationale(null);
+  }, [collectIntentPrompt]);
 
   useEffect(() => {
     if (user && tab === "saved") void loadInsights();
@@ -479,6 +486,35 @@ function HarvestInner() {
     return null;
   }
 
+  async function suggestCollectionKeywordsFromGoal() {
+    const intent = collectIntentPrompt.trim();
+    if (intent.length < 16) {
+      setError("Describe what ads you want in at least a sentence (~16+ characters), then ask AI for keywords.");
+      setInfo(null);
+      return;
+    }
+    setCollectionKwSuggestBusy(true);
+    setError(null);
+    setInfo(null);
+    setCollectionKwRationale(null);
+    try {
+      const { keywords, rationale } = await expansion.competitor.suggestMetaHarvestCollectionKeywords({
+        intentPrompt: intent,
+      });
+      if (keywords.length) setKwInput(keywords.join(", "));
+      setCollectionKwRationale(rationale.trim() ? rationale.trim() : null);
+      if (keywords.length) {
+        setInfo("Suggestion applied — edit the keyword box if needed, then collect.");
+      } else {
+        setError("AI returned no keywords. Check OPENAI_API_KEY on your API server or try a richer description.");
+      }
+    } catch (e) {
+      setError(userFacingError(e));
+    } finally {
+      setCollectionKwSuggestBusy(false);
+    }
+  }
+
   async function runHarvest() {
     const keywords = kwInput
       .split(/[,;\n]+/)
@@ -495,6 +531,7 @@ function HarvestInner() {
       const { run } = await expansion.competitor.createMetaHarvestRun({
         keywords,
         label: label.trim() || undefined,
+        intentPrompt: collectIntentPrompt.trim() || undefined,
       });
       const adsCount = Math.max(run.adsStored ?? 0, run._count?.ads ?? 0);
       const diagLines = harvestDiagnosticsLines(run.diagnostics);
@@ -732,7 +769,35 @@ function HarvestInner() {
                 Enter words your customers might search—services, cities, problems you solve. We gather a sample of active ads and group them
                 by advertiser so you can review what shows up for those topics.
               </p>
-              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="harvest-keywords">
+              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="harvest-intent">
+                What are you trying to find? (optional — saves with this collection)
+              </label>
+              <textarea
+                id="harvest-intent"
+                value={collectIntentPrompt}
+                onChange={(e) => setCollectIntentPrompt(e.target.value)}
+                rows={3}
+                placeholder="Example: Active ads from boutique cryotherapy studios and cold plunge brands targeting wellness shoppers in Texas—not generic gym chains."
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+              />
+              <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                AI can turn this into Meta search keywords below. Each successful collection updates a workspace vocabulary so suggestions improve as you pull more ads.
+              </p>
+              <button
+                type="button"
+                disabled={collectionKwSuggestBusy || harvestBusy}
+                onClick={() => void suggestCollectionKeywordsFromGoal()}
+                className="mt-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+              >
+                {collectionKwSuggestBusy ? "Suggesting…" : "Suggest keywords from description"}
+              </button>
+              {collectionKwRationale ? (
+                <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-700">
+                  <span className="font-semibold text-zinc-800">Why these terms: </span>
+                  {collectionKwRationale}
+                </div>
+              ) : null}
+              <label className="mt-6 block text-xs font-medium text-zinc-500" htmlFor="harvest-keywords">
                 Keywords (comma or line separated, up to 12)
               </label>
               <textarea
