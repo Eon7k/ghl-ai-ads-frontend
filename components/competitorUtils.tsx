@@ -8,17 +8,57 @@ export type YourCampaignIdea = {
   whyItWorks: string;
 };
 
+/** Landscape / market-overview extras nested under `competitivePack.landscapeAnalysis` in saved JSON. */
+export type LandscapeAnalysisParsed = {
+  standoutAdvertisers: { name: string; rank: number; rationale: string }[];
+  whatOthersDoWell: string[];
+  howYouCanStandOut: string[];
+};
+
 export type CompetitivePackParsed = {
   theirPlaybook: string;
   howToWin: string[];
   yourCampaigns: YourCampaignIdea[];
   theirAdTactics: { headline: string; tactic: string }[];
+  landscapeAnalysis?: LandscapeAnalysisParsed | null;
 };
+
+export function parseLandscapeAnalysis(x: unknown): LandscapeAnalysisParsed | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  const standoutAdvertisers: LandscapeAnalysisParsed["standoutAdvertisers"] = [];
+  if (Array.isArray(o.standoutAdvertisers)) {
+    for (const item of o.standoutAdvertisers.slice(0, 10)) {
+      if (!item || typeof item !== "object") continue;
+      const r = item as Record<string, unknown>;
+      const name = typeof r.name === "string" ? r.name.trim() : "";
+      if (!name) continue;
+      let rank = typeof r.rank === "number" && Number.isFinite(r.rank) ? Math.round(r.rank) : standoutAdvertisers.length + 1;
+      rank = Math.min(99, Math.max(1, rank));
+      const rationale = typeof r.rationale === "string" ? r.rationale.trim() : "";
+      standoutAdvertisers.push({ name: name.slice(0, 140), rank, rationale });
+    }
+    standoutAdvertisers.sort((a, b) => a.rank - b.rank);
+  }
+  const whatOthersDoWell = Array.isArray(o.whatOthersDoWell)
+    ? o.whatOthersDoWell.filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((s) => s.trim()).slice(0, 14)
+    : [];
+  const howYouCanStandOut = Array.isArray(o.howYouCanStandOut)
+    ? o.howYouCanStandOut.filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((s) => s.trim()).slice(0, 14)
+    : [];
+  if (!standoutAdvertisers.length && !whatOthersDoWell.length && !howYouCanStandOut.length) return null;
+  return {
+    standoutAdvertisers: standoutAdvertisers.slice(0, 8),
+    whatOthersDoWell,
+    howYouCanStandOut,
+  };
+}
 
 export function parseCompetitivePack(x: unknown): CompetitivePackParsed | null {
   if (!x || typeof x !== "object") return null;
   const o = x as Record<string, unknown>;
   if (typeof o.theirPlaybook !== "string") return null;
+  const landscapeAnalysis = parseLandscapeAnalysis(o.landscapeAnalysis);
   const howToWin = Array.isArray(o.howToWin)
     ? o.howToWin.filter((a): a is string => typeof a === "string").map((s) => s.trim())
     : [];
@@ -49,7 +89,34 @@ export function parseCompetitivePack(x: unknown): CompetitivePackParsed | null {
       }
     }
   }
-  return { theirPlaybook: o.theirPlaybook, howToWin, yourCampaigns, theirAdTactics };
+  return { theirPlaybook: o.theirPlaybook, howToWin, yourCampaigns, theirAdTactics, landscapeAnalysis };
+}
+
+/** Matches Home campaign creator sessionStorage shape used on competitor watch pages. */
+export function storeCampaignPrefillForHome(idea: YourCampaignIdea, namePrefix: string): void {
+  if (typeof window === "undefined") return;
+  const n = `${namePrefix || "Harvest"} — ${idea.title}`.slice(0, 120);
+  const pLower = idea.platform.toLowerCase();
+  const selectedPlatforms: ("meta" | "google" | "tiktok" | "linkedin")[] = pLower.includes("google")
+    ? ["google"]
+    : pLower.includes("linkedin")
+      ? ["linkedin"]
+      : pLower.includes("tiktok")
+        ? ["tiktok"]
+        : ["meta"];
+  sessionStorage.setItem(
+    "ghl-campaign-prefill",
+    JSON.stringify({
+      name: n,
+      prompt: [idea.angle && `**Angle:** ${idea.angle}`, idea.adCopy, idea.whyItWorks && `**Why it can win:** ${idea.whyItWorks}`]
+        .filter(Boolean)
+        .join("\n\n"),
+      creativePrompt: pLower.includes("google")
+        ? "Match Google ad style: clear headline + CTA in description."
+        : "High-impact visual; match the angle above in the ad image or video.",
+      selectedPlatforms,
+    })
+  );
 }
 
 export function stringArrayFromJson(x: unknown, max = 8): string[] {

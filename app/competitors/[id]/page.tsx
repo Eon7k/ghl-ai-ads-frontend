@@ -7,6 +7,7 @@ import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import {
   renderInsightSummaryText,
+  storeCampaignPrefillForHome,
   stringArrayFromJson,
   strongestAdsFromJson,
   parseCompetitivePack,
@@ -394,29 +395,7 @@ function CompetitorDetailInner() {
       : null;
 
   function goUseCampaign(idea: YourCampaignIdea) {
-    if (typeof window === "undefined") return;
-    const n = `${watch?.competitorName ?? "Competitor"} — ${idea.title}`.slice(0, 120);
-    const pLower = idea.platform.toLowerCase();
-    const selectedPlatforms: ("meta" | "google" | "tiktok" | "linkedin")[] = pLower.includes("google")
-      ? ["google"]
-      : pLower.includes("linkedin")
-        ? ["linkedin"]
-        : pLower.includes("tiktok")
-          ? ["tiktok"]
-          : ["meta"];
-    sessionStorage.setItem(
-      "ghl-campaign-prefill",
-      JSON.stringify({
-        name: n,
-        prompt: [idea.angle && `**Angle:** ${idea.angle}`, idea.adCopy, idea.whyItWorks && `**Why it can win:** ${idea.whyItWorks}`]
-          .filter(Boolean)
-          .join("\n\n"),
-        creativePrompt: pLower.includes("google")
-          ? "Match Google ad style: clear headline + CTA in description."
-          : "High-impact visual; match the angle above in the ad image or video.",
-        selectedPlatforms,
-      })
-    );
+    storeCampaignPrefillForHome(idea, watch?.competitorName ?? "Competitor");
     router.push("/?open=create");
   }
 

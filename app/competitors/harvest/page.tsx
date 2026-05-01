@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
-import { renderInsightSummaryText } from "@/components/competitorUtils";
+import { HarvestReportBriefBody } from "@/components/HarvestReportBrief";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   expansion,
@@ -41,8 +41,11 @@ function isMetaAdLibrarySnapshotUrl(url: string): boolean {
     const u = new URL(url);
     const h = u.hostname.replace(/^www\./i, "").toLowerCase();
     return (
-      (h === "facebook.com" || h === "m.facebook.com" || h === "lm.facebook.com") &&
-      (u.pathname.includes("/ads/") || u.pathname.includes("render_ad"))
+      (h === "facebook.com" ||
+        h === "m.facebook.com" ||
+        h === "lm.facebook.com" ||
+        h === "l.facebook.com") &&
+      (u.pathname.includes("/ads/") || u.pathname.includes("render_ad") || h === "l.facebook.com")
     );
   } catch {
     return false;
@@ -94,9 +97,12 @@ function HarvestAdPreview({
   /** Retry Meta CDN `<img>` with different referrer policies before falling back to iframe embed. */
   const [remoteThumbReferrer, setRemoteThumbReferrer] = useState<"" | "no-referrer" | "origin">("");
 
+  const previewHtmlRef = useRef<string | null>(null);
+
   useEffect(() => {
     setThumb(null);
     setSnapshotEmbedHtml(null);
+    previewHtmlRef.current = null;
     setThumbError(false);
     setThumbLoading(false);
     setImgFailed(false);
@@ -108,16 +114,23 @@ function HarvestAdPreview({
     void fetchHarvestSnapshotPreview(mediaUrl, thumbPriority)
       .then((r) => {
         if (cancelled) return;
-        setSnapshotEmbedHtml(r.previewHtml ?? null);
+        const ph = r.previewHtml ?? null;
+        previewHtmlRef.current = ph;
+        setSnapshotEmbedHtml(ph);
         if (r.thumbnailDataUrl) {
           setThumb(r.thumbnailDataUrl);
+          return;
+        }
+        /* Meta CDN URLs often “load” in <img> without onError but paint nothing — prefer iframe HTML when available. */
+        if (ph) {
+          setThumb(null);
           return;
         }
         if (r.thumbnailUrl) {
           setThumb(r.thumbnailUrl);
           return;
         }
-        if (!r.previewHtml) setThumbError(true);
+        setThumbError(true);
       })
       .catch(() => {
         if (!cancelled) setThumbError(true);
@@ -142,6 +155,15 @@ function HarvestAdPreview({
 
   if (thumb) {
     const isRemoteHttpsThumb = /^https:\/\//i.test(thumb);
+    const handleImgSoftFail = () => {
+      if (isRemoteHttpsThumb && remoteThumbReferrer === "") setRemoteThumbReferrer("no-referrer");
+      else if (isRemoteHttpsThumb && remoteThumbReferrer === "no-referrer") setRemoteThumbReferrer("origin");
+      else if (previewHtmlRef.current) setThumb(null);
+      else {
+        setThumb(null);
+        setThumbError(true);
+      }
+    };
     return (
       <div className={wrap}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -151,15 +173,11 @@ function HarvestAdPreview({
           alt=""
           className="h-full w-full object-cover bg-zinc-200"
           referrerPolicy={isRemoteHttpsThumb && remoteThumbReferrer ? remoteThumbReferrer : undefined}
-          onError={() => {
-            if (isRemoteHttpsThumb && remoteThumbReferrer === "") setRemoteThumbReferrer("no-referrer");
-            else if (isRemoteHttpsThumb && remoteThumbReferrer === "no-referrer") setRemoteThumbReferrer("origin");
-            else if (snapshotEmbedHtml) setThumb(null);
-            else {
-              setThumb(null);
-              setThumbError(true);
-            }
+          onLoad={(e) => {
+            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+            if (w === 0 || h === 0 || (w <= 16 && h <= 16)) handleImgSoftFail();
           }}
+          onError={handleImgSoftFail}
         />
         <a
           href={mediaUrl}
@@ -1066,8 +1084,11 @@ function HarvestInner() {
                       ? ` · ${landscapePreview.adsExcluded} left out as off-topic`
                       : ""}
                   </p>
-                  <div className="prose prose-sm prose-zinc mt-3 max-w-none">
-                    {renderInsightSummaryText(landscapePreview.summary)}
+                  <div className="mt-3 max-w-none">
+                    <HarvestReportBriefBody
+                      report={landscapePreview}
+                      campaignNamePrefix={landscapePreview.competitorDisplayName || landscapeTopic || "Market overview"}
+                    />
                   </div>
                 </div>
               )}
@@ -1155,8 +1176,11 @@ function HarvestInner() {
                       ? ` · ${reportPreview.adsExcluded} left out as off-topic`
                       : ""}
                   </p>
-                  <div className="prose prose-sm prose-zinc mt-3 max-w-none">
-                    {renderInsightSummaryText(reportPreview.summary)}
+                  <div className="mt-3 max-w-none">
+                    <HarvestReportBriefBody
+                      report={reportPreview}
+                      campaignNamePrefix={reportPreview.competitorDisplayName || reportName || "Focused advertisers"}
+                    />
                   </div>
                 </div>
               )}
@@ -1238,8 +1262,13 @@ function HarvestInner() {
                         ? ` · ${selectedInsight.report.adsExcluded} left out as off-topic`
                         : ""}
                     </p>
-                    <div className="prose prose-sm prose-zinc mt-4 max-w-none">
-                      {renderInsightSummaryText(selectedInsight.report.summary)}
+                    <div className="mt-4 max-w-none">
+                      <HarvestReportBriefBody
+                        report={selectedInsight.report}
+                        campaignNamePrefix={
+                          selectedInsight.report.competitorDisplayName || selectedInsight.title || "Saved report"
+                        }
+                      />
                     </div>
                   </>
                 ) : (
