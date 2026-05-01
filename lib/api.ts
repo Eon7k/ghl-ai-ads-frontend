@@ -967,6 +967,12 @@ export const expansion = {
     listMetaHarvestRuns: () => request<{ runs: MetaAdHarvestRunRow[] }>("api/agency/competitor/meta-harvest-runs"),
     getMetaHarvestRun: (id: string) =>
       request<{ run: MetaAdHarvestRunRow & { ads: MetaAdHarvestAdRow[] } }>(`api/agency/competitor/meta-harvest-runs/${id}`),
+    /** Meta snapshot HTML → og:image URL for thumbnails (server-side fetch). */
+    fetchMetaAdSnapshotThumb: (snapshotUrl: string) =>
+      request<{ thumbnailUrl: string | null }>("api/agency/competitor/meta-ad-snapshot-thumb", {
+        method: "POST",
+        body: { snapshotUrl },
+      }),
     listMetaHarvestBrands: (q?: string) =>
       request<{ brands: MetaHarvestBrandRow[] }>(
         `api/agency/competitor/meta-harvest-brands${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`
