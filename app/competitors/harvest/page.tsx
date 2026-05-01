@@ -91,6 +91,8 @@ function HarvestAdPreview({
   const [thumbError, setThumbError] = useState(false);
   const [thumbLoading, setThumbLoading] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  /** Retry Meta CDN `<img>` with different referrer policies before falling back to iframe embed. */
+  const [remoteThumbReferrer, setRemoteThumbReferrer] = useState<"" | "no-referrer" | "origin">("");
 
   useEffect(() => {
     setThumb(null);
@@ -98,6 +100,7 @@ function HarvestAdPreview({
     setThumbError(false);
     setThumbLoading(false);
     setImgFailed(false);
+    setRemoteThumbReferrer("");
     if (!mediaUrl || !isMetaAdLibrarySnapshotUrl(mediaUrl)) return;
     if (!inView) return;
     let cancelled = false;
@@ -105,15 +108,16 @@ function HarvestAdPreview({
     void fetchHarvestSnapshotPreview(mediaUrl, thumbPriority)
       .then((r) => {
         if (cancelled) return;
+        setSnapshotEmbedHtml(r.previewHtml ?? null);
+        if (r.thumbnailDataUrl) {
+          setThumb(r.thumbnailDataUrl);
+          return;
+        }
         if (r.thumbnailUrl) {
           setThumb(r.thumbnailUrl);
           return;
         }
-        if (r.previewHtml) {
-          setSnapshotEmbedHtml(r.previewHtml);
-          return;
-        }
-        setThumbError(true);
+        if (!r.previewHtml) setThumbError(true);
       })
       .catch(() => {
         if (!cancelled) setThumbError(true);
@@ -137,10 +141,26 @@ function HarvestAdPreview({
   }
 
   if (thumb) {
+    const isRemoteHttpsThumb = /^https:\/\//i.test(thumb);
     return (
       <div className={wrap}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={thumb} alt="" className="h-full w-full object-cover" />
+        <img
+          key={isRemoteHttpsThumb ? `${thumb}:${remoteThumbReferrer}` : thumb}
+          src={thumb}
+          alt=""
+          className="h-full w-full object-cover bg-zinc-200"
+          referrerPolicy={isRemoteHttpsThumb && remoteThumbReferrer ? remoteThumbReferrer : undefined}
+          onError={() => {
+            if (isRemoteHttpsThumb && remoteThumbReferrer === "") setRemoteThumbReferrer("no-referrer");
+            else if (isRemoteHttpsThumb && remoteThumbReferrer === "no-referrer") setRemoteThumbReferrer("origin");
+            else if (snapshotEmbedHtml) setThumb(null);
+            else {
+              setThumb(null);
+              setThumbError(true);
+            }
+          }}
+        />
         <a
           href={mediaUrl}
           target="_blank"

@@ -986,7 +986,7 @@ export const expansion = {
       }),
     /** Meta snapshot HTML → og:image URL for thumbnails (server-side fetch). */
     fetchMetaAdSnapshotThumb: (snapshotUrl: string) =>
-      request<{ thumbnailUrl: string | null; previewHtml: string | null }>(
+      request<{ thumbnailUrl: string | null; thumbnailDataUrl: string | null; previewHtml: string | null }>(
         "api/agency/competitor/meta-ad-snapshot-thumb",
         {
           method: "POST",

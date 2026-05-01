@@ -5,6 +5,8 @@ export const HARVEST_THUMB_PRELOAD_FIRST = 16;
 
 export type HarvestSnapshotPreview = {
   thumbnailUrl: string | null;
+  /** Server-fetched CDN image as data URL (preferred for `<img>` when Meta blocks hotlinking). */
+  thumbnailDataUrl: string | null;
   /** Sanitized snapshot HTML when no direct image URL was found (iframe srcDoc). */
   previewHtml: string | null;
 };
@@ -57,12 +59,13 @@ export function fetchHarvestSnapshotPreview(snapshotUrl: string, priority: numbe
         const res = await expansion.competitor.fetchMetaAdSnapshotThumb(snapshotUrl);
         const out: HarvestSnapshotPreview = {
           thumbnailUrl: res.thumbnailUrl ?? null,
+          thumbnailDataUrl: res.thumbnailDataUrl ?? null,
           previewHtml: res.previewHtml ?? null,
         };
         settled.set(snapshotUrl, out);
         return out;
       } catch {
-        const empty: HarvestSnapshotPreview = { thumbnailUrl: null, previewHtml: null };
+        const empty: HarvestSnapshotPreview = { thumbnailUrl: null, thumbnailDataUrl: null, previewHtml: null };
         settled.set(snapshotUrl, empty);
         return empty;
       } finally {
