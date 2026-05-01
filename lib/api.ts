@@ -715,6 +715,8 @@ export type MetaAdHarvestAdRow = {
   headline: string | null;
   bodyText: string | null;
   mediaUrl: string | null;
+  /** ISO 639-1 codes from Meta when available (derived server-side). */
+  languages?: string[];
   createdAt: string;
 };
 

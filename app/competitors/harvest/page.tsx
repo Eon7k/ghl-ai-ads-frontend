@@ -30,14 +30,78 @@ function isQueuedHarvestResponse(
   return "backgroundAccepted" in x && x.backgroundAccepted === true;
 }
 
-/** Compact preview cell — links out like Ads Manager thumbnail. */
-function HarvestAdCreativeThumb({ mediaUrl }: { mediaUrl: string | null }) {
+/** Meta snapshot URLs are HTML pages — use a scaled iframe + link; never `<img src>`. */
+function isMetaAdLibrarySnapshotUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const h = u.hostname.replace(/^www\./i, "").toLowerCase();
+    return (
+      (h === "facebook.com" || h === "m.facebook.com" || h === "lm.facebook.com") &&
+      (u.pathname.includes("/ads/") || u.pathname.includes("render_ad"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Compact Meta Library snapshot or remote image thumbnail. */
+function HarvestAdPreview({
+  mediaUrl,
+  compact = true,
+}: {
+  mediaUrl: string | null;
+  compact?: boolean;
+}) {
   const [imgFailed, setImgFailed] = useState(false);
 
   if (!mediaUrl) {
     return (
-      <div className="flex h-[120px] w-[120px] shrink-0 flex-col items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-2 text-center text-[11px] leading-snug text-zinc-500">
+      <div
+        className={
+          compact
+            ? "flex h-[102px] w-[118px] shrink-0 flex-col items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-1 text-center text-[10px] leading-snug text-zinc-500"
+            : "flex h-[132px] w-[148px] shrink-0 flex-col items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 px-2 text-center text-[11px] leading-snug text-zinc-500"
+        }
+      >
         No creative URL stored for this row
+      </div>
+    );
+  }
+
+  if (isMetaAdLibrarySnapshotUrl(mediaUrl)) {
+    const scale = compact ? 0.38 : 0.46;
+    const iw = 300;
+    const ih = 480;
+    return (
+      <div
+        className={
+          compact
+            ? "relative h-[102px] w-[118px] shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 shadow-inner"
+            : "relative h-[132px] w-[148px] shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 shadow-inner"
+        }
+      >
+        <iframe
+          src={mediaUrl}
+          title="Meta Ad Library creative preview"
+          className="pointer-events-none absolute left-0 top-0 border-0 bg-white"
+          style={{
+            width: iw,
+            height: ih,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+        <a
+          href={mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-0 left-0 right-0 z-[1] truncate bg-white/95 px-1 py-0.5 text-center text-[10px] font-semibold text-violet-700 hover:bg-white"
+        >
+          Open on Meta ↗
+        </a>
       </div>
     );
   }
@@ -51,9 +115,13 @@ function HarvestAdCreativeThumb({ mediaUrl }: { mediaUrl: string | null }) {
         href={mediaUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-[120px] w-[120px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-700 bg-gradient-to-b from-zinc-700 to-zinc-900 px-2 text-center text-[11px] font-medium leading-tight text-white hover:opacity-95"
+        className={
+          compact
+            ? "flex h-[102px] w-[118px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-700 bg-gradient-to-b from-zinc-700 to-zinc-900 px-2 text-center text-[10px] font-medium leading-tight text-white hover:opacity-95"
+            : "flex h-[132px] w-[148px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-700 bg-gradient-to-b from-zinc-700 to-zinc-900 px-2 text-center text-[11px] font-medium leading-tight text-white hover:opacity-95"
+        }
       >
-        <span className="text-base" aria-hidden>
+        <span className="text-sm" aria-hidden>
           ▶
         </span>
         Play video
@@ -67,28 +135,28 @@ function HarvestAdCreativeThumb({ mediaUrl }: { mediaUrl: string | null }) {
         href={mediaUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-[120px] w-[120px] shrink-0 flex-col items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 px-2 text-center text-[11px] font-medium text-violet-700 hover:bg-zinc-200"
+        className={
+          compact
+            ? "flex h-[102px] w-[118px] shrink-0 flex-col items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 px-2 text-center text-[10px] font-medium text-violet-700 hover:bg-zinc-200"
+            : "flex h-[132px] w-[148px] shrink-0 flex-col items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 px-2 text-center text-[11px] font-medium text-violet-700 hover:bg-zinc-200"
+        }
       >
-        Open creative (preview unavailable)
+        Open link (preview blocked)
       </a>
     );
   }
 
+  const box = compact ? "h-[102px] w-[118px]" : "h-[132px] w-[148px]";
   return (
     <a
       href={mediaUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="block h-[120px] w-[120px] shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 ring-offset-2 hover:ring-2 hover:ring-violet-400"
+      className={`block shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 ring-offset-2 hover:ring-2 hover:ring-violet-400 ${box}`}
       title="Open creative in new tab"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- remote Meta CDN URLs */}
-      <img
-        src={mediaUrl}
-        alt=""
-        className="h-full w-full object-cover"
-        onError={() => setImgFailed(true)}
-      />
+      {/* eslint-disable-next-line @next/next/no-img-element -- remote CDN URLs */}
+      <img src={mediaUrl} alt="" className="h-full w-full object-cover" onError={() => setImgFailed(true)} />
     </a>
   );
 }
@@ -130,6 +198,7 @@ function HarvestInner() {
   const [adPickLoading, setAdPickLoading] = useState(false);
   const [selectedAdLibraryIds, setSelectedAdLibraryIds] = useState<Record<string, boolean>>({});
   const [expandedAdPickRows, setExpandedAdPickRows] = useState<Record<string, boolean>>({});
+  const [adLangFilter, setAdLangFilter] = useState<"all" | "en" | "es">("all");
 
   const [insights, setInsights] = useState<MetaHarvestInsightRow[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -179,6 +248,15 @@ function HarvestInner() {
     () => runs.filter((r) => r.status === "completed" && (r.adsStored > 0 || (r._count?.ads ?? 0) > 0)),
     [runs]
   );
+
+  const adPickRowsFiltered = useMemo(() => {
+    if (adLangFilter === "all") return adPickRows;
+    return adPickRows.filter((a) => {
+      const langs = a.languages;
+      if (!langs?.length) return false;
+      return langs.includes(adLangFilter);
+    });
+  }, [adPickRows, adLangFilter]);
 
   useEffect(() => {
     setSelectedAdLibraryIds({});
@@ -486,6 +564,11 @@ function HarvestInner() {
                 className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
                 placeholder="Example: dental implants Austin, smile makeover"
               />
+              <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                Meta surfaces creatives in the languages they target—English searches can still return Spanish copy. Write keywords in the language you want when possible. Your backend can restrict{" "}
+                <strong>new</strong> pulls with env{" "}
+                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono">META_AD_LIBRARY_CONTENT_LANGUAGES=en</code> (comma-separated ISO codes).
+              </p>
               <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="harvest-label">
                 Friendly name (optional)
               </label>
@@ -584,10 +667,12 @@ function HarvestInner() {
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-zinc-900">Pick specific ads (optional)</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Browse like Ads Manager: each row shows full primary text and headline in the table so you can scroll the list quickly. Use{" "}
-                <span className="font-medium text-zinc-800">Feed preview</span> on any row for a familiar card layout. Tick rows to include in
-                your next summary—focused brief uses up to {BRAND_AD_PICK_CAP} ads and market overview up to {LANDSCAPE_AD_PICK_CAP}, in your
-                selection order.
+                Browse like Ads Manager: each row shows scrolling primary text so several ads fit on screen at once. Creatives load from Meta’s
+                snapshot viewer (embedded); use &ldquo;Open on Meta ↗&rdquo; if the thumbnail looks blank—some browsers block embedded Facebook
+                pages. Meta matches keywords to ad language (Spanish often appears next to English ads); filter below when we know languages from
+                the API, or set backend env{" "}
+                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_AD_LIBRARY_CONTENT_LANGUAGES=en</code> so{" "}
+                <strong>new</strong> collections prefer English copy.
               </p>
               <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="ad-pick-run">
                 Collection to browse
@@ -614,12 +699,29 @@ function HarvestInner() {
               ) : null}
               {adPickRows.length > 0 ? (
                 <div className="mt-4">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-500" htmlFor="ad-lang-filter">
+                        Filter table by Meta language tags
+                      </label>
+                      <select
+                        id="ad-lang-filter"
+                        value={adLangFilter}
+                        onChange={(e) => setAdLangFilter(e.target.value as "all" | "en" | "es")}
+                        className="mt-1 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                      >
+                        <option value="all">All languages</option>
+                        <option value="en">English only</option>
+                        <option value="es">Spanish only</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         const next: Record<string, boolean> = {};
-                        for (const a of adPickRows) next[a.adLibraryId] = true;
+                        for (const a of adPickRowsFiltered) next[a.adLibraryId] = true;
                         setSelectedAdLibraryIds(next);
                       }}
                       className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
@@ -635,12 +737,18 @@ function HarvestInner() {
                     </button>
                   </div>
                   <p className="mt-2 text-xs text-zinc-500">
-                    {pickedAdLibraryIds().length} selected · up to {BRAND_AD_PICK_CAP} for focused summary · up to {LANDSCAPE_AD_PICK_CAP}{" "}
-                    for market overview
+                    Showing {adPickRowsFiltered.length} of {adPickRows.length} ads · {pickedAdLibraryIds().length} selected · up to{" "}
+                    {BRAND_AD_PICK_CAP} for focused summary · up to {LANDSCAPE_AD_PICK_CAP} for market overview
                   </p>
+                  {adPickRows.length > 0 && adPickRowsFiltered.length === 0 ? (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      No ads match this language filter (Meta did not tag languages on these rows). Choose &ldquo;All languages&rdquo; or collect
+                      again with English-only filtering on the server.
+                    </p>
+                  ) : null}
                   <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-                    <div className="max-h-[min(70vh,720px)] overflow-auto">
-                      <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+                    <div className="max-h-[min(88vh,960px)] overflow-auto">
+                      <table className="w-full min-w-[940px] border-collapse text-left text-sm">
                         <caption className="sr-only">
                           Harvested ads from this collection. Select rows to include in competitive summaries.
                         </caption>
@@ -652,90 +760,100 @@ function HarvestInner() {
                             <th scope="col" className="w-11 px-1 py-2.5">
                               Use
                             </th>
-                            <th scope="col" className="w-[132px] px-2 py-2.5">
-                              Preview
+                            <th scope="col" className="w-[126px] px-2 py-2">
+                              Creative
                             </th>
-                            <th scope="col" className="min-w-[160px] px-3 py-2.5">
+                            <th scope="col" className="min-w-[140px] px-2 py-2">
                               Advertiser
                             </th>
-                            <th scope="col" className="min-w-[280px] px-3 py-2.5">
+                            <th scope="col" className="min-w-[220px] max-w-[280px] px-2 py-2">
                               Primary text
                             </th>
-                            <th scope="col" className="min-w-[180px] px-3 py-2.5">
+                            <th scope="col" className="min-w-[140px] max-w-[200px] px-2 py-2">
                               Headline
                             </th>
-                            <th scope="col" className="min-w-[140px] px-3 py-2.5">
-                              Ad Library ID
+                            <th scope="col" className="w-[72px] px-1 py-2 text-center">
+                              Lang
                             </th>
-                            <th scope="col" className="w-[108px] px-2 py-2.5">
-                              Actions
+                            <th scope="col" className="min-w-[120px] px-2 py-2">
+                              Library ID
+                            </th>
+                            <th scope="col" className="w-[96px] px-1 py-2">
+                              More
                             </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 bg-white">
-                          {adPickRows.map((a, idx) => {
+                          {adPickRowsFiltered.map((a, idx) => {
                             const pickId = `ad-pick-${a.adLibraryId}`;
                             const expanded = !!expandedAdPickRows[a.adLibraryId];
                             return (
                               <Fragment key={a.id}>
                                 <tr className="align-top hover:bg-zinc-50/90">
-                                  <td className="whitespace-nowrap px-2 py-3 text-xs text-zinc-400">{idx + 1}</td>
-                                  <td className="px-1 py-3">
+                                  <td className="whitespace-nowrap px-2 py-1.5 align-top text-xs text-zinc-400">{idx + 1}</td>
+                                  <td className="px-1 py-1.5 align-top">
                                     <input
                                       id={pickId}
                                       type="checkbox"
                                       checked={!!selectedAdLibraryIds[a.adLibraryId]}
                                       onChange={() => toggleAdLibraryPick(a.adLibraryId)}
                                       aria-label={`Include ad ${idx + 1} from ${a.pageName || "advertiser"} in summary`}
-                                      className="rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                                      className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
                                     />
                                   </td>
-                                  <td className="px-2 py-3">
-                                    <HarvestAdCreativeThumb mediaUrl={a.mediaUrl} />
+                                  <td className="px-1 py-1.5 align-top">
+                                    <HarvestAdPreview mediaUrl={a.mediaUrl} compact />
                                   </td>
-                                  <td className="px-3 py-3">
+                                  <td className="max-w-[180px] px-2 py-1.5 align-top">
                                     <label htmlFor={pickId} className="cursor-pointer">
-                                      <span className="font-semibold text-zinc-900">{a.pageName || "Advertiser"}</span>
-                                      <span className="mt-1 block font-mono text-[11px] text-zinc-500">Page {a.facebookPageId}</span>
+                                      <span className="text-xs font-semibold text-zinc-900">{a.pageName || "Advertiser"}</span>
+                                      <span className="mt-0.5 block font-mono text-[10px] text-zinc-500">{a.facebookPageId}</span>
                                     </label>
                                   </td>
-                                  <td className="max-w-xl px-3 py-3">
+                                  <td className="max-w-[280px] min-w-[200px] px-2 py-1.5 align-top">
                                     <label htmlFor={pickId} className="cursor-pointer">
                                       {a.bodyText ? (
-                                        <span className="block whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-800">
+                                        <span className="block max-h-[4.75rem] overflow-y-auto whitespace-pre-wrap break-words text-[11px] leading-snug text-zinc-800 [scrollbar-width:thin]">
                                           {a.bodyText}
                                         </span>
                                       ) : (
-                                        <span className="text-zinc-400 italic">No primary text captured</span>
+                                        <span className="text-[11px] text-zinc-400 italic">No primary text</span>
                                       )}
                                     </label>
                                   </td>
-                                  <td className="max-w-xs px-3 py-3">
+                                  <td className="max-w-[200px] px-2 py-1.5 align-top">
                                     <label htmlFor={pickId} className="cursor-pointer">
                                       {a.headline ? (
-                                        <span className="block whitespace-pre-wrap break-words font-semibold text-zinc-900">{a.headline}</span>
+                                        <span className="block max-h-[2.62rem] overflow-y-auto whitespace-pre-wrap break-words text-[11px] font-semibold leading-snug text-zinc-900 [scrollbar-width:thin]">
+                                          {a.headline}
+                                        </span>
                                       ) : (
-                                        <span className="text-zinc-400 italic">—</span>
+                                        <span className="text-[11px] text-zinc-400 italic">—</span>
                                       )}
                                     </label>
                                   </td>
-                                  <td className="px-3 py-3 font-mono text-[11px] text-zinc-600">{a.adLibraryId}</td>
-                                  <td className="px-2 py-3">
-                                    <div className="flex flex-col gap-1.5">
+                                  <td className="px-1 py-1.5 align-top text-center">
+                                    <span className="inline-block rounded bg-zinc-100 px-1 py-0.5 font-mono text-[10px] uppercase text-zinc-700">
+                                      {(a.languages && a.languages.length ? a.languages.join(",") : "—").slice(0, 14)}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 py-1.5 align-top font-mono text-[10px] leading-tight text-zinc-600">{a.adLibraryId}</td>
+                                  <td className="px-1 py-1.5 align-top">
+                                    <div className="flex flex-col gap-1">
                                       <button
                                         type="button"
                                         onClick={() => toggleAdPickRowExpanded(a.adLibraryId)}
                                         aria-expanded={expanded}
-                                        className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-50"
+                                        className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-800 hover:bg-zinc-50"
                                       >
-                                        {expanded ? "Hide preview" : "Feed preview"}
+                                        {expanded ? "Hide" : "Expand"}
                                       </button>
                                       {a.mediaUrl ? (
                                         <a
                                           href={a.mediaUrl}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-center text-[11px] font-medium text-violet-700 hover:underline"
+                                          className="text-center text-[10px] font-medium text-violet-700 hover:underline"
                                         >
                                           Open creative
                                         </a>
@@ -745,36 +863,29 @@ function HarvestInner() {
                                 </tr>
                                 {expanded ? (
                                   <tr className="bg-zinc-50">
-                                    <td colSpan={8} className="px-4 py-5">
-                                      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                                        How this ad reads in the feed (approximation)
+                                    <td colSpan={9} className="px-4 py-4">
+                                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                                        Full creative + copy
                                       </p>
-                                      <div className="mx-auto max-w-md rounded-xl border border-zinc-200 bg-white shadow-md">
-                                        <div className="border-b border-zinc-100 px-4 py-3">
-                                          <div className="flex items-start justify-between gap-2">
-                                            <div>
-                                              <p className="text-sm font-semibold text-zinc-900">{a.pageName || "Advertiser"}</p>
-                                              <p className="text-xs text-zinc-500">Sponsored · Public</p>
-                                            </div>
-                                          </div>
+                                      <div className="mx-auto max-w-lg rounded-xl border border-zinc-200 bg-white shadow-md">
+                                        <div className="border-b border-zinc-100 px-4 py-2">
+                                          <p className="text-sm font-semibold text-zinc-900">{a.pageName || "Advertiser"}</p>
+                                          <p className="text-xs text-zinc-500">Sponsored · preview from Meta Ad Library</p>
                                         </div>
                                         <div className="bg-zinc-50 px-4 pb-4 pt-3">
-                                          <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-                                            <div className="flex justify-center bg-zinc-100 p-3">
-                                              <HarvestAdCreativeThumb mediaUrl={a.mediaUrl} />
-                                            </div>
-                                            <div className="space-y-2 px-3 pb-4 pt-3">
+                                          <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-center">
+                                            <HarvestAdPreview mediaUrl={a.mediaUrl} compact={false} />
+                                            <div className="min-w-0 flex-1 space-y-2 px-1">
                                               {a.bodyText ? (
-                                                <p className="whitespace-pre-wrap text-[15px] leading-snug text-zinc-900">{a.bodyText}</p>
+                                                <p className="max-h-[min(40vh,320px)] overflow-y-auto whitespace-pre-wrap text-sm leading-snug text-zinc-900 [scrollbar-width:thin]">
+                                                  {a.bodyText}
+                                                </p>
                                               ) : (
                                                 <p className="text-sm italic text-zinc-400">No primary text</p>
                                               )}
                                               {a.headline ? (
-                                                <p className="text-[13px] font-semibold leading-snug text-zinc-900">{a.headline}</p>
+                                                <p className="text-sm font-semibold leading-snug text-zinc-900">{a.headline}</p>
                                               ) : null}
-                                              <div className="rounded-md bg-zinc-100 px-3 py-2 text-center text-xs font-medium text-zinc-600">
-                                                Learn more
-                                              </div>
                                             </div>
                                           </div>
                                         </div>
