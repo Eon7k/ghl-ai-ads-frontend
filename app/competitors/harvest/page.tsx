@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
@@ -100,13 +100,13 @@ function HarvestInner() {
     if (user && tab === "saved") void loadInsights();
   }, [user, tab, loadInsights]);
 
+  const hasPendingInsights = useMemo(() => insights.some((i) => i.status === "pending"), [insights]);
+
   useEffect(() => {
-    if (tab !== "saved") return;
-    const hasPending = insights.some((i) => i.status === "pending");
-    if (!hasPending) return;
+    if (tab !== "saved" || !hasPendingInsights) return;
     const id = window.setInterval(() => void loadInsights(), 4000);
     return () => window.clearInterval(id);
-  }, [tab, insights, loadInsights]);
+  }, [tab, hasPendingInsights, loadInsights]);
 
   async function pollInsightUntilReady(id: string) {
     for (let i = 0; i < 72; i++) {

@@ -53,7 +53,6 @@ export function HomeClient() {
   const [campaigns, setCampaigns] = useState<Experiment[]>([]);
   const [integrations, setIntegrations] = useState<ConnectedIntegration[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
-  const [integrationsLoading, setIntegrationsLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<("meta" | "google" | "tiktok" | "linkedin")[]>(["meta"]);
   const [name, setName] = useState("");
@@ -95,8 +94,7 @@ export function HomeClient() {
 
   useEffect(() => {
     if (!user) return;
-    setIntegrationsLoading(true);
-    api.integrations.list().then(setIntegrations).catch(() => setIntegrations([])).finally(() => setIntegrationsLoading(false));
+    api.integrations.list().then(setIntegrations).catch(() => setIntegrations([]));
   }, [user, connectedParam]);
 
   useEffect(() => {

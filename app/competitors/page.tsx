@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
-import { expansion, type CompetitorWatchRow } from "@/lib/api";
+import { expansion, type CompetitorWatchRow, type MetaAdHarvestRunRow } from "@/lib/api";
 import { userFacingError } from "@/lib/userFacingError";
 import { CompetitorWatchGuide } from "@/components/CompetitorWatchGuide";
 
@@ -42,6 +42,11 @@ function CompetitorsPageInner() {
   const [adLibIdForResolve, setAdLibIdForResolve] = useState("");
   const [resolvingAdLib, setResolvingAdLib] = useState(false);
 
+  const [keywordScanInput, setKeywordScanInput] = useState("");
+  const [keywordScanLabel, setKeywordScanLabel] = useState("");
+  const [keywordScanBusy, setKeywordScanBusy] = useState(false);
+  const [keywordScanResult, setKeywordScanResult] = useState<MetaAdHarvestRunRow | null>(null);
+
   const load = useCallback(async () => {
     if (!user) return;
     setListLoading(true);
@@ -70,6 +75,31 @@ function CompetitorsPageInner() {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, []);
+
+  async function runKeywordScanOnly() {
+    const keywords = keywordScanInput
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 2);
+    if (!keywords.length) {
+      setError("Keyword scan needs at least one word or phrase (three or more characters each).");
+      return;
+    }
+    setKeywordScanBusy(true);
+    setError(null);
+    setKeywordScanResult(null);
+    try {
+      const { run } = await expansion.competitor.createMetaHarvestRun({
+        keywords,
+        label: keywordScanLabel.trim() || undefined,
+      });
+      setKeywordScanResult(run);
+    } catch (e) {
+      setError(userFacingError(e));
+    } finally {
+      setKeywordScanBusy(false);
+    }
+  }
 
   async function discoverPageFromCompetitorWebsite() {
     const w = website.trim();
@@ -228,17 +258,78 @@ function CompetitorsPageInner() {
           ← Home
         </Link>
         <h1 className="mt-4 text-2xl font-bold text-zinc-900">Competitor watch</h1>
-        <p className="mt-2 text-sm text-zinc-700">
-          Prefer to explore by topic instead of naming one competitor first?{" "}
-          <Link href="/competitors/harvest" className="font-medium text-violet-700 underline hover:text-violet-800">
-            Open ad library research
-          </Link>
-          {" "}
-          to collect ads by keyword, review advertisers that appeared, and save market or brand summaries.
+
+        <section
+          className="mt-6 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-5 shadow-sm"
+          aria-labelledby="keyword-scan-heading"
+        >
+          <h2 id="keyword-scan-heading" className="text-base font-semibold text-zinc-900">
+            Keyword-only Meta scan
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-700">
+            Run a quick search against Meta&apos;s public ad library using only words or phrases—no competitor profile, website, or Facebook
+            Page required. This is the simplest way to confirm keyword search is working. Ads are saved to your account so you can browse them
+            under{" "}
+            <Link href="/competitors/harvest" className="font-medium text-emerald-800 underline hover:text-emerald-900">
+              Ad library research
+            </Link>
+            .
+          </p>
+          <label className="mt-4 block text-xs font-medium text-zinc-600" htmlFor="keyword-scan-input">
+            Keywords (comma or line separated)
+          </label>
+          <textarea
+            id="keyword-scan-input"
+            value={keywordScanInput}
+            onChange={(e) => setKeywordScanInput(e.target.value)}
+            rows={3}
+            placeholder="Example: cryotherapy Dallas, cold therapy spa"
+            className="mt-1 w-full rounded-xl border border-emerald-200/80 bg-white px-3 py-2 text-sm outline-none ring-emerald-500/20 focus:border-emerald-400 focus:ring-2"
+          />
+          <label className="mt-3 block text-xs font-medium text-zinc-600" htmlFor="keyword-scan-label">
+            Label for this run (optional)
+          </label>
+          <input
+            id="keyword-scan-label"
+            value={keywordScanLabel}
+            onChange={(e) => setKeywordScanLabel(e.target.value)}
+            placeholder="Example: Keyword test March"
+            className="mt-1 w-full rounded-xl border border-emerald-200/80 bg-white px-3 py-2 text-sm outline-none ring-emerald-500/20 focus:border-emerald-400 focus:ring-2"
+          />
+          <button
+            type="button"
+            disabled={keywordScanBusy}
+            onClick={() => void runKeywordScanOnly()}
+            className="mt-4 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+          >
+            {keywordScanBusy ? "Running keyword scan…" : "Run keyword scan"}
+          </button>
+          {keywordScanResult && (
+            <div className="mt-4 rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm text-zinc-800">
+              <p className="font-medium text-zinc-900">
+                {keywordScanResult.status === "completed"
+                  ? `Finished · ${keywordScanResult.adsStored ?? keywordScanResult._count?.ads ?? 0} ads stored`
+                  : keywordScanResult.status === "failed"
+                    ? "Run failed"
+                    : `Status: ${keywordScanResult.status}`}
+              </p>
+              {keywordScanResult.errorMessage && (
+                <p className="mt-2 text-red-800">{keywordScanResult.errorMessage}</p>
+              )}
+              <Link href="/competitors/harvest" className="mt-3 inline-block font-medium text-emerald-800 underline hover:text-emerald-900">
+                View ads & summaries →
+              </Link>
+            </div>
+          )}
+        </section>
+
+        <p className="mt-6 text-sm text-zinc-700">
+          Everything below is for <strong>named competitor watches</strong>—website, optional Facebook Page, and repeat scans. The keyword
+          box above skips all of that and only queries Meta&apos;s public ads by phrase.
         </p>
         <p className="mt-2 text-sm text-zinc-600">
-          Each scan summarizes what we can see from the competitor&apos;s public website (headlines and messaging), optionally pulls recent
-          public Meta ads when you connect their Page, and drafts an actionable brief when automation is enabled for your workspace.
+          Each watch scan summarizes public website messaging, optionally pulls Meta ads when a Page is linked, and adds notes to that
+          competitor&apos;s history when automation is available for your workspace.
         </p>
 
         <CompetitorWatchGuide />

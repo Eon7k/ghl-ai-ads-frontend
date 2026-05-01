@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, type MetaAdAccount } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
@@ -17,7 +17,6 @@ const CREATIVE_SWAP_PREFIX = "creative-swap:";
 
 export default function CampaignDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { isAdmin } = useAuth();
   const id = typeof params.id === "string" ? params.id : "";
 
@@ -413,7 +412,7 @@ export default function CampaignDetailPage() {
       });
       setSavedVariantId(v.id);
       setTimeout(() => setSavedVariantId(null), 2000);
-    } catch (e) {
+    } catch {
       // Could set a per-variant error; for now we don't
     } finally {
       setSavingVariantId(null);
@@ -435,7 +434,7 @@ export default function CampaignDetailPage() {
           ),
         };
       });
-    } catch (e) {
+    } catch {
       // Could show per-variant error
     } finally {
       setRegeneratingVariantId(null);
@@ -456,7 +455,7 @@ export default function CampaignDetailPage() {
           variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, hasCreative: true } : x)),
         };
       });
-    } catch (e) {
+    } catch {
       // could set per-variant error
     } finally {
       setGeneratingCreativeId(null);
@@ -799,7 +798,7 @@ export default function CampaignDetailPage() {
           if (!prev?.variants) return prev;
           return { ...prev, variants: prev.variants.map((x) => (x.id === variantId ? { ...x, hasCreative: true } : x)) };
         });
-      } catch (_e) {
+      } catch {
         // continue with next
       } finally {
         setRedesigningVariantIds((prev) => {

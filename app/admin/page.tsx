@@ -119,15 +119,6 @@ export default function AdminPage() {
     ? adminUsers.filter((u) => u.email.toLowerCase().includes(userSearch.trim().toLowerCase()))
     : adminUsers;
 
-  const loadUsers = useCallback(async () => {
-    try {
-      const list = await api.admin.listUsers();
-      setAdminUsers(list);
-    } catch {
-      setAdminUsers([]);
-    }
-  }, []);
-
   const loadAgencyClients = useCallback(async (agencyUserId: string) => {
     try {
       const clients = await api.admin.listAgencyClients(agencyUserId);

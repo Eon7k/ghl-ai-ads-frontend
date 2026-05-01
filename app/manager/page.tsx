@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { hasExpansionProduct } from "@/lib/products";
@@ -41,7 +41,7 @@ export default function ManagerPage() {
 
   useEffect(() => {
     if (!user) return;
-    setLoadingList(true);
+    startTransition(() => setLoadingList(true));
     api.listExperiments().then(setCampaigns).catch(() => setCampaigns([])).finally(() => setLoadingList(false));
   }, [user]);
 
