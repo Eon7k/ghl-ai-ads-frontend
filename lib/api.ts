@@ -755,6 +755,39 @@ export type MetaHarvestReportPayload = {
   scanNotes: string[];
 };
 
+/** Saved harvest AI brief (market overview or selected brands). */
+export type MetaHarvestInsightRow = {
+  id: string;
+  agencyId: string;
+  clientId: string;
+  kind: string;
+  title: string | null;
+  harvestRunId: string | null;
+  facebookPageIds: unknown;
+  excludePhrases: unknown;
+  strictFilter: boolean;
+  topicHint: string | null;
+  competitorDisplayName: string | null;
+  adsUsed: number | null;
+  adsConsidered: number | null;
+  adsExcluded: number | null;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  report: MetaHarvestReportPayload | null;
+};
+
+export type MetaHarvestReportSyncResponse = {
+  report: MetaHarvestReportPayload;
+  insight: MetaHarvestInsightRow;
+};
+
+export type MetaHarvestReportQueuedResponse = {
+  insight: MetaHarvestInsightRow;
+  backgroundAccepted: true;
+};
+
 async function expansionMultipart(
   path: string,
   formData: FormData
@@ -943,21 +976,34 @@ export const expansion = {
       keywords?: string[];
       excludePhrases?: string[];
       strictRelevanceFilter?: boolean;
+      /** Finish in the background; check Saved reports for status. */
+      runInBackground?: boolean;
     }) =>
-      request<{ report: MetaHarvestReportPayload }>("api/agency/competitor/meta-harvest-report", {
-        method: "POST",
-        body,
-      }),
+      request<MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse>(
+        "api/agency/competitor/meta-harvest-report",
+        {
+          method: "POST",
+          body,
+        }
+      ),
     /** Landscape brief across one harvest run (or entire workspace pool): aggregate patterns & differentiation ideas. */
     createMetaHarvestLandscapeReport: (body: {
       harvestRunId?: string;
       topicHint?: string;
       excludePhrases?: string[];
       strictRelevanceFilter?: boolean;
+      runInBackground?: boolean;
     }) =>
-      request<{ report: MetaHarvestReportPayload }>("api/agency/competitor/meta-harvest-landscape-report", {
-        method: "POST",
-        body,
-      }),
+      request<MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse>(
+        "api/agency/competitor/meta-harvest-landscape-report",
+        {
+          method: "POST",
+          body,
+        }
+      ),
+    listMetaHarvestInsights: () =>
+      request<{ insights: MetaHarvestInsightRow[] }>("api/agency/competitor/meta-harvest-insights"),
+    getMetaHarvestInsight: (id: string) =>
+      request<{ insight: MetaHarvestInsightRow }>(`api/agency/competitor/meta-harvest-insights/${id}`),
   },
 };

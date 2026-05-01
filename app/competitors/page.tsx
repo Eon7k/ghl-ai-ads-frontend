@@ -228,17 +228,17 @@ function CompetitorsPageInner() {
           ← Home
         </Link>
         <h1 className="mt-4 text-2xl font-bold text-zinc-900">Competitor watch</h1>
-        <p className="mt-2 text-sm text-violet-900">
-          <Link href="/competitors/harvest" className="font-semibold text-violet-700 underline hover:text-violet-800">
-            Keyword harvest pool
+        <p className="mt-2 text-sm text-zinc-700">
+          Prefer to explore by topic instead of naming one competitor first?{" "}
+          <Link href="/competitors/harvest" className="font-medium text-violet-700 underline hover:text-violet-800">
+            Open ad library research
           </Link>
-          {" — sweep Meta by keywords, browse advertiser brands you collected, run an AI brief without creating a watch."}
+          {" "}
+          to collect ads by keyword, review advertisers that appeared, and save market or brand summaries.
         </p>
         <p className="mt-2 text-sm text-zinc-600">
-          <strong>What you get on each run:</strong> a safe fetch of the competitor’s public site (title, key copy, your keyword
-          presence), optional <strong>Meta Ad Library</strong> ads when you add their Page ID and the backend has Meta app
-          credentials, and an <strong>AI brief</strong> (themes, counter-angles) when <code className="rounded bg-zinc-100 px-1">OPENAI_API_KEY</code> is
-          set on the server. Re-run any time the market moves.
+          Each scan summarizes what we can see from the competitor&apos;s public website (headlines and messaging), optionally pulls recent
+          public Meta ads when you connect their Page, and drafts an actionable brief when automation is enabled for your workspace.
         </p>
 
         <CompetitorWatchGuide />
@@ -251,13 +251,13 @@ function CompetitorsPageInner() {
               rejected).
             </li>
             <li>
-              Optional: <strong>Meta Page ID</strong> to pull public ads. Easiest: in{" "}
+              Optional: connect their <strong>Facebook Page</strong> if you want public Meta ads in the brief. Visit{" "}
               <a className="font-medium text-violet-800 underline" href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer">
-                Ad Library
-              </a>{" "}
-              → open a brand ad → <strong>View all ads</strong> → copy the URL (it has{" "}
-              <code className="rounded bg-white/80 px-1">view_all_page_id=…</code>) and use <strong>Look up Page id</strong> in the
-              form below, or paste that URL in the field.
+                Meta&apos;s Ad Library
+              </a>
+              , open any ad from that brand, then use <strong>See ad details</strong> or <strong>View all ads</strong>. Copy the Page URL
+              from your browser (or anything on that screen), paste it into the Page field below, and tap{" "}
+              <strong>Look up Page id</strong>—we&apos;ll fill in the correct reference for you.
             </li>
             <li>
               <strong>Keywords</strong> you care about — we count how often they show up on the page.

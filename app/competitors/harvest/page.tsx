@@ -7,15 +7,34 @@ import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { renderInsightSummaryText } from "@/components/competitorUtils";
 import { useAuth } from "@/contexts/AuthContext";
-import { expansion, type MetaAdHarvestRunRow, type MetaHarvestBrandRow, type MetaHarvestReportPayload } from "@/lib/api";
+import {
+  expansion,
+  type MetaAdHarvestRunRow,
+  type MetaHarvestBrandRow,
+  type MetaHarvestInsightRow,
+  type MetaHarvestReportPayload,
+  type MetaHarvestReportQueuedResponse,
+  type MetaHarvestReportSyncResponse,
+} from "@/lib/api";
 import { userFacingError } from "@/lib/userFacingError";
+
+type HarvestTab = "collect" | "reports" | "saved";
+
+function isQueuedHarvestResponse(
+  x: MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse
+): x is MetaHarvestReportQueuedResponse {
+  return "backgroundAccepted" in x && x.backgroundAccepted === true;
+}
 
 function HarvestInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
-  const [kwInput, setKwInput] = useState("cryotherapy, longevity spa, body contouring");
+  const [tab, setTab] = useState<HarvestTab>("collect");
+
+  const [kwInput, setKwInput] = useState("cryotherapy, cold therapy spa, wellness studio");
   const [label, setLabel] = useState("");
   const [harvestBusy, setHarvestBusy] = useState(false);
   const [runs, setRuns] = useState<MetaAdHarvestRunRow[]>([]);
@@ -28,15 +47,20 @@ function HarvestInner() {
 
   const [reportName, setReportName] = useState("");
   const [reportBusy, setReportBusy] = useState(false);
-  const [report, setReport] = useState<MetaHarvestReportPayload | null>(null);
+  const [reportPreview, setReportPreview] = useState<MetaHarvestReportPayload | null>(null);
 
-  const [excludeInput, setExcludeInput] = useState("sperm bank, fertility clinic, IVF, egg freezing");
+  const [excludeInput, setExcludeInput] = useState("");
   const [strictFilter, setStrictFilter] = useState(true);
+  const [runInBackground, setRunInBackground] = useState(false);
 
   const [landscapeRunId, setLandscapeRunId] = useState("");
   const [landscapeTopic, setLandscapeTopic] = useState("");
   const [landscapeBusy, setLandscapeBusy] = useState(false);
-  const [landscapeReport, setLandscapeReport] = useState<MetaHarvestReportPayload | null>(null);
+  const [landscapePreview, setLandscapePreview] = useState<MetaHarvestReportPayload | null>(null);
+
+  const [insights, setInsights] = useState<MetaHarvestInsightRow[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
 
   const loadRuns = useCallback(async () => {
     if (!user) return;
@@ -51,6 +75,19 @@ function HarvestInner() {
     }
   }, [user]);
 
+  const loadInsights = useCallback(async () => {
+    if (!user) return;
+    setInsightsLoading(true);
+    try {
+      const { insights: list } = await expansion.competitor.listMetaHarvestInsights();
+      setInsights(list);
+    } catch (e) {
+      setError(userFacingError(e));
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!loading && !user) router.replace("/");
   }, [loading, user, router]);
@@ -59,22 +96,54 @@ function HarvestInner() {
     if (user) void loadRuns();
   }, [user, loadRuns]);
 
+  useEffect(() => {
+    if (user && tab === "saved") void loadInsights();
+  }, [user, tab, loadInsights]);
+
+  useEffect(() => {
+    if (tab !== "saved") return;
+    const hasPending = insights.some((i) => i.status === "pending");
+    if (!hasPending) return;
+    const id = window.setInterval(() => void loadInsights(), 4000);
+    return () => window.clearInterval(id);
+  }, [tab, insights, loadInsights]);
+
+  async function pollInsightUntilReady(id: string) {
+    for (let i = 0; i < 72; i++) {
+      try {
+        const { insight } = await expansion.competitor.getMetaHarvestInsight(id);
+        if (insight.status !== "pending") {
+          await loadInsights();
+          setSelectedInsightId(insight.id);
+          return insight;
+        }
+      } catch {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+    await loadInsights();
+    return null;
+  }
+
   async function runHarvest() {
     const keywords = kwInput
       .split(/[,;\n]+/)
       .map((s) => s.trim())
       .filter((s) => s.length > 2);
     if (!keywords.length) {
-      setError("Enter at least one keyword (3+ characters each).");
+      setError("Add at least one keyword (three or more letters each).");
       return;
     }
     setHarvestBusy(true);
     setError(null);
+    setInfo(null);
     try {
       await expansion.competitor.createMetaHarvestRun({
         keywords,
         label: label.trim() || undefined,
       });
+      setInfo("Collection finished. New ads are ready to browse and report on.");
       await loadRuns();
       await searchBrandsInternal(brandQ);
     } catch (e) {
@@ -112,15 +181,28 @@ function HarvestInner() {
   async function generateLandscape() {
     setLandscapeBusy(true);
     setError(null);
-    setLandscapeReport(null);
+    setInfo(null);
+    if (!runInBackground) {
+      setLandscapePreview(null);
+    }
     try {
-      const { report: r } = await expansion.competitor.createMetaHarvestLandscapeReport({
+      const body = {
         harvestRunId: landscapeRunId.trim() || undefined,
         topicHint: landscapeTopic.trim() || undefined,
         excludePhrases: parseExcludePhrases(),
         strictRelevanceFilter: strictFilter,
-      });
-      setLandscapeReport(r);
+        runInBackground,
+      };
+      const res = await expansion.competitor.createMetaHarvestLandscapeReport(body);
+      if (isQueuedHarvestResponse(res)) {
+        setInfo("Your market overview is generating. You can open Saved reports to watch it finish, or keep working elsewhere.");
+        setTab("saved");
+        void pollInsightUntilReady(res.insight.id);
+      } else {
+        setLandscapePreview(res.report);
+        setInfo("Market overview saved to your library.");
+        void loadInsights();
+      }
     } catch (e) {
       setError(userFacingError(e));
     } finally {
@@ -134,20 +216,32 @@ function HarvestInner() {
       .map(([id]) => id.replace(/\D/g, ""))
       .filter(Boolean);
     if (!facebookPageIds.length) {
-      setError("Select at least one brand (checkbox) by Page id.");
+      setError("Select one or more advertisers from the list before building a focused report.");
       return;
     }
     setReportBusy(true);
     setError(null);
-    setReport(null);
+    setInfo(null);
+    if (!runInBackground) {
+      setReportPreview(null);
+    }
     try {
-      const { report: r } = await expansion.competitor.createMetaHarvestReport({
+      const res = await expansion.competitor.createMetaHarvestReport({
         facebookPageIds,
         competitorDisplayName: reportName.trim() || undefined,
         excludePhrases: parseExcludePhrases(),
         strictRelevanceFilter: strictFilter,
+        runInBackground,
       });
-      setReport(r);
+      if (isQueuedHarvestResponse(res)) {
+        setInfo("Your advertiser report is generating. Check Saved reports for the finished brief.");
+        setTab("saved");
+        void pollInsightUntilReady(res.insight.id);
+      } else {
+        setReportPreview(res.report);
+        setInfo("Focused report saved to your library.");
+        void loadInsights();
+      }
     } catch (e) {
       setError(userFacingError(e));
     } finally {
@@ -158,6 +252,8 @@ function HarvestInner() {
   function togglePage(pid: string) {
     setSelectedPages((prev) => ({ ...prev, [pid]: !prev[pid] }));
   }
+
+  const selectedInsight = insights.find((x) => x.id === selectedInsightId) ?? null;
 
   if (loading || !user) {
     return (
@@ -170,231 +266,414 @@ function HarvestInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
-        <div className="flex flex-wrap gap-2 text-sm text-violet-700">
-          <Link href="/competitors" className="hover:underline">
-            ← Competitor watches
+      <main id="main-content" className="mx-auto max-w-4xl px-4 py-8 pb-16">
+        <div className="flex flex-wrap gap-2 text-sm text-zinc-600">
+          <Link href="/competitors" className="text-violet-700 hover:underline">
+            Competitor watches
           </Link>
           <span className="text-zinc-300">·</span>
           <Link href="/" className="hover:underline">
             Home
           </Link>
         </div>
-        <h1 className="mt-4 text-2xl font-bold text-zinc-900">Keyword harvest pool</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          Run Meta Ad Library keyword sweeps for your workspace. Ads are stored by advertiser Page. Analyze the whole harvest for market-wide
-          patterns, or search brands and run a focused brief — optional AI + phrase filters drop off-vertical noise (e.g. fertility ads in a
-          cryotherapy sweep).
+
+        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900">Ad library research</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
+          Collect public Meta ads by topic, spot what competitors are saying, then get plain-language summaries—either across the whole
+          collection or for hand-picked advertisers. Irrelevant sponsors (for example clinics you do not compete with) can be filtered out
+          before summaries are written.
         </p>
 
+        <div
+          className="mt-6 flex gap-1 rounded-xl border border-zinc-200 bg-white p-1 shadow-sm"
+          role="tablist"
+          aria-label="Research steps"
+        >
+          {(
+            [
+              ["collect", "Collect ads"],
+              ["reports", "Summaries"],
+              ["saved", "Saved reports"],
+            ] as const
+          ).map(([id, lab]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => {
+                setTab(id);
+                setError(null);
+              }}
+              className={
+                tab === id
+                  ? "flex-1 rounded-lg bg-violet-600 px-3 py-2.5 text-center text-sm font-medium text-white shadow-sm"
+                  : "flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              }
+            >
+              {lab}
+            </button>
+          ))}
+        </div>
+
         {error && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900" role="alert">
             {error}
           </div>
         )}
-
-        <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">1. Run a keyword harvest</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Comma or newline separated (up to 12). The API merges samples and keeps rows that include{" "}
-            <code className="rounded bg-zinc-100 px-0.5">page_id</code>.
-          </p>
-          <textarea
-            value={kwInput}
-            onChange={(e) => setKwInput(e.target.value)}
-            rows={3}
-            className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            placeholder="e.g. cryotherapy, mommy makeover Dallas"
-          />
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Optional label (for your notes)"
-            className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            disabled={harvestBusy}
-            onClick={() => void runHarvest()}
-            className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-          >
-            {harvestBusy ? "Harvesting…" : "Run harvest"}
-          </button>
-        </section>
-
-        <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">2. Recent harvests</h2>
-          {runsLoading ? (
-            <p className="mt-2 text-sm text-zinc-500">Loading…</p>
-          ) : runs.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">No harvests yet.</p>
-          ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {runs.map((r) => (
-                <li key={r.id} className="rounded border border-zinc-100 px-3 py-2">
-                  <span className="font-medium text-zinc-900">{r.label || "Harvest"}</span>
-                  <span className="text-zinc-500"> · {r.status}</span>
-                  <span className="text-zinc-500"> · {r.adsStored} ads</span>
-                  <span className="block text-xs text-zinc-400">{new Date(r.createdAt).toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="mt-8 rounded-xl border border-zinc-200 bg-amber-50/50 p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">Relevance filters (landscape + brand reports)</h2>
-          <p className="mt-1 text-xs text-zinc-600">
-            Phrases are matched on page name + ad copy (case-insensitive). When OpenAI is configured, we also run a semantic pass to drop
-            mismatches — use <span className="font-medium text-zinc-800">Strict</span> for noisy broad keywords (e.g. “cryotherapy” vs fertility
-            cryo).
-          </p>
-          <textarea
-            value={excludeInput}
-            onChange={(e) => setExcludeInput(e.target.value)}
-            rows={2}
-            className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm"
-            placeholder="e.g. sperm bank, fertility, egg donation"
-          />
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
-            <input type="checkbox" checked={strictFilter} onChange={(e) => setStrictFilter(e.target.checked)} className="rounded" />
-            Strict AI relevance (drop more off-topic ads; recommended for ambiguous keywords)
-          </label>
-        </section>
-
-        <section className="mt-8 rounded-xl border border-sky-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">3. Whole-harvest landscape</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Cross-advertiser view: recurring themes, crowded angles, whitespace, and campaign ideas to differentiate — not a single-brand
-            teardown.
-          </p>
-          <div className="mt-3 space-y-2">
-            <label className="block text-xs font-medium text-zinc-600" htmlFor="harvest-scope">
-              Scope
-            </label>
-            <select
-              id="harvest-scope"
-              value={landscapeRunId}
-              onChange={(e) => setLandscapeRunId(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All harvest ads in this workspace (latest sample, capped)</option>
-              {runs
-                .filter((r) => r.status === "completed" && (r.adsStored > 0 || (r._count?.ads ?? 0) > 0))
-                .map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {(r.label || "Harvest").slice(0, 60)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
-                    {new Date(r.createdAt).toLocaleDateString()}
-                  </option>
-                ))}
-            </select>
-            <input
-              value={landscapeTopic}
-              onChange={(e) => setLandscapeTopic(e.target.value)}
-              placeholder="Optional topic label (defaults to run label or keywords)"
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            />
+        {info && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" role="status">
+            {info}
           </div>
-          <button
-            type="button"
-            disabled={landscapeBusy}
-            onClick={() => void generateLandscape()}
-            className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-          >
-            {landscapeBusy ? "Analyzing…" : "Generate landscape report"}
-          </button>
-          <p className="mt-2 text-xs text-zinc-500">
-            Uses ads from the scope you selected; excludes using the filters above. Needs <code className="rounded bg-zinc-100 px-0.5">OPENAI_API_KEY</code>{" "}
-            on the API.
-          </p>
-          {landscapeReport && (
-            <div className="mt-6 border-t border-zinc-100 pt-4">
-              <p className="text-xs font-medium uppercase text-zinc-500">
-                Landscape ({landscapeReport.adsUsed} ads in brief
-                {typeof landscapeReport.adsExcluded === "number" && landscapeReport.adsExcluded > 0
-                  ? ` · ${landscapeReport.adsExcluded} filtered out`
-                  : ""}
-                )
+        )}
+
+        {tab === "collect" && (
+          <div className="mt-8 space-y-8">
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-zinc-900">Collect ads from Meta’s ad library</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Enter words your customers might search—services, cities, problems you solve. We gather a sample of active ads and group them
+                by advertiser so you can review what shows up for those topics.
               </p>
-              <div className="prose prose-sm mt-2 max-w-none text-zinc-800">{renderInsightSummaryText(landscapeReport.summary)}</div>
-            </div>
-          )}
-        </section>
+              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="harvest-keywords">
+                Keywords (comma or line separated, up to 12)
+              </label>
+              <textarea
+                id="harvest-keywords"
+                value={kwInput}
+                onChange={(e) => setKwInput(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                placeholder="Example: dental implants Austin, smile makeover"
+              />
+              <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="harvest-label">
+                Friendly name (optional)
+              </label>
+              <input
+                id="harvest-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Example: Spring competitor sweep"
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+              />
+              <button
+                type="button"
+                disabled={harvestBusy}
+                onClick={() => void runHarvest()}
+                className="mt-4 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {harvestBusy ? "Collecting…" : "Collect ads"}
+              </button>
+            </section>
 
-        <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">4. Search harvested brands</h2>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            <input
-              value={brandQ}
-              onChange={(e) => setBrandQ(e.target.value)}
-              placeholder="Brand name or Page id digits"
-              className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              disabled={brandsLoading}
-              onClick={() => void searchBrands()}
-              className="rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"
-            >
-              {brandsLoading ? "Searching…" : "Search"}
-            </button>
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-zinc-900">Recent collections</h2>
+              {runsLoading ? (
+                <p className="mt-3 text-sm text-zinc-500">Loading…</p>
+              ) : runs.length === 0 ? (
+                <p className="mt-3 text-sm text-zinc-600">Nothing yet—run your first collection above.</p>
+              ) : (
+                <ul className="mt-4 divide-y divide-zinc-100">
+                  {runs.map((r) => (
+                    <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-2 py-3 text-sm">
+                      <div>
+                        <span className="font-medium text-zinc-900">{r.label || "Collection"}</span>
+                        <span className="text-zinc-500"> · </span>
+                        <span className="capitalize text-zinc-600">{r.status}</span>
+                      </div>
+                      <span className="text-zinc-500">
+                        {r.adsStored || r._count?.ads || 0} ads · {new Date(r.createdAt).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-4 text-xs text-zinc-500">
+                Large searches can take a little while. When the status shows completed, switch to Summaries to analyze what you collected.
+              </p>
+            </section>
           </div>
-          <button type="button" onClick={() => void searchBrandsInternal("")} className="mt-2 text-xs text-violet-700 hover:underline">
-            Load top brands (empty query)
-          </button>
+        )}
 
-          {brands.length > 0 && (
-            <ul className="mt-4 max-h-72 space-y-2 overflow-y-auto text-sm">
-              {brands.map((b) => (
-                <li key={b.facebookPageId} className="flex items-start gap-2 rounded border border-zinc-100 px-2 py-2">
-                  <input
-                    type="checkbox"
-                    checked={!!selectedPages[b.facebookPageId]}
-                    onChange={() => togglePage(b.facebookPageId)}
-                    className="mt-1 rounded"
-                    aria-label={`Select ${b.pageName ?? b.facebookPageId}`}
-                  />
-                  <div>
-                    <p className="font-medium text-zinc-900">{b.pageName || "(unknown name)"}</p>
-                    <p className="font-mono text-xs text-zinc-500">{b.facebookPageId}</p>
-                    <p className="text-xs text-zinc-500">{b.adCount} ad sample(s)</p>
+        {tab === "reports" && (
+          <div className="mt-8 space-y-6">
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-zinc-900">Keep summaries on-topic</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Broad keywords sometimes pull unrelated advertisers. List themes or business types you want removed (they are matched against
+                advertiser names and ad copy). Turning on extra tightening asks the assistant to drop more edge cases—helpful when two
+                industries share similar words.
+              </p>
+              <textarea
+                value={excludeInput}
+                onChange={(e) => setExcludeInput(e.target.value)}
+                rows={2}
+                className="mt-3 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                placeholder="Example: sperm bank, fertility clinic, egg freezing"
+              />
+              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-zinc-800">
+                <input
+                  type="checkbox"
+                  checked={strictFilter}
+                  onChange={(e) => setStrictFilter(e.target.checked)}
+                  className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                />
+                <span>
+                  <span className="font-medium text-zinc-900">Tighter relevance</span>
+                  <span className="mt-0.5 block text-zinc-600">
+                    Recommended when your keywords could mean more than one kind of business.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={runInBackground}
+                  onChange={(e) => setRunInBackground(e.target.checked)}
+                  className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                />
+                <span>
+                  <span className="font-medium text-zinc-900">Generate in the background</span>
+                  <span className="mt-0.5 block text-zinc-600">
+                    Saves each summary to Saved reports while it runs—fine to leave this page and come back.
+                  </span>
+                </span>
+              </label>
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-zinc-900">Market overview</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Looks across many advertisers at once: common promises, tones, offers, and ideas for how you could stand apart—in messaging
+                or in campaign structure.
+              </p>
+              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="overview-scope">
+                Which ads should we include?
+              </label>
+              <select
+                id="overview-scope"
+                value={landscapeRunId}
+                onChange={(e) => setLandscapeRunId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+              >
+                <option value="">Everything collected in this account (most recent ads first)</option>
+                {runs
+                  .filter((r) => r.status === "completed" && (r.adsStored > 0 || (r._count?.ads ?? 0) > 0))
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {(r.label || "Collection").slice(0, 56)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </option>
+                  ))}
+              </select>
+              <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="overview-topic">
+                Short label for this overview (optional)
+              </label>
+              <input
+                id="overview-topic"
+                value={landscapeTopic}
+                onChange={(e) => setLandscapeTopic(e.target.value)}
+                placeholder="Example: Cryotherapy studios — Dallas area"
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+              />
+              <button
+                type="button"
+                disabled={landscapeBusy}
+                onClick={() => void generateLandscape()}
+                className="mt-4 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {landscapeBusy ? "Working…" : "Build market overview"}
+              </button>
+              {landscapePreview && !runInBackground && (
+                <div className="mt-6 border-t border-zinc-100 pt-6">
+                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Preview · {landscapePreview.adsUsed} ads in this summary
+                    {typeof landscapePreview.adsExcluded === "number" && landscapePreview.adsExcluded > 0
+                      ? ` · ${landscapePreview.adsExcluded} left out as off-topic`
+                      : ""}
+                  </p>
+                  <div className="prose prose-sm prose-zinc mt-3 max-w-none">
+                    {renderInsightSummaryText(landscapePreview.summary)}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                </div>
+              )}
+            </section>
 
-        <section className="mt-8 rounded-xl border border-violet-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">5. Brand competition report</h2>
-          <input
-            value={reportName}
-            onChange={(e) => setReportName(e.target.value)}
-            placeholder="Display name for the brief (optional)"
-            className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            disabled={reportBusy}
-            onClick={() => void generateReport()}
-            className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {reportBusy ? "Generating…" : "Generate AI report from selected brands"}
-          </button>
-          <p className="mt-2 text-xs text-zinc-500">
-            Selected Pages only; uses the relevance filters above. Requires OpenAI on the API.
-          </p>
-
-          {report && (
-            <div className="mt-6 border-t border-zinc-100 pt-4">
-              <p className="text-xs font-medium uppercase text-zinc-500">
-                Brief ({report.adsUsed} ads
-                {typeof report.adsExcluded === "number" && report.adsExcluded > 0 ? ` · ${report.adsExcluded} excluded` : ""})
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-zinc-900">Focused advertiser summary</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Search the advertisers from your collections, tick the ones you care about, then request a concise competitive-style brief for
+                just those brands.
               </p>
-              <div className="prose prose-sm mt-2 max-w-none text-zinc-800">{renderInsightSummaryText(report.summary)}</div>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={brandQ}
+                  onChange={(e) => setBrandQ(e.target.value)}
+                  placeholder="Search by advertiser name"
+                  className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void searchBrands();
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={brandsLoading}
+                  onClick={() => void searchBrands()}
+                  className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {brandsLoading ? "Searching…" : "Search"}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void searchBrandsInternal("")}
+                className="mt-2 text-sm text-violet-700 hover:underline"
+              >
+                Show popular advertisers from your collections
+              </button>
+
+              {brands.length > 0 && (
+                <ul className="mt-4 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-zinc-100 p-2">
+                  {brands.map((b) => (
+                    <li key={b.facebookPageId}>
+                      <label className="flex cursor-pointer gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedPages[b.facebookPageId]}
+                          onChange={() => togglePage(b.facebookPageId)}
+                          className="mt-1 rounded border-zinc-300 text-violet-600"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium text-zinc-900">{b.pageName || "Advertiser"}</span>
+                          <span className="text-xs text-zinc-500">{b.adCount} ads in sample · ID {b.facebookPageId}</span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="brand-label">
+                How should we refer to this group? (optional)
+              </label>
+              <input
+                id="brand-label"
+                value={reportName}
+                onChange={(e) => setReportName(e.target.value)}
+                placeholder="Example: Top three local rivals"
+                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+              />
+              <button
+                type="button"
+                disabled={reportBusy}
+                onClick={() => void generateReport()}
+                className="mt-4 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {reportBusy ? "Working…" : "Build focused summary"}
+              </button>
+
+              {reportPreview && !runInBackground && (
+                <div className="mt-6 border-t border-zinc-100 pt-6">
+                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Preview · {reportPreview.adsUsed} ads in this summary
+                    {typeof reportPreview.adsExcluded === "number" && reportPreview.adsExcluded > 0
+                      ? ` · ${reportPreview.adsExcluded} left out as off-topic`
+                      : ""}
+                  </p>
+                  <div className="prose prose-sm prose-zinc mt-3 max-w-none">
+                    {renderInsightSummaryText(reportPreview.summary)}
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {tab === "saved" && (
+          <div className="mt-8 grid gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-lg font-semibold text-zinc-900">Library</h2>
+                  <button
+                    type="button"
+                    onClick={() => void loadInsights()}
+                    className="text-sm text-violet-700 hover:underline"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                {insightsLoading ? (
+                  <p className="mt-4 text-sm text-zinc-500">Loading…</p>
+                ) : insights.length === 0 ? (
+                  <p className="mt-4 text-sm text-zinc-600">
+                    No saved summaries yet. Build one under Summaries—they are stored here automatically.
+                  </p>
+                ) : (
+                  <ul className="mt-4 space-y-1">
+                    {insights.map((row) => (
+                      <li key={row.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInsightId(row.id)}
+                          className={
+                            selectedInsightId === row.id
+                              ? "w-full rounded-xl border border-violet-300 bg-violet-50 px-3 py-3 text-left text-sm"
+                              : "w-full rounded-xl border border-transparent px-3 py-3 text-left text-sm hover:bg-zinc-50"
+                          }
+                        >
+                          <span className="block font-medium text-zinc-900">
+                            {row.title || (row.kind === "landscape" ? "Market overview" : "Advertiser summary")}
+                          </span>
+                          <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-zinc-500">
+                            <span className="capitalize">{row.kind}</span>
+                            <span>·</span>
+                            <span>{new Date(row.createdAt).toLocaleString()}</span>
+                            <span>·</span>
+                            <span className="capitalize">{row.status}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             </div>
-          )}
-        </section>
+            <div className="lg:col-span-3">
+              <section className="min-h-[280px] rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                {!selectedInsight ? (
+                  <p className="text-sm text-zinc-600">Choose a report on the left to read it here.</p>
+                ) : selectedInsight.status === "pending" ? (
+                  <div className="text-sm text-zinc-700">
+                    <p className="font-medium text-zinc-900">Still generating…</p>
+                    <p className="mt-2 text-zinc-600">
+                      This can take a minute or two for large collections. Use Refresh if the list does not update.
+                    </p>
+                  </div>
+                ) : selectedInsight.status === "failed" ? (
+                  <div className="text-sm text-red-900">
+                    <p className="font-medium">Something went wrong</p>
+                    <p className="mt-2">{selectedInsight.errorMessage || "Please try building the summary again."}</p>
+                  </div>
+                ) : selectedInsight.report ? (
+                  <>
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      {selectedInsight.report.adsUsed} ads in this summary
+                      {typeof selectedInsight.report.adsExcluded === "number" && selectedInsight.report.adsExcluded > 0
+                        ? ` · ${selectedInsight.report.adsExcluded} left out as off-topic`
+                        : ""}
+                    </p>
+                    <div className="prose prose-sm prose-zinc mt-4 max-w-none">
+                      {renderInsightSummaryText(selectedInsight.report.summary)}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-zinc-600">This entry has no readable body yet.</p>
+                )}
+              </section>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
