@@ -24,6 +24,11 @@ type HarvestTab = "collect" | "reports" | "saved";
 const BRAND_AD_PICK_CAP = 48;
 const LANDSCAPE_AD_PICK_CAP = 80;
 
+function harvestDiagnosticsLines(d: unknown): string[] {
+  if (!Array.isArray(d)) return [];
+  return d.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((s) => s.trim());
+}
+
 function isQueuedHarvestResponse(
   x: MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse
 ): x is MetaHarvestReportQueuedResponse {
@@ -307,11 +312,29 @@ function HarvestInner() {
     setError(null);
     setInfo(null);
     try {
-      await expansion.competitor.createMetaHarvestRun({
+      const { run } = await expansion.competitor.createMetaHarvestRun({
         keywords,
         label: label.trim() || undefined,
       });
-      setInfo("Collection finished. New ads are ready to browse and report on.");
+      const adsCount = Math.max(run.adsStored ?? 0, run._count?.ads ?? 0);
+      const diagLines = harvestDiagnosticsLines(run.diagnostics);
+
+      if (run.status === "failed") {
+        setInfo(null);
+        setError([run.errorMessage, diagLines.join(" ")].filter(Boolean).join(" — ") || "Collection failed.");
+      } else if (adsCount === 0) {
+        setInfo(null);
+        const hint =
+          diagLines.length > 0
+            ? diagLines.join(" ")
+            : "No diagnostic lines returned — on the API host confirm META_AD_LIBRARY_TOKEN or META_APP_ID+META_APP_SECRET, clear META_AD_LIBRARY_CONTENT_LANGUAGES if set, or set META_HARVEST_STRICT_KEYWORD_MATCH=false to test.";
+        setError(
+          `No ads were saved. ${hint} If you use META_AD_LIBRARY_TOKEN (a user long-lived token), it often expires after ~60 days — generate a new one in Meta and update your server env.`
+        );
+      } else {
+        setError(null);
+        setInfo("Collection finished. New ads are ready to browse and report on.");
+      }
       await loadRuns();
       await searchBrandsInternal(brandQ);
     } catch (e) {
@@ -574,15 +597,34 @@ function HarvestInner() {
               ) : (
                 <ul className="mt-4 divide-y divide-zinc-100">
                   {runs.map((r) => (
-                    <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-2 py-3 text-sm">
-                      <div>
-                        <span className="font-medium text-zinc-900">{r.label || "Collection"}</span>
-                        <span className="text-zinc-500"> · </span>
-                        <span className="capitalize text-zinc-600">{r.status}</span>
+                    <li key={r.id} className="border-b border-zinc-100 py-3 text-sm last:border-b-0">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <div>
+                          <span className="font-medium text-zinc-900">{r.label || "Collection"}</span>
+                          <span className="text-zinc-500"> · </span>
+                          <span className="capitalize text-zinc-600">{r.status}</span>
+                        </div>
+                        <span className="text-zinc-500">
+                          {r.adsStored || r._count?.ads || 0} ads · {new Date(r.createdAt).toLocaleString()}
+                        </span>
                       </div>
-                      <span className="text-zinc-500">
-                        {r.adsStored || r._count?.ads || 0} ads · {new Date(r.createdAt).toLocaleString()}
-                      </span>
+                      {(r.adsStored || r._count?.ads || 0) === 0 ? (
+                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950">
+                          {r.errorMessage ? <p className="font-medium text-amber-950">{r.errorMessage}</p> : null}
+                          {harvestDiagnosticsLines(r.diagnostics).length ? (
+                            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                              {harvestDiagnosticsLines(r.diagnostics).slice(0, 10).map((line, idx) => (
+                                <li key={idx}>{line}</li>
+                              ))}
+                            </ul>
+                          ) : !r.errorMessage ? (
+                            <p className="text-amber-900/90">
+                              No detailed diagnostics — if this happens again, check Meta env on the API server (token, languages filter, strict
+                              keyword match).
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
