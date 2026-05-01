@@ -868,5 +868,14 @@ export const expansion = {
         method: "POST",
         body: { website, ...options },
       }),
+    /** Meta Ad Library text search → advertiser Pages (`page_id`) that appear in matching ads (pick agency/shell Page when brand Page has no ads). */
+    discoverMetaPagesFromAdLibrarySearch: (searchTerm: string) =>
+      request<{
+        candidates: { pageId: string; pageName: string | null; adsSeenInSample: number }[];
+        message?: string;
+      }>("api/agency/competitor/discover-meta-pages-from-ad-library-search", {
+        method: "POST",
+        body: { searchTerm },
+      }),
   },
 };

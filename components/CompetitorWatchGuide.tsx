@@ -25,8 +25,7 @@ export function CompetitorWatchGuide() {
                 Meta for Developers
               </a>{" "}
               → your app → <strong>App settings</strong> → <strong>Basic</strong>. The backend builds{" "}
-              <code className="rounded bg-zinc-100 px-0.5">APP_ID|APP_SECRET</code> (app access token) for Ad Library. Only if you cannot use
-              app id+secret on that host, set a long-lived token in <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> (fallback).
+              <code className="rounded bg-zinc-100 px-0.5">APP_ID|APP_SECRET</code> (app access token) for Ad Library calls — same vars as Meta OAuth elsewhere.
             </li>
             <li>
               Optional: <code className="rounded bg-zinc-100 px-1">META_GRAPH_API_VERSION</code> (e.g. <code className="rounded bg-zinc-100 px-0.5">v25.0</code>).

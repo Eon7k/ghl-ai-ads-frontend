@@ -58,6 +58,11 @@ function CompetitorDetailInner() {
   >(null);
   const [adLibIdForResolve, setAdLibIdForResolve] = useState("");
   const [resolvingAdLib, setResolvingAdLib] = useState(false);
+  const [adLibKeywordSearch, setAdLibKeywordSearch] = useState("");
+  const [discoveringKeywordPages, setDiscoveringKeywordPages] = useState(false);
+  const [adLibKeywordCandidates, setAdLibKeywordCandidates] = useState<
+    { pageId: string; pageName: string | null; adsSeenInSample: number }[] | null
+  >(null);
 
   const [competitorName, setCompetitorName] = useState("");
   const [website, setWebsite] = useState("");
@@ -97,6 +102,8 @@ function CompetitorDetailInner() {
       setKeywords(typeof pre?.keywords === "string" && pre.keywords.length ? pre.keywords : keywordsToString(w.keywords));
       setPlatforms(platformsToString(w.platforms) || "meta, google");
       setIsActive(w.isActive);
+      setAdLibKeywordSearch(w.competitorName.trim());
+      setAdLibKeywordCandidates(null);
     } catch (e) {
       setLoadError(userFacingError(e));
       setWatch(null);
@@ -154,6 +161,7 @@ function CompetitorDetailInner() {
     setActionError(null);
     setFbResolveMsg(null);
     setFbWebCandidates(null);
+    setAdLibKeywordCandidates(null);
     try {
       const r = await expansion.competitor.discoverFacebookPageFromWebsite(w, {
         companyName: competitorName.trim() || undefined,
@@ -188,6 +196,41 @@ function CompetitorDetailInner() {
       setActionError(userFacingError(e));
     } finally {
       setDiscoveringFromWeb(false);
+    }
+  }
+
+  async function discoverAdvertiserPagesFromAdLibraryKeyword() {
+    const term = adLibKeywordSearch.trim();
+    if (term.length < 2) {
+      setActionError("Enter at least 2 characters to search Meta Ad Library (e.g. brand or product name).");
+      return;
+    }
+    setDiscoveringKeywordPages(true);
+    setActionError(null);
+    setFbResolveMsg(null);
+    setAdLibKeywordCandidates(null);
+    try {
+      const r = await expansion.competitor.discoverMetaPagesFromAdLibrarySearch(term);
+      setAdLibKeywordCandidates(r.candidates);
+      setFbWebCandidates(null);
+      if (r.candidates.length === 0) {
+        setFbResolveMsg(null);
+        setActionError(r.message ?? "No advertiser Pages found for that keyword.");
+        return;
+      }
+      const top = r.candidates[0]!;
+      setFbId(top.pageId);
+      const extra =
+        r.candidates.length > 1
+          ? ` ${r.candidates.length} Pages matched — pick one below if this isn’t the advertiser running their ads.`
+          : "";
+      setFbResolveMsg(
+        `Keyword search: set Page id to ${top.pageId}${top.pageName ? ` (${top.pageName})` : ""}.${extra} Save settings, then scan.`
+      );
+    } catch (e) {
+      setActionError(userFacingError(e));
+    } finally {
+      setDiscoveringKeywordPages(false);
     }
   }
 
@@ -463,8 +506,8 @@ function CompetitorDetailInner() {
               <p className="mt-1 text-xs text-zinc-600">
                 This is the server&rsquo;s step-by-step log (not an error from your browser). If you expected ads, read the list below, then
                 check <code className="rounded bg-zinc-100/80 px-0.5">META_APP_ID</code> +{" "}
-                <code className="rounded bg-zinc-100/80 px-0.5">META_APP_SECRET</code> (app access) on the API host; optional{" "}
-                <code className="rounded bg-zinc-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> only if you use a separate long-lived token.
+                <code className="rounded bg-zinc-100/80 px-0.5">META_APP_SECRET</code> on the API host (built as app access token{" "}
+                <code className="rounded bg-zinc-100/80 px-0.5">APP_ID|APP_SECRET</code>).
               </p>
               {adLibPermissionDenied && (
                 <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs text-violet-950">
@@ -480,11 +523,10 @@ function CompetitorDetailInner() {
                     >
                       Meta for Developers
                     </a>
-                    . The backend prefers <code className="rounded bg-violet-100/80 px-0.5">META_APP_ID</code> +{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">META_APP_SECRET</code> (built as{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">APP_ID|APP_SECRET</code>). If your app is approved but you still get
-                    permission errors, you can set <code className="rounded bg-violet-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> to a
-                    long-lived token with the needed permissions and restart the API. Official:{" "}
+                    . The backend uses <code className="rounded bg-violet-100/80 px-0.5">META_APP_ID</code> +{" "}
+                    <code className="rounded bg-violet-100/80 px-0.5">META_APP_SECRET</code> (app access{" "}
+                    <code className="rounded bg-violet-100/80 px-0.5">APP_ID|APP_SECRET</code>) for those calls — confirm the app has completed{" "}
+                    <strong>Ad Library API</strong> onboarding and is in the right mode. Official:{" "}
                     <a
                       href="https://www.facebook.com/ads/library/api/"
                       className="font-medium text-violet-800 underline"
@@ -528,7 +570,7 @@ function CompetitorDetailInner() {
         >
           <h2 className="text-base font-semibold text-zinc-900">Watch settings</h2>
           <p className="text-sm text-zinc-600">
-            Include a <strong>Facebook Page ID</strong> to pull that Page&apos;s public ads on each scan. Use the Page (brand), not a person.
+            Include a <strong>Facebook Page ID</strong> for the Page Meta attributes each public ad to — often the advertiser Page (sometimes an agency/shell Page), not necessarily the brand Page from their website.
           </p>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Competitor name</label>
@@ -616,6 +658,53 @@ function CompetitorDetailInner() {
                 </button>
               </div>
             </div>
+            <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2">
+              <p className="text-xs font-medium text-sky-950">Find the advertiser Page via keyword (management / alternate Page)</p>
+              <p className="mt-0.5 text-xs text-sky-900/85">
+                When scans show no ads for the Page from their site, Meta may still attribute creatives to another Page. Search Ad Library by a brand or offer phrase; we group matching ads by advertiser Page id so you can pick the right one.
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="text"
+                  value={adLibKeywordSearch}
+                  onChange={(e) => {
+                    setAdLibKeywordSearch(e.target.value);
+                    setAdLibKeywordCandidates(null);
+                  }}
+                  placeholder="e.g. competitor brand name"
+                  className="min-w-0 flex-1 rounded border border-sky-200 bg-white px-2 py-1.5 text-sm"
+                  aria-label="Keyword for Meta Ad Library search"
+                />
+                <button
+                  type="button"
+                  onClick={() => void discoverAdvertiserPagesFromAdLibraryKeyword()}
+                  disabled={discoveringKeywordPages}
+                  className="shrink-0 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-sm font-medium text-sky-950 hover:bg-sky-100 disabled:opacity-50"
+                >
+                  {discoveringKeywordPages ? "Searching…" : "Search advertisers by keyword"}
+                </button>
+              </div>
+            </div>
+            {adLibKeywordCandidates && adLibKeywordCandidates.length > 1 && (
+              <div className="mt-2 max-w-lg">
+                <label className="block text-xs font-medium text-zinc-600" htmlFor="fb-pick-keyword-candidate">
+                  Pick the Page that matches who runs their ads (agency names often appear here):
+                </label>
+                <select
+                  id="fb-pick-keyword-candidate"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm"
+                  value={fbId}
+                  onChange={(e) => setFbId(e.target.value)}
+                >
+                  {adLibKeywordCandidates.map((c) => (
+                    <option key={c.pageId} value={c.pageId}>
+                      {c.pageId}
+                      {c.pageName ? ` — ${c.pageName.slice(0, 80)}` : ""} ({c.adsSeenInSample} ad{c.adsSeenInSample === 1 ? "" : "s"} in sample)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {fbWebCandidates && fbWebCandidates.length > 1 && (
               <div className="mt-2 max-w-lg">
                 <label className="block text-xs font-medium text-zinc-600" htmlFor="fb-pick-website-candidate">
@@ -703,9 +792,8 @@ function CompetitorDetailInner() {
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
               No ads in your workspace yet. Add a <strong>Facebook Page</strong> (or numeric Page id) in Watch settings, set{" "}
-              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> (or optional{" "}
-              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code>) on the
-              server, and run a scan. If you see their ads in{" "}
+              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> on the
+              API host (Ad Library uses app access <code className="rounded bg-zinc-100 px-0.5">APP_ID|APP_SECRET</code>), and run a scan. If you see their ads in{" "}
               <a
                 className="font-medium text-violet-700 hover:underline"
                 href="https://www.facebook.com/ads/library"
@@ -714,8 +802,10 @@ function CompetitorDetailInner() {
               >
                 Meta&apos;s public Ad Library
               </a>{" "}
-              but not here, ask your team to set optional <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_COUNTRIES</code> to the regions
-              their ads target (e.g. <code className="rounded bg-zinc-100 px-0.5">US,GB,DE</code>).
+              but not here, their ads may run under a <strong>different</strong> Facebook Page — use{" "}
+              <strong>Search advertisers by keyword</strong> or <strong>Get Page id from ad id</strong> in Watch settings.
+              Also confirm <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_COUNTRIES</code> includes regions their ads target (e.g.{" "}
+              <code className="rounded bg-zinc-100 px-0.5">US,GB,DE</code>).
             </p>
           ) : (
             <ul className="mt-4 space-y-4">
