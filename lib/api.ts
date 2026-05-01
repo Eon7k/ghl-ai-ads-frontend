@@ -706,6 +706,55 @@ export type CompetitorWatchDetail = CompetitorWatchRow & {
   ads: CompetitorAdRow[];
 };
 
+export type MetaAdHarvestAdRow = {
+  id: string;
+  runId: string;
+  facebookPageId: string;
+  pageName: string | null;
+  adLibraryId: string;
+  headline: string | null;
+  bodyText: string | null;
+  mediaUrl: string | null;
+  createdAt: string;
+};
+
+export type MetaAdHarvestRunRow = {
+  id: string;
+  agencyId: string;
+  clientId: string;
+  label: string | null;
+  keywords: unknown;
+  status: string;
+  errorMessage: string | null;
+  adsStored: number;
+  diagnostics: unknown;
+  createdAt: string;
+  completedAt: string | null;
+  _count?: { ads: number };
+};
+
+export type MetaHarvestBrandRow = {
+  facebookPageId: string;
+  pageName: string | null;
+  adCount: number;
+};
+
+export type MetaHarvestReportPayload = {
+  competitorDisplayName: string;
+  adsUsed: number;
+  /** Ads considered before filtering / caps */
+  adsConsidered?: number;
+  /** Removed by phrase match + AI relevance filter */
+  adsExcluded?: number;
+  summary: string;
+  topThemes: unknown;
+  suggestedCounterAngles: unknown;
+  strongestAds: unknown;
+  competitivePack: unknown;
+  rawPromptUsed: string | null;
+  scanNotes: string[];
+};
+
 async function expansionMultipart(
   path: string,
   formData: FormData
@@ -876,6 +925,39 @@ export const expansion = {
       }>("api/agency/competitor/discover-meta-pages-from-ad-library-search", {
         method: "POST",
         body: { searchTerm },
+      }),
+    /** Keyword-first harvest: sweep Ad Library, store ads by advertiser Page for later brand search & AI report. */
+    createMetaHarvestRun: (body: { keywords: string[]; label?: string }) =>
+      request<{ run: MetaAdHarvestRunRow }>("api/agency/competitor/meta-harvest-runs", { method: "POST", body }),
+    listMetaHarvestRuns: () => request<{ runs: MetaAdHarvestRunRow[] }>("api/agency/competitor/meta-harvest-runs"),
+    getMetaHarvestRun: (id: string) =>
+      request<{ run: MetaAdHarvestRunRow & { ads: MetaAdHarvestAdRow[] } }>(`api/agency/competitor/meta-harvest-runs/${id}`),
+    listMetaHarvestBrands: (q?: string) =>
+      request<{ brands: MetaHarvestBrandRow[] }>(
+        `api/agency/competitor/meta-harvest-brands${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`
+      ),
+    /** Build AI competition brief from harvested ads for selected Page ids (does not create a CompetitorWatch). */
+    createMetaHarvestReport: (body: {
+      facebookPageIds: string[];
+      competitorDisplayName?: string;
+      keywords?: string[];
+      excludePhrases?: string[];
+      strictRelevanceFilter?: boolean;
+    }) =>
+      request<{ report: MetaHarvestReportPayload }>("api/agency/competitor/meta-harvest-report", {
+        method: "POST",
+        body,
+      }),
+    /** Landscape brief across one harvest run (or entire workspace pool): aggregate patterns & differentiation ideas. */
+    createMetaHarvestLandscapeReport: (body: {
+      harvestRunId?: string;
+      topicHint?: string;
+      excludePhrases?: string[];
+      strictRelevanceFilter?: boolean;
+    }) =>
+      request<{ report: MetaHarvestReportPayload }>("api/agency/competitor/meta-harvest-landscape-report", {
+        method: "POST",
+        body,
       }),
   },
 };

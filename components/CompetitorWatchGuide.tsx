@@ -31,6 +31,10 @@ export function CompetitorWatchGuide() {
               Optional: <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> — when set on the API host, competitor Ad Library calls use this token <strong>first</strong> (e.g. long-lived token from Graph). Useful if app-access errors persist; remember long-lived tokens still expire unless renewed.
             </li>
             <li>
+              <strong>Keyword-only Meta</strong> — Leave Facebook Page blank and scans still call Ad Library using <strong>competitor name</strong> +{" "}
+              <strong>keywords</strong>; unrelated ads are filtered before the AI brief (Page id gives tighter Page-level results when you have it).
+            </li>
+            <li>
               Optional: <code className="rounded bg-zinc-100 px-1">META_GRAPH_API_VERSION</code> (e.g. <code className="rounded bg-zinc-100 px-0.5">v25.0</code>).
             </li>
           </ul>

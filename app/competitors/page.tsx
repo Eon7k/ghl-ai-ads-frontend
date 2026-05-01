@@ -228,6 +228,12 @@ function CompetitorsPageInner() {
           ← Home
         </Link>
         <h1 className="mt-4 text-2xl font-bold text-zinc-900">Competitor watch</h1>
+        <p className="mt-2 text-sm text-violet-900">
+          <Link href="/competitors/harvest" className="font-semibold text-violet-700 underline hover:text-violet-800">
+            Keyword harvest pool
+          </Link>
+          {" — sweep Meta by keywords, browse advertiser brands you collected, run an AI brief without creating a watch."}
+        </p>
         <p className="mt-2 text-sm text-zinc-600">
           <strong>What you get on each run:</strong> a safe fetch of the competitor’s public site (title, key copy, your keyword
           presence), optional <strong>Meta Ad Library</strong> ads when you add their Page ID and the backend has Meta app

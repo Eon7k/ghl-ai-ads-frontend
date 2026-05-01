@@ -425,9 +425,9 @@ function CompetitorDetailInner() {
       <AppNav />
       <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
         <p className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          <strong className="text-zinc-800">Add website + Facebook Page ID</strong> in{" "}
-          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a> below, then
-          save and run a scan. Full env help:{" "}
+          <strong className="text-zinc-800">Website + competitor name / keywords</strong> are enough for{" "}
+          <strong className="text-zinc-800">keyword-only Meta ads</strong> (no Facebook Page id required). With a Page id, scans prefer Page-scoped ads. Save settings in{" "}
+          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a>, then run a scan. Env help:{" "}
           <Link href="/competitors#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitors</Link>.
         </p>
 
@@ -571,7 +571,9 @@ function CompetitorDetailInner() {
         >
           <h2 className="text-base font-semibold text-zinc-900">Watch settings</h2>
           <p className="text-sm text-zinc-600">
-            Include a <strong>Facebook Page ID</strong> for the Page Meta attributes each public ad to — often the advertiser Page (sometimes an agency/shell Page), not necessarily the brand Page from their website.
+            <strong>Facebook Page</strong> is optional: leave it blank and scans query Meta Ad Library by <strong>competitor name</strong> +{" "}
+            <strong>keywords</strong>, then keep only ads that match your business name, keywords, or website host (noise reduced before the AI brief).
+            With a Page id, scans pull ads for that Page instead (usually sharper).
           </p>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Competitor name</label>
@@ -778,24 +780,21 @@ function CompetitorDetailInner() {
         </div>
 
         <p className="mt-6 text-sm text-zinc-600">
-          <strong>Run scan</strong> fetches the public website (if set), optional Meta Ad Library (Facebook Page ID + server token on
-          the API), and stores an AI brief when OpenAI is configured. This tool <strong>does not</strong> post to Facebook — it only
+          <strong>Run scan</strong> fetches the public website (if set), Meta Ad Library when configured (Facebook Page id <strong>or</strong> competitor name + keywords), and stores an AI brief when OpenAI is set. This tool <strong>does not</strong> post to Facebook — it only
           reads public data and saves to your account.
         </p>
 
         <section className="mt-10" aria-label="Competitor ads from Meta Ad Library">
           <h2 className="text-lg font-semibold text-zinc-900">What they are running (Meta Ad Library)</h2>
           <p className="mt-1 text-sm text-zinc-500">
-            These are <strong>public creative snapshots</strong> for this Facebook Page, not a full list of ad campaigns in Ads
-            Manager. It is the closest live view to “what ads are they running right now” you can get without their account. Each run
-            refreshes the list.
+            These are <strong>public creative snapshots</strong> from Meta Ad Library (Page-scoped or keyword discovery). Not a full Ads Manager export — closest live view without their login.
           </p>
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
-              No ads in your workspace yet. Add a <strong>Facebook Page</strong> (or numeric Page id) in Watch settings, set{" "}
-              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> (optional, used first) or{" "}
-              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> on the
-              API host, and run a scan. If you see their ads in{" "}
+              No Meta ads stored yet. Either add a <strong>Facebook Page</strong> for Page-level pulls, or leave Page blank and use <strong>competitor name</strong> +{" "}
+              <strong>keywords</strong> (keyword-only mode — server filters unrelated ads). Set tokens on the API host (
+              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> or{" "}
+              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code>), then run a scan. If you see ads on{" "}
               <a
                 className="font-medium text-violet-700 hover:underline"
                 href="https://www.facebook.com/ads/library"
