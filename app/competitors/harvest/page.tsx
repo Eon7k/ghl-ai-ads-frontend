@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
@@ -17,6 +17,7 @@ import {
   type MetaHarvestReportQueuedResponse,
   type MetaHarvestReportSyncResponse,
 } from "@/lib/api";
+import { fetchHarvestSnapshotThumb, HARVEST_THUMB_PRELOAD_FIRST } from "@/lib/harvestSnapshotThumbQueue";
 import { userFacingError } from "@/lib/userFacingError";
 
 type HarvestTab = "collect" | "reports" | "saved";
@@ -49,7 +50,42 @@ function isMetaAdLibrarySnapshotUrl(url: string): boolean {
 }
 
 /** Meta snapshot pages block embedded iframes; load og:image via backend (crawler UA). */
-function HarvestAdPreview({ mediaUrl }: { mediaUrl: string | null }) {
+function HarvestAdPreview({
+  mediaUrl,
+  thumbPriority = 0,
+  intersectionRoot,
+}: {
+  mediaUrl: string | null;
+  /** Lower = fetched sooner (grid row index). */
+  thumbPriority?: number;
+  /** Scroll container for lazy thumbnails; cards beyond the first batch wait until scrolled near. */
+  intersectionRoot?: HTMLDivElement | null;
+}) {
+  const observeTargetRef = useRef<HTMLDivElement | null>(null);
+  const eager = thumbPriority < HARVEST_THUMB_PRELOAD_FIRST;
+  const [inView, setInView] = useState(eager);
+
+  useEffect(() => {
+    if (thumbPriority < HARVEST_THUMB_PRELOAD_FIRST) {
+      setInView(true);
+      return;
+    }
+    setInView(false);
+    const el = observeTargetRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { root: intersectionRoot ?? undefined, rootMargin: "320px", threshold: 0.02 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [thumbPriority, mediaUrl, intersectionRoot]);
+
   const [thumb, setThumb] = useState<string | null>(null);
   const [thumbError, setThumbError] = useState(false);
   const [thumbLoading, setThumbLoading] = useState(false);
@@ -61,13 +97,13 @@ function HarvestAdPreview({ mediaUrl }: { mediaUrl: string | null }) {
     setThumbLoading(false);
     setImgFailed(false);
     if (!mediaUrl || !isMetaAdLibrarySnapshotUrl(mediaUrl)) return;
+    if (!inView) return;
     let cancelled = false;
     setThumbLoading(true);
-    void expansion.competitor
-      .fetchMetaAdSnapshotThumb(mediaUrl)
-      .then((res) => {
+    void fetchHarvestSnapshotThumb(mediaUrl, thumbPriority)
+      .then((url) => {
         if (cancelled) return;
-        if (res.thumbnailUrl) setThumb(res.thumbnailUrl);
+        if (url) setThumb(url);
         else setThumbError(true);
       })
       .catch(() => {
@@ -79,7 +115,7 @@ function HarvestAdPreview({ mediaUrl }: { mediaUrl: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [mediaUrl]);
+  }, [mediaUrl, inView, thumbPriority]);
 
   const wrap = "relative h-[136px] w-full overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100";
 
@@ -109,8 +145,21 @@ function HarvestAdPreview({ mediaUrl }: { mediaUrl: string | null }) {
   }
 
   if (isMetaAdLibrarySnapshotUrl(mediaUrl)) {
+    if (!inView) {
+      return (
+        <div
+          ref={observeTargetRef}
+          className={`${wrap} flex flex-col items-center justify-center gap-1 bg-zinc-100 px-2 text-center`}
+        >
+          <span className="text-[10px] text-zinc-600">Preview loads when scrolled into view</span>
+          <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold text-violet-700 hover:underline">
+            Open on Meta ↗
+          </a>
+        </div>
+      );
+    }
     return (
-      <div className={`${wrap} flex flex-col items-center justify-center gap-1 bg-zinc-200 px-2 text-center`}>
+      <div ref={observeTargetRef} className={`${wrap} flex flex-col items-center justify-center gap-1 bg-zinc-200 px-2 text-center`}>
         {thumbLoading ? <span className="text-[10px] text-zinc-600">Loading thumbnail…</span> : null}
         {!thumbLoading && thumbError ? <span className="text-[10px] text-zinc-600">Thumbnail unavailable</span> : null}
         <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold text-violet-700 hover:underline">
@@ -194,6 +243,9 @@ function HarvestInner() {
   const [adPickRows, setAdPickRows] = useState<MetaAdHarvestAdRow[]>([]);
   const [adPickLoading, setAdPickLoading] = useState(false);
   const [selectedAdLibraryIds, setSelectedAdLibraryIds] = useState<Record<string, boolean>>({});
+
+  /** Scroll root for lazy-loading creative thumbnails (IntersectionObserver). */
+  const [thumbScrollRoot, setThumbScrollRoot] = useState<HTMLDivElement | null>(null);
 
   const [insights, setInsights] = useState<MetaHarvestInsightRow[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -685,7 +737,7 @@ function HarvestInner() {
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-zinc-900">Pick specific ads (optional)</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Cards lay out <strong>four per row</strong> on wide screens (fewer on tablets/phones)—scroll inside the bordered panel to skim many ads quickly. Images come from Meta snapshot pages via our API (iframes usually stay gray).{" "}
+                Cards lay out <strong>four per row</strong> on wide screens (fewer on tablets/phones)—scroll inside the bordered panel to skim many ads quickly. Creative thumbnails load through our API (max four at a time, top ads first); farther-down cards fetch when you scroll near them so the grid stays responsive.{" "}
                 <strong>New collections</strong> keep ads whose copy/Page name mentions your keywords; random listings like unrelated music merch should disappear unless your backend sets{" "}
                 <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_HARVEST_STRICT_KEYWORD_MATCH=false</code>. Optional{" "}
                 <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_AD_LIBRARY_CONTENT_LANGUAGES=en</code> narrows Meta&apos;s search by language.
@@ -740,7 +792,7 @@ function HarvestInner() {
                     {LANDSCAPE_AD_PICK_CAP} for market overview
                   </p>
                   <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 shadow-sm">
-                    <div className="max-h-[min(88vh,960px)] overflow-y-auto pr-1">
+                    <div ref={setThumbScrollRoot} className="max-h-[min(88vh,960px)] overflow-y-auto pr-1">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         {adPickRows.map((a, idx) => {
                           const pickId = `ad-pick-${a.adLibraryId}`;
@@ -760,7 +812,7 @@ function HarvestInner() {
                                   className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
                                 />
                               </div>
-                              <HarvestAdPreview mediaUrl={a.mediaUrl} />
+                              <HarvestAdPreview mediaUrl={a.mediaUrl} thumbPriority={idx} intersectionRoot={thumbScrollRoot} />
                               <label htmlFor={pickId} className="mt-2 cursor-pointer">
                                 <span className="text-[11px] font-semibold leading-tight text-zinc-900">{a.pageName || "Advertiser"}</span>
                                 <span className="mt-0.5 block truncate font-mono text-[10px] text-zinc-500">{a.facebookPageId}</span>
