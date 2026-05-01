@@ -486,7 +486,7 @@ function CompetitorDetailInner() {
 
         {lastScanLog && lastScanLog.length > 0 && (() => {
           const adLibPermissionDenied = lastScanLog.some((s) =>
-            /does not have permission|Application does not have permission|#10\b|code.?10|2332002/i.test(s)
+            /does not have permission|Application does not have permission|#10\b|code.?10|2332002|2332004|App role required/i.test(s)
           );
           return (
             <div
@@ -505,9 +505,9 @@ function CompetitorDetailInner() {
               </p>
               <p className="mt-1 text-xs text-zinc-600">
                 This is the server&rsquo;s step-by-step log (not an error from your browser). If you expected ads, read the list below, then
-                check <code className="rounded bg-zinc-100/80 px-0.5">META_APP_ID</code> +{" "}
-                <code className="rounded bg-zinc-100/80 px-0.5">META_APP_SECRET</code> on the API host (built as app access token{" "}
-                <code className="rounded bg-zinc-100/80 px-0.5">APP_ID|APP_SECRET</code>).
+                check the API host: <code className="rounded bg-zinc-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> is used first when set; otherwise{" "}
+                <code className="rounded bg-zinc-100/80 px-0.5">META_APP_ID</code> + <code className="rounded bg-zinc-100/80 px-0.5">META_APP_SECRET</code>{" "}
+                (<code className="rounded bg-zinc-100/80 px-0.5">APP_ID|APP_SECRET</code>).
               </p>
               {adLibPermissionDenied && (
                 <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs text-violet-950">
@@ -523,9 +523,10 @@ function CompetitorDetailInner() {
                     >
                       Meta for Developers
                     </a>
-                    . The backend uses <code className="rounded bg-violet-100/80 px-0.5">META_APP_ID</code> +{" "}
+                    . When <code className="rounded bg-violet-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> is set on the server, those calls use it; otherwise{" "}
+                    <code className="rounded bg-violet-100/80 px-0.5">META_APP_ID</code> +{" "}
                     <code className="rounded bg-violet-100/80 px-0.5">META_APP_SECRET</code> (app access{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">APP_ID|APP_SECRET</code>) for those calls — confirm the app has completed{" "}
+                    <code className="rounded bg-violet-100/80 px-0.5">APP_ID|APP_SECRET</code>). Confirm the app has completed{" "}
                     <strong>Ad Library API</strong> onboarding and is in the right mode. Official:{" "}
                     <a
                       href="https://www.facebook.com/ads/library/api/"
@@ -792,8 +793,9 @@ function CompetitorDetailInner() {
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
               No ads in your workspace yet. Add a <strong>Facebook Page</strong> (or numeric Page id) in Watch settings, set{" "}
+              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> (optional, used first) or{" "}
               <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code> on the
-              API host (Ad Library uses app access <code className="rounded bg-zinc-100 px-0.5">APP_ID|APP_SECRET</code>), and run a scan. If you see their ads in{" "}
+              API host, and run a scan. If you see their ads in{" "}
               <a
                 className="font-medium text-violet-700 hover:underline"
                 href="https://www.facebook.com/ads/library"

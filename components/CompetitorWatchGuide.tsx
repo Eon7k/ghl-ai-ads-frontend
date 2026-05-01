@@ -25,7 +25,10 @@ export function CompetitorWatchGuide() {
                 Meta for Developers
               </a>{" "}
               → your app → <strong>App settings</strong> → <strong>Basic</strong>. The backend builds{" "}
-              <code className="rounded bg-zinc-100 px-0.5">APP_ID|APP_SECRET</code> (app access token) for Ad Library calls — same vars as Meta OAuth elsewhere.
+              <code className="rounded bg-zinc-100 px-0.5">APP_ID|APP_SECRET</code> for Ad Library when no separate library token is set (same vars as Meta OAuth).
+            </li>
+            <li>
+              Optional: <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> — when set on the API host, competitor Ad Library calls use this token <strong>first</strong> (e.g. long-lived token from Graph). Useful if app-access errors persist; remember long-lived tokens still expire unless renewed.
             </li>
             <li>
               Optional: <code className="rounded bg-zinc-100 px-1">META_GRAPH_API_VERSION</code> (e.g. <code className="rounded bg-zinc-100 px-0.5">v25.0</code>).
