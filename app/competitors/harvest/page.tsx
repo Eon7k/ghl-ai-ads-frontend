@@ -9,6 +9,7 @@ import { renderInsightSummaryText } from "@/components/competitorUtils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   expansion,
+  type MetaAdHarvestAdRow,
   type MetaAdHarvestRunRow,
   type MetaHarvestBrandRow,
   type MetaHarvestInsightRow,
@@ -19,6 +20,9 @@ import {
 import { userFacingError } from "@/lib/userFacingError";
 
 type HarvestTab = "collect" | "reports" | "saved";
+
+const BRAND_AD_PICK_CAP = 48;
+const LANDSCAPE_AD_PICK_CAP = 80;
 
 function isQueuedHarvestResponse(
   x: MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse
@@ -57,6 +61,11 @@ function HarvestInner() {
   const [landscapeTopic, setLandscapeTopic] = useState("");
   const [landscapeBusy, setLandscapeBusy] = useState(false);
   const [landscapePreview, setLandscapePreview] = useState<MetaHarvestReportPayload | null>(null);
+
+  const [adPickRunId, setAdPickRunId] = useState("");
+  const [adPickRows, setAdPickRows] = useState<MetaAdHarvestAdRow[]>([]);
+  const [adPickLoading, setAdPickLoading] = useState(false);
+  const [selectedAdLibraryIds, setSelectedAdLibraryIds] = useState<Record<string, boolean>>({});
 
   const [insights, setInsights] = useState<MetaHarvestInsightRow[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -101,6 +110,42 @@ function HarvestInner() {
   }, [user, tab, loadInsights]);
 
   const hasPendingInsights = useMemo(() => insights.some((i) => i.status === "pending"), [insights]);
+
+  const completedHarvestRuns = useMemo(
+    () => runs.filter((r) => r.status === "completed" && (r.adsStored > 0 || (r._count?.ads ?? 0) > 0)),
+    [runs]
+  );
+
+  useEffect(() => {
+    setSelectedAdLibraryIds({});
+  }, [adPickRunId]);
+
+  useEffect(() => {
+    if (!user || tab !== "reports" || !adPickRunId.trim()) {
+      setAdPickRows([]);
+      setAdPickLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAdPickLoading(true);
+    void expansion.competitor
+      .getMetaHarvestRun(adPickRunId.trim())
+      .then(({ run }) => {
+        if (!cancelled) setAdPickRows(run.ads ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(userFacingError(e));
+          setAdPickRows([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAdPickLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, tab, adPickRunId]);
 
   useEffect(() => {
     if (tab !== "saved" || !hasPendingInsights) return;
@@ -178,21 +223,41 @@ function HarvestInner() {
       .slice(0, 24);
   }
 
+  function pickedAdLibraryIds(): string[] {
+    return Object.entries(selectedAdLibraryIds)
+      .filter(([, v]) => v)
+      .map(([id]) => id);
+  }
+
+  function toggleAdLibraryPick(adLibraryId: string) {
+    setSelectedAdLibraryIds((prev) => ({ ...prev, [adLibraryId]: !prev[adLibraryId] }));
+  }
+
   async function generateLandscape() {
-    setLandscapeBusy(true);
     setError(null);
     setInfo(null);
+    const picks = pickedAdLibraryIds();
+    if (picks.length > 0 && !adPickRunId.trim()) {
+      setError("Choose the collection your selected ads belong to (Pick specific ads), then try again.");
+      return;
+    }
+    setLandscapeBusy(true);
     if (!runInBackground) {
       setLandscapePreview(null);
     }
     try {
-      const body = {
-        harvestRunId: landscapeRunId.trim() || undefined,
+      const body: Parameters<(typeof expansion.competitor)["createMetaHarvestLandscapeReport"]>[0] = {
+        harvestRunId:
+          picks.length > 0 ? adPickRunId.trim() || undefined : landscapeRunId.trim() || undefined,
+        ...(picks.length > 0 ? { adLibraryIds: picks.slice(0, LANDSCAPE_AD_PICK_CAP) } : {}),
         topicHint: landscapeTopic.trim() || undefined,
         excludePhrases: parseExcludePhrases(),
         strictRelevanceFilter: strictFilter,
         runInBackground,
       };
+      if (picks.length > LANDSCAPE_AD_PICK_CAP) {
+        setInfo(`Using the first ${LANDSCAPE_AD_PICK_CAP} of ${picks.length} selected ads (limit per overview).`);
+      }
       const res = await expansion.competitor.createMetaHarvestLandscapeReport(body);
       if (isQueuedHarvestResponse(res)) {
         setInfo("Your market overview is generating. You can open Saved reports to watch it finish, or keep working elsewhere.");
@@ -211,28 +276,34 @@ function HarvestInner() {
   }
 
   async function generateReport() {
+    setError(null);
+    setInfo(null);
+    const picks = pickedAdLibraryIds();
     const facebookPageIds = Object.entries(selectedPages)
       .filter(([, v]) => v)
       .map(([id]) => id.replace(/\D/g, ""))
       .filter(Boolean);
-    if (!facebookPageIds.length) {
-      setError("Select one or more advertisers from the list before building a focused report.");
+    if (!picks.length && !facebookPageIds.length) {
+      setError("Select one or more advertisers from the list, or choose specific ads below, before building a focused report.");
       return;
     }
     setReportBusy(true);
-    setError(null);
-    setInfo(null);
     if (!runInBackground) {
       setReportPreview(null);
     }
     try {
       const res = await expansion.competitor.createMetaHarvestReport({
-        facebookPageIds,
+        ...(picks.length > 0
+          ? { adLibraryIds: picks.slice(0, BRAND_AD_PICK_CAP) }
+          : { facebookPageIds }),
         competitorDisplayName: reportName.trim() || undefined,
         excludePhrases: parseExcludePhrases(),
         strictRelevanceFilter: strictFilter,
         runInBackground,
       });
+      if (picks.length > BRAND_AD_PICK_CAP) {
+        setInfo(`Used the first ${BRAND_AD_PICK_CAP} of ${picks.length} selected ads (limit per summary).`);
+      }
       if (isQueuedHarvestResponse(res)) {
         setInfo("Your advertiser report is generating. Check Saved reports for the finished brief.");
         setTab("saved");
@@ -442,10 +513,112 @@ function HarvestInner() {
             </section>
 
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-zinc-900">Pick specific ads (optional)</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Open a saved collection to see individual ads (headline, copy, advertiser). Tick the ones you want in your next summary. A
+                focused brief can use only those ads; a market overview uses them when you click build (it still needs the collection for
+                context). At most {BRAND_AD_PICK_CAP} ads go to a focused summary and {LANDSCAPE_AD_PICK_CAP} to an overview—we use your
+                selection order first.
+              </p>
+              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="ad-pick-run">
+                Collection to browse
+              </label>
+              <select
+                id="ad-pick-run"
+                value={adPickRunId}
+                onChange={(e) => setAdPickRunId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+              >
+                <option value="">— None —</option>
+                {completedHarvestRuns.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {(r.label || "Collection").slice(0, 56)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
+                    {new Date(r.createdAt).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+              {adPickRunId.trim() && adPickLoading ? (
+                <p className="mt-4 text-sm text-zinc-500">Loading ads…</p>
+              ) : null}
+              {adPickRunId.trim() && !adPickLoading && adPickRows.length === 0 ? (
+                <p className="mt-4 text-sm text-zinc-600">No ads in this slice—try another collection or recollect.</p>
+              ) : null}
+              {adPickRows.length > 0 ? (
+                <div className="mt-4">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next: Record<string, boolean> = {};
+                        for (const a of adPickRows) next[a.adLibraryId] = true;
+                        setSelectedAdLibraryIds(next);
+                      }}
+                      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                    >
+                      Select all listed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAdLibraryIds({})}
+                      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    {pickedAdLibraryIds().length} selected · up to {BRAND_AD_PICK_CAP} for focused summary · up to {LANDSCAPE_AD_PICK_CAP}{" "}
+                    for market overview
+                  </p>
+                  <ul className="mt-3 max-h-80 divide-y divide-zinc-100 overflow-y-auto rounded-xl border border-zinc-100">
+                    {adPickRows.map((a) => {
+                      const pickId = `ad-pick-${a.adLibraryId}`;
+                      return (
+                        <li key={a.id} className="flex gap-3 px-2 py-3">
+                          <input
+                            id={pickId}
+                            type="checkbox"
+                            checked={!!selectedAdLibraryIds[a.adLibraryId]}
+                            onChange={() => toggleAdLibraryPick(a.adLibraryId)}
+                            className="mt-1 shrink-0 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <label htmlFor={pickId} className="cursor-pointer">
+                              <span className="block text-sm font-medium text-zinc-900">{a.pageName || "Advertiser"}</span>
+                              {a.headline ? (
+                                <span className="mt-0.5 block text-sm text-zinc-800">{a.headline}</span>
+                              ) : null}
+                              {a.bodyText ? (
+                                <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-zinc-600">{a.bodyText}</span>
+                              ) : null}
+                            </label>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+                              <span>ID {a.adLibraryId}</span>
+                              {a.mediaUrl ? (
+                                <a
+                                  href={a.mediaUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-violet-700 hover:underline"
+                                >
+                                  Open creative
+                                </a>
+                              ) : null}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-zinc-900">Market overview</h2>
               <p className="mt-2 text-sm text-zinc-600">
                 Looks across many advertisers at once: common promises, tones, offers, and ideas for how you could stand apart—in messaging
-                or in campaign structure.
+                or in campaign structure. If you selected specific ads under &ldquo;Pick specific ads,&rdquo; the overview uses those (and the
+                collection you chose there); otherwise it follows the scope below.
               </p>
               <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="overview-scope">
                 Which ads should we include?
@@ -457,14 +630,12 @@ function HarvestInner() {
                 className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
               >
                 <option value="">Everything collected in this account (most recent ads first)</option>
-                {runs
-                  .filter((r) => r.status === "completed" && (r.adsStored > 0 || (r._count?.ads ?? 0) > 0))
-                  .map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {(r.label || "Collection").slice(0, 56)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
-                      {new Date(r.createdAt).toLocaleDateString()}
-                    </option>
-                  ))}
+                {completedHarvestRuns.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {(r.label || "Collection").slice(0, 56)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
+                    {new Date(r.createdAt).toLocaleDateString()}
+                  </option>
+                ))}
               </select>
               <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="overview-topic">
                 Short label for this overview (optional)
@@ -503,7 +674,8 @@ function HarvestInner() {
               <h2 className="text-lg font-semibold text-zinc-900">Focused advertiser summary</h2>
               <p className="mt-2 text-sm text-zinc-600">
                 Search the advertisers from your collections, tick the ones you care about, then request a concise competitive-style brief for
-                just those brands.
+                just those brands. If you ticked specific ads under &ldquo;Pick specific ads,&rdquo; the next brief uses those ads instead of
+                all ads from the selected Pages.
               </p>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <input

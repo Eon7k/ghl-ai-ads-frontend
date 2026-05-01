@@ -969,9 +969,12 @@ export const expansion = {
       request<{ brands: MetaHarvestBrandRow[] }>(
         `api/agency/competitor/meta-harvest-brands${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`
       ),
-    /** Build AI competition brief from harvested ads for selected Page ids (does not create a CompetitorWatch). */
+    /** Build AI competition brief from harvested ads for selected Pages and/or specific saved ads (does not create a CompetitorWatch). */
     createMetaHarvestReport: (body: {
-      facebookPageIds: string[];
+      /** Selected advertiser Pages (optional if `adLibraryIds` is set). */
+      facebookPageIds?: string[];
+      /** Specific harvested ads by Ad Library id (optional if `facebookPageIds` is set). Max 48 server-side. */
+      adLibraryIds?: string[];
       competitorDisplayName?: string;
       keywords?: string[];
       excludePhrases?: string[];
@@ -989,6 +992,8 @@ export const expansion = {
     /** Landscape brief across one harvest run (or entire workspace pool): aggregate patterns & differentiation ideas. */
     createMetaHarvestLandscapeReport: (body: {
       harvestRunId?: string;
+      /** Requires `harvestRunId` when non-empty; max 80 server-side. */
+      adLibraryIds?: string[];
       topicHint?: string;
       excludePhrases?: string[];
       strictRelevanceFilter?: boolean;
