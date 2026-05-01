@@ -17,7 +17,7 @@ import {
   type MetaHarvestReportQueuedResponse,
   type MetaHarvestReportSyncResponse,
 } from "@/lib/api";
-import { fetchHarvestSnapshotThumb, HARVEST_THUMB_PRELOAD_FIRST } from "@/lib/harvestSnapshotThumbQueue";
+import { fetchHarvestSnapshotPreview, HARVEST_THUMB_PRELOAD_FIRST } from "@/lib/harvestSnapshotThumbQueue";
 import { userFacingError } from "@/lib/userFacingError";
 
 type HarvestTab = "collect" | "reports" | "saved";
@@ -87,12 +87,14 @@ function HarvestAdPreview({
   }, [thumbPriority, mediaUrl, intersectionRoot]);
 
   const [thumb, setThumb] = useState<string | null>(null);
+  const [snapshotEmbedHtml, setSnapshotEmbedHtml] = useState<string | null>(null);
   const [thumbError, setThumbError] = useState(false);
   const [thumbLoading, setThumbLoading] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {
     setThumb(null);
+    setSnapshotEmbedHtml(null);
     setThumbError(false);
     setThumbLoading(false);
     setImgFailed(false);
@@ -100,11 +102,18 @@ function HarvestAdPreview({
     if (!inView) return;
     let cancelled = false;
     setThumbLoading(true);
-    void fetchHarvestSnapshotThumb(mediaUrl, thumbPriority)
-      .then((url) => {
+    void fetchHarvestSnapshotPreview(mediaUrl, thumbPriority)
+      .then((r) => {
         if (cancelled) return;
-        if (url) setThumb(url);
-        else setThumbError(true);
+        if (r.thumbnailUrl) {
+          setThumb(r.thumbnailUrl);
+          return;
+        }
+        if (r.previewHtml) {
+          setSnapshotEmbedHtml(r.previewHtml);
+          return;
+        }
+        setThumbError(true);
       })
       .catch(() => {
         if (!cancelled) setThumbError(true);
@@ -132,6 +141,30 @@ function HarvestAdPreview({
       <div className={wrap}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={thumb} alt="" className="h-full w-full object-cover" />
+        <a
+          href={mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-0 left-0 right-0 truncate bg-white/95 py-1 text-center text-[10px] font-semibold text-violet-700 hover:bg-white"
+        >
+          Open on Meta ↗
+        </a>
+      </div>
+    );
+  }
+
+  const embedWrap =
+    "relative min-h-[220px] h-[220px] w-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-inner";
+
+  if (snapshotEmbedHtml) {
+    return (
+      <div className={embedWrap}>
+        <iframe
+          title="Meta ad preview"
+          srcDoc={snapshotEmbedHtml}
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          className="h-full w-full border-0 bg-white"
+        />
         <a
           href={mediaUrl}
           target="_blank"
@@ -251,6 +284,11 @@ function HarvestInner() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
 
+  const [pickIntentPrompt, setPickIntentPrompt] = useState("");
+  const [pickRankingKwInput, setPickRankingKwInput] = useState("");
+  const [rankingSaveBusy, setRankingSaveBusy] = useState(false);
+  const [rankingSuggestBusy, setRankingSuggestBusy] = useState(false);
+
   const loadRuns = useCallback(async () => {
     if (!user) return;
     setRunsLoading(true);
@@ -298,6 +336,8 @@ function HarvestInner() {
 
   useEffect(() => {
     setSelectedAdLibraryIds({});
+    setPickIntentPrompt("");
+    setPickRankingKwInput("");
   }, [adPickRunId]);
 
   useEffect(() => {
@@ -311,7 +351,14 @@ function HarvestInner() {
     void expansion.competitor
       .getMetaHarvestRun(adPickRunId.trim())
       .then(({ run }) => {
-        if (!cancelled) setAdPickRows(run.ads ?? []);
+        if (!cancelled) {
+          setAdPickRows(run.ads ?? []);
+          setPickIntentPrompt(typeof run.intentPrompt === "string" ? run.intentPrompt : "");
+          const rk = Array.isArray(run.rankingKeywords)
+            ? (run.rankingKeywords as unknown[]).filter((x): x is string => typeof x === "string").map((x) => x.trim())
+            : [];
+          setPickRankingKwInput(rk.join(", "));
+        }
       })
       .catch((e) => {
         if (!cancelled) {
@@ -332,6 +379,49 @@ function HarvestInner() {
     const id = window.setInterval(() => void loadInsights(), 4000);
     return () => window.clearInterval(id);
   }, [tab, hasPendingInsights, loadInsights]);
+
+  async function saveHarvestRankingContext() {
+    if (!adPickRunId.trim()) return;
+    setRankingSaveBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const phrases = pickRankingKwInput
+        .split(/[,;\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 1)
+        .slice(0, 36);
+      await expansion.competitor.updateMetaHarvestRunRankingContext(adPickRunId.trim(), {
+        intentPrompt: pickIntentPrompt.trim() || null,
+        rankingKeywords: phrases,
+      });
+      const { run } = await expansion.competitor.getMetaHarvestRun(adPickRunId.trim());
+      setAdPickRows(run.ads ?? []);
+      setInfo("Ranking settings saved — ads are re-sorted below.");
+    } catch (e) {
+      setError(userFacingError(e));
+    } finally {
+      setRankingSaveBusy(false);
+    }
+  }
+
+  async function suggestHarvestRankingKeywords() {
+    if (!adPickRunId.trim()) return;
+    setRankingSuggestBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const { keywords } = await expansion.competitor.suggestMetaHarvestRankingKeywords(adPickRunId.trim(), {
+        intentPrompt: pickIntentPrompt.trim() || undefined,
+      });
+      if (keywords.length) setPickRankingKwInput(keywords.join(", "));
+      else setInfo("No AI phrases returned — write intent above or confirm OPENAI_API_KEY on your API server.");
+    } catch (e) {
+      setError(userFacingError(e));
+    } finally {
+      setRankingSuggestBusy(false);
+    }
+  }
 
   async function pollInsightUntilReady(id: string) {
     for (let i = 0; i < 72; i++) {
@@ -737,7 +827,7 @@ function HarvestInner() {
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-zinc-900">Pick specific ads (optional)</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Cards lay out <strong>four per row</strong> on wide screens (fewer on tablets/phones)—scroll inside the bordered panel to skim many ads quickly. Creative thumbnails load through our API (max four at a time, top ads first); farther-down cards fetch when you scroll near them so the grid stays responsive.{" "}
+                Ads sort by <strong>relevance score</strong> (collection keywords + phrases/intent below + soft boosts from advertisers you&apos;ve picked before on normal accounts). Cards lay out <strong>four per row</strong> on wide screens (fewer on tablets/phones)—scroll inside the bordered panel to skim many ads quickly. Creative previews load through our API (max four at a time, top ads first): we extract image URLs from Meta’s snapshot HTML when we can; otherwise we embed a sanitized snapshot (scripts removed) when the HTML already includes images or video tags—cards farther down fetch when you scroll near them so the grid stays responsive.{" "}
                 <strong>New collections</strong> keep ads whose copy/Page name mentions your keywords; random listings like unrelated music merch should disappear unless your backend sets{" "}
                 <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_HARVEST_STRICT_KEYWORD_MATCH=false</code>. Optional{" "}
                 <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_AD_LIBRARY_CONTENT_LANGUAGES=en</code> narrows Meta&apos;s search by language.
@@ -767,6 +857,54 @@ function HarvestInner() {
               ) : null}
               {adPickRows.length > 0 ? (
                 <div className="mt-4">
+                  <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50/50 p-4 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-900">Ranking & intent</p>
+                    <p className="mt-1 text-xs leading-snug text-zinc-600">
+                      Tell the system what you care about in this collection. Save extra phrases here or generate them from your intent with AI.
+                      Intent text is logged for this workspace (skipped for API admin emails in{" "}
+                      <code className="rounded bg-white px-1 py-0.5 font-mono text-[10px]">ADMIN_EMAILS</code>) and helps sort ads plus steer future summary prompts.
+                    </p>
+                    <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="pick-intent">
+                      What ads do you want at the top?
+                    </label>
+                    <textarea
+                      id="pick-intent"
+                      value={pickIntentPrompt}
+                      onChange={(e) => setPickIntentPrompt(e.target.value)}
+                      rows={2}
+                      placeholder="Example: wellness studios promoting cryotherapy packages to women 35–55 in Texas—not generic gyms."
+                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                    />
+                    <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="pick-ranking-kw">
+                      Extra ranking phrases (comma-separated, saved with this collection)
+                    </label>
+                    <textarea
+                      id="pick-ranking-kw"
+                      value={pickRankingKwInput}
+                      onChange={(e) => setPickRankingKwInput(e.target.value)}
+                      rows={2}
+                      placeholder="cryotherapy package, body contouring, localized fat loss"
+                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                    />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={rankingSuggestBusy || !adPickRunId.trim()}
+                        onClick={() => void suggestHarvestRankingKeywords()}
+                        className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-sm font-medium text-violet-900 hover:bg-violet-50 disabled:opacity-50"
+                      >
+                        {rankingSuggestBusy ? "Suggesting…" : "Suggest phrases from intent"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rankingSaveBusy || !adPickRunId.trim()}
+                        onClick={() => void saveHarvestRankingContext()}
+                        className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        {rankingSaveBusy ? "Saving…" : "Save ranking settings"}
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -802,7 +940,17 @@ function HarvestInner() {
                               className="flex flex-col rounded-xl border border-zinc-200 bg-white p-3 shadow-sm ring-offset-2 hover:ring-2 hover:ring-violet-200"
                             >
                               <div className="mb-2 flex items-start justify-between gap-2">
-                                <span className="text-[11px] font-medium text-zinc-400">#{idx + 1}</span>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[11px] font-medium text-zinc-400">#{idx + 1}</span>
+                                  {typeof a.relevanceScore === "number" ? (
+                                    <span
+                                      className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800"
+                                      title="Relevance score (higher = closer match to keywords, intent, and your past picks)"
+                                    >
+                                      {Math.round(a.relevanceScore)}
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <input
                                   id={pickId}
                                   type="checkbox"

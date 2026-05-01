@@ -717,6 +717,8 @@ export type MetaAdHarvestAdRow = {
   mediaUrl: string | null;
   /** ISO 639-1 codes from Meta when available (derived server-side). */
   languages?: string[];
+  /** Server-ranked relevance for browsing (keywords + intent + prior selections). */
+  relevanceScore?: number;
   createdAt: string;
 };
 
@@ -726,6 +728,11 @@ export type MetaAdHarvestRunRow = {
   clientId: string;
   label: string | null;
   keywords: unknown;
+  /** Natural-language browse/report intent for this collection. */
+  intentPrompt?: string | null;
+  /** Extra phrases used only for relevance ranking (stored JSON array). */
+  rankingKeywords?: unknown;
+  rankingKeywordsUpdatedAt?: string | null;
   status: string;
   errorMessage: string | null;
   adsStored: number;
@@ -967,12 +974,25 @@ export const expansion = {
     listMetaHarvestRuns: () => request<{ runs: MetaAdHarvestRunRow[] }>("api/agency/competitor/meta-harvest-runs"),
     getMetaHarvestRun: (id: string) =>
       request<{ run: MetaAdHarvestRunRow & { ads: MetaAdHarvestAdRow[] } }>(`api/agency/competitor/meta-harvest-runs/${id}`),
+    updateMetaHarvestRunRankingContext: (id: string, body: { intentPrompt?: string | null; rankingKeywords?: string[] }) =>
+      request<{ run: MetaAdHarvestRunRow }>(`api/agency/competitor/meta-harvest-runs/${id}/ranking-context`, {
+        method: "PATCH",
+        body,
+      }),
+    suggestMetaHarvestRankingKeywords: (id: string, body?: { intentPrompt?: string }) =>
+      request<{ keywords: string[] }>(`api/agency/competitor/meta-harvest-runs/${id}/suggest-ranking-keywords`, {
+        method: "POST",
+        body: body ?? {},
+      }),
     /** Meta snapshot HTML → og:image URL for thumbnails (server-side fetch). */
     fetchMetaAdSnapshotThumb: (snapshotUrl: string) =>
-      request<{ thumbnailUrl: string | null }>("api/agency/competitor/meta-ad-snapshot-thumb", {
-        method: "POST",
-        body: { snapshotUrl },
-      }),
+      request<{ thumbnailUrl: string | null; previewHtml: string | null }>(
+        "api/agency/competitor/meta-ad-snapshot-thumb",
+        {
+          method: "POST",
+          body: { snapshotUrl },
+        }
+      ),
     listMetaHarvestBrands: (q?: string) =>
       request<{ brands: MetaHarvestBrandRow[] }>(
         `api/agency/competitor/meta-harvest-brands${q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`

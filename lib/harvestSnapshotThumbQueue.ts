@@ -3,6 +3,12 @@ import { expansion } from "@/lib/api";
 /** First N rows fetch thumbnails immediately (still capped by concurrency below). Lower indices win the queue. */
 export const HARVEST_THUMB_PRELOAD_FIRST = 16;
 
+export type HarvestSnapshotPreview = {
+  thumbnailUrl: string | null;
+  /** Sanitized snapshot HTML when no direct image URL was found (iframe srcDoc). */
+  previewHtml: string | null;
+};
+
 const MAX_CONCURRENT = 4;
 
 type Waiter = { priority: number; tid: number; resolve: () => void };
@@ -33,15 +39,14 @@ function releaseSlot(): void {
   pumpSlots();
 }
 
-/** Avoid duplicate network calls for the same snapshot URL across cards / remounts. */
-const settled = new Map<string, string | null>();
-const inflightByUrl = new Map<string, Promise<string | null>>();
+const settled = new Map<string, HarvestSnapshotPreview>();
+const inflightByUrl = new Map<string, Promise<HarvestSnapshotPreview>>();
 
 /**
- * Fetch Meta snapshot og:image via API. Requests are deduped by URL and globally limited to
- * MAX_CONCURRENT at once; lower `priority` (list index) runs sooner.
+ * Resolve Meta snapshot preview (image URL and/or sanitized embed HTML). Deduped by URL and limited to
+ * MAX_CONCURRENT server fetches at once; lower `priority` runs sooner.
  */
-export function fetchHarvestSnapshotThumb(snapshotUrl: string, priority: number): Promise<string | null> {
+export function fetchHarvestSnapshotPreview(snapshotUrl: string, priority: number): Promise<HarvestSnapshotPreview> {
   if (settled.has(snapshotUrl)) return Promise.resolve(settled.get(snapshotUrl)!);
 
   let p = inflightByUrl.get(snapshotUrl);
@@ -50,12 +55,16 @@ export function fetchHarvestSnapshotThumb(snapshotUrl: string, priority: number)
       await acquireSlot(priority);
       try {
         const res = await expansion.competitor.fetchMetaAdSnapshotThumb(snapshotUrl);
-        const out = res.thumbnailUrl ?? null;
+        const out: HarvestSnapshotPreview = {
+          thumbnailUrl: res.thumbnailUrl ?? null,
+          previewHtml: res.previewHtml ?? null,
+        };
         settled.set(snapshotUrl, out);
         return out;
       } catch {
-        settled.set(snapshotUrl, null);
-        return null;
+        const empty: HarvestSnapshotPreview = { thumbnailUrl: null, previewHtml: null };
+        settled.set(snapshotUrl, empty);
+        return empty;
       } finally {
         releaseSlot();
         inflightByUrl.delete(snapshotUrl);
