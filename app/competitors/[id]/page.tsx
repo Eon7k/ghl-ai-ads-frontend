@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AppNav from "@/components/AppNav";
+import { CompetitorsSectionNav } from "@/components/CompetitorsSectionNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import {
   renderInsightSummaryText,
@@ -326,7 +327,7 @@ function CompetitorDetailInner() {
     setActionError(null);
     try {
       await expansion.competitor.deleteWatch(id);
-      router.push("/competitors");
+      router.push("/competitors/watches");
     } catch (e) {
       setActionError(userFacingError(e));
     }
@@ -345,8 +346,9 @@ function CompetitorDetailInner() {
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
         <main className="mx-auto max-w-3xl px-4 py-8">
-          <p className="text-zinc-600">Invalid watch id.</p>
-          <Link href="/competitors" className="mt-2 inline-block text-violet-700 hover:underline">← All watches</Link>
+          <CompetitorsSectionNav />
+          <p className="mt-4 text-zinc-600">Invalid watch id.</p>
+          <Link href="/competitors/watches" className="mt-2 inline-block text-violet-700 hover:underline">← All watches</Link>
         </main>
       </div>
     );
@@ -357,7 +359,8 @@ function CompetitorDetailInner() {
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
         <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
-          <p className="text-red-600">{loadError}</p>
+          <CompetitorsSectionNav />
+          <p className="mt-4 text-red-600">{loadError}</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
@@ -366,7 +369,7 @@ function CompetitorDetailInner() {
             >
               Retry
             </button>
-            <Link href="/competitors" className="inline-block text-violet-700 hover:underline">
+            <Link href="/competitors/watches" className="inline-block text-violet-700 hover:underline">
               ← All watches
             </Link>
           </div>
@@ -403,20 +406,21 @@ function CompetitorDetailInner() {
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
       <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
-        <p className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          <strong className="text-zinc-800">Website + competitor name / keywords</strong> are enough for{" "}
-          <strong className="text-zinc-800">keyword-only Meta ads</strong> (no Facebook Page id required). With a Page id, scans prefer Page-scoped ads. Save settings in{" "}
-          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a>, then run a scan. Env help:{" "}
-          <Link href="/competitors#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitors</Link>.
-        </p>
-
-        <div className="mt-3 flex flex-wrap gap-2 text-sm text-violet-700">
-          <Link href="/competitors" className="hover:underline">← All watches</Link>
+        <CompetitorsSectionNav />
+        <div className="mt-4 flex flex-wrap gap-2 text-sm text-violet-700">
+          <Link href="/competitors/watches" className="hover:underline">← All watches</Link>
           <span className="text-zinc-300">·</span>
           <Link href="/" className="hover:underline">Home</Link>
           <span className="text-zinc-300">·</span>
           <Link href="/content-strategy" className="hover:underline">Content strategy</Link>
         </div>
+
+        <p className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          <strong className="text-zinc-800">Website + competitor name / keywords</strong> are enough for{" "}
+          <strong className="text-zinc-800">keyword-only Meta ads</strong> (no Facebook Page id required). With a Page id, scans prefer Page-scoped ads. Save settings in{" "}
+          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a>, then run a scan. Env help:{" "}
+          <Link href="/competitors/watches#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitor watches</Link>.
+        </p>
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div>

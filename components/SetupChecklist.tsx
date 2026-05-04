@@ -55,7 +55,7 @@ export function SetupChecklist({
       done: canCompetitors ? hasCompetitorWatch : true,
       label: "Run a competitor watch",
       hint: "We analyze their site, optional public Meta ads, and AI counter-angles.",
-      href: "/competitors",
+      href: "/competitors/harvest",
       cta: "Competitors",
     },
   ].filter((s) => s.id !== "lp" || canLandingPages);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
+import { CompetitorsSectionNav } from "@/components/CompetitorsSectionNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { HarvestReportBriefBody } from "@/components/HarvestReportBrief";
 import { useAuth } from "@/contexts/AuthContext";
@@ -702,17 +703,14 @@ function HarvestInner() {
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
       <main id="main-content" className="mx-auto max-w-7xl px-4 py-8 pb-16">
-        <div className="flex flex-wrap gap-2 text-sm text-zinc-600">
-          <Link href="/competitors" className="text-violet-700 hover:underline">
-            Competitor watches
-          </Link>
-          <span className="text-zinc-300">·</span>
-          <Link href="/" className="hover:underline">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <CompetitorsSectionNav />
+          <Link href="/" className="shrink-0 text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
             Home
           </Link>
         </div>
 
-        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900">Ad library research</h1>
+        <h1 className="mt-6 text-2xl font-bold tracking-tight text-zinc-900">Ads Library research</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
           Collect public Meta ads by topic, spot what competitors are saying, then get plain-language summaries—either across the whole
           collection or for hand-picked advertisers. Irrelevant sponsors (for example clinics you do not compete with) can be filtered out

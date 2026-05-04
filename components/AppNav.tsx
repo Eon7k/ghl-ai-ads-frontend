@@ -161,7 +161,7 @@ export default function AppNav() {
             )}
             {canUse("competitors") && (
               <Link
-                href="/competitors"
+                href="/competitors/harvest"
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   pathname?.startsWith("/competitors")
                     ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80"

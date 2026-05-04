@@ -94,7 +94,7 @@ export default function ManagerPage() {
               {canCompetitors ? (
                 <>
                   Track positioning with{" "}
-                  <Link href="/competitors" className="text-violet-700 hover:underline">Competitor watch</Link>
+                  <Link href="/competitors/harvest" className="text-violet-700 hover:underline">Competitors · Ad Library</Link>
                   .
                 </>
               ) : null}
