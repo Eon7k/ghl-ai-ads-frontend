@@ -306,7 +306,8 @@ function HarvestInner() {
 
   const [excludeInput, setExcludeInput] = useState("");
   const [strictFilter, setStrictFilter] = useState(true);
-  const [runInBackground, setRunInBackground] = useState(false);
+  /** Default on: landscape/report OpenAI work often exceeds hosted proxy limits (e.g. Vercel) if we wait synchronously. */
+  const [runInBackground, setRunInBackground] = useState(true);
 
   const [landscapeRunId, setLandscapeRunId] = useState("");
   const [landscapeTopic, setLandscapeTopic] = useState("");
@@ -921,7 +922,8 @@ function HarvestInner() {
                 <span>
                   <span className="font-medium text-zinc-900">Generate in the background</span>
                   <span className="mt-0.5 block text-zinc-600">
-                    Saves each summary to Saved reports while it runs—fine to leave this page and come back.
+                    Recommended. Market overview and advertiser reports call the model for a while; waiting in the browser often hits a
+                    gateway timeout. Off: you get an on-page preview when it finishes, if your hosting allows long requests.
                   </span>
                 </span>
               </label>
