@@ -43,6 +43,10 @@ function LandingPageEditorPageInner() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [conversionGoal, setConversionGoal] = useState("");
   const [pixel, setPixel] = useState("");
+  const [competitorBrief, setCompetitorBrief] = useState("");
+  const [competitorUrlsScan, setCompetitorUrlsScan] = useState("");
+  const [scanBusy, setScanBusy] = useState(false);
+  const [aiDraftBusy, setAiDraftBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id || !user) return;
@@ -115,6 +119,51 @@ function LandingPageEditorPageInner() {
       setSaveError(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function runUrlAnalysis() {
+    if (!competitorUrlsScan.trim()) {
+      setSaveError("Paste URLs to analyze (one per line).");
+      return;
+    }
+    setScanBusy(true);
+    setSaveError(null);
+    try {
+      const r = await expansion.landingPages.competitorScan({ urlsText: competitorUrlsScan });
+      if (r.synthesis) setCompetitorBrief(r.synthesis);
+      else setSaveError(r.error ?? "No synthesis — check OPENAI_API_KEY on the API.");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Scan failed");
+    } finally {
+      setScanBusy(false);
+    }
+  }
+
+  async function regenerateFromAi() {
+    if (!id) return;
+    if (!aiPrompt.trim()) {
+      setSaveError("Add an AI generation prompt below before regenerating.");
+      return;
+    }
+    setAiDraftBusy(true);
+    setSaveError(null);
+    setSaveOk(false);
+    try {
+      const { page: row } = await expansion.landingPages.aiDraft(id, {
+        prompt: aiPrompt.trim(),
+        conversionGoal: conversionGoal.trim() || null,
+        competitorBrief: competitorBrief.trim() || undefined,
+        competitorUrlsText: competitorUrlsScan.trim() || undefined,
+      });
+      setPage(row);
+      setPageData(normalizePageData(row.pageData));
+      setSaveOk(true);
+      setTimeout(() => setSaveOk(false), 2500);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "AI regenerate failed");
+    } finally {
+      setAiDraftBusy(false);
     }
   }
 
@@ -278,14 +327,53 @@ function LandingPageEditorPageInner() {
             <h2 className="text-sm font-semibold text-zinc-900">AI & tracking (optional)</h2>
             <div className="mt-4 space-y-4">
               <div>
+                <label className="block text-sm font-medium text-zinc-700">Competitor URLs to analyze</label>
+                <textarea
+                  value={competitorUrlsScan}
+                  onChange={(e) => setCompetitorUrlsScan(e.target.value)}
+                  rows={3}
+                  placeholder="One URL per line (optional — fills research notes below)"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  disabled={scanBusy || !competitorUrlsScan.trim()}
+                  onClick={() => void runUrlAnalysis()}
+                  className="mt-2 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  {scanBusy ? "Analyzing…" : "Run URL analysis"}
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Competitor research notes</label>
+                <textarea
+                  value={competitorBrief}
+                  onChange={(e) => setCompetitorBrief(e.target.value)}
+                  rows={6}
+                  placeholder="Paste insights here, or run URL analysis above. Used when you regenerate headline/body with AI."
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-zinc-700">AI generation prompt</label>
                 <textarea
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   rows={3}
-                  placeholder="Describe the offer, audience, and tone for a future AI draft…"
+                  placeholder="Describe the offer, audience, and tone…"
                   className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
                 />
+                <button
+                  type="button"
+                  disabled={aiDraftBusy || !aiPrompt.trim()}
+                  onClick={() => void regenerateFromAi()}
+                  className="mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {aiDraftBusy ? "Regenerating…" : "Regenerate headline & body from AI"}
+                </button>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Overwrites headline, subheadline, body, and CTA fields using your prompt plus optional research notes (and URLs if you did not analyze yet).
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700">Conversion goal</label>

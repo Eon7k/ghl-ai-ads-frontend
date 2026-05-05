@@ -576,6 +576,15 @@ export type AgencyBrandingRecord = AgencyBrandingPublic & {
   updatedAt: string;
 };
 
+export type LandingCompetitorSiteScanRow = {
+  url: string;
+  ok: boolean;
+  error?: string;
+  title?: string;
+  description?: string;
+  textPreview?: string;
+};
+
 /** Stored JSON for landing page content (headline, CTAs, etc.). */
 export type LandingPageData = {
   headline?: string;
@@ -882,6 +891,36 @@ export const expansion = {
       }>
     ) => request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}`, { method: "PATCH", body }),
     delete: (id: string) => request<{ ok: boolean }>(`api/agency/landing-pages/${id}`, { method: "DELETE" }),
+    competitorScan: (body: { urlsText?: string; urls?: string[] }) =>
+      request<{ sites: LandingCompetitorSiteScanRow[]; synthesis: string | null; error?: string }>(
+        "api/agency/landing-pages/competitor-scan",
+        { method: "POST", body }
+      ),
+    aiCreate: (body: {
+      title: string;
+      prompt: string;
+      conversionGoal?: string | null;
+      competitorUrlsText?: string;
+      competitorUrls?: string[];
+    }) =>
+      request<{ page: LandingPageRecord; competitorScan?: { sites: unknown[]; error?: string } }>(
+        "api/agency/landing-pages/ai-create",
+        { method: "POST", body }
+      ),
+    aiDraft: (
+      id: string,
+      body?: {
+        prompt?: string;
+        conversionGoal?: string | null;
+        competitorBrief?: string | null;
+        competitorUrlsText?: string;
+        competitorUrls?: string[];
+      }
+    ) =>
+      request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}/ai-draft`, {
+        method: "POST",
+        body: body ?? {},
+      }),
   },
 
   reports: {
