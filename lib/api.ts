@@ -715,6 +715,8 @@ export type CompetitorWatchDetail = CompetitorWatchRow & {
   ads: CompetitorAdRow[];
 };
 
+export type HarvestAdLibraryPlatform = "meta" | "linkedin";
+
 export type MetaAdHarvestAdRow = {
   id: string;
   runId: string;
@@ -724,6 +726,10 @@ export type MetaAdHarvestAdRow = {
   headline: string | null;
   bodyText: string | null;
   mediaUrl: string | null;
+  /** LinkedIn Ad Library preview URL when different from creative URL. */
+  adPreviewUrl?: string | null;
+  /** Which library this row came from when collections include LinkedIn. */
+  platform?: HarvestAdLibraryPlatform;
   /** ISO 639-1 codes from Meta when available (derived server-side). */
   languages?: string[];
   /** Server-ranked relevance for browsing (keywords + intent + prior selections). */
@@ -737,6 +743,8 @@ export type MetaAdHarvestRunRow = {
   clientId: string;
   label: string | null;
   keywords: unknown;
+  /** Platforms queried for this run: `meta`, `linkedin` (JSON array on the API). */
+  harvestSources?: unknown;
   /** Natural-language browse/report intent for this collection. */
   intentPrompt?: string | null;
   /** Extra phrases used only for relevance ranking (stored JSON array). */
@@ -748,13 +756,14 @@ export type MetaAdHarvestRunRow = {
   diagnostics: unknown;
   createdAt: string;
   completedAt: string | null;
-  _count?: { ads: number };
+  _count?: { ads: number; linkedInAds?: number };
 };
 
 export type MetaHarvestBrandRow = {
   facebookPageId: string;
   pageName: string | null;
   adCount: number;
+  platform?: HarvestAdLibraryPlatform;
 };
 
 export type MetaHarvestReportPayload = {
@@ -1008,7 +1017,13 @@ export const expansion = {
         body: { searchTerm },
       }),
     /** Keyword-first harvest: sweep Ad Library, store ads by advertiser Page for later brand search & AI report. */
-    createMetaHarvestRun: (body: { keywords: string[]; label?: string; intentPrompt?: string | null }) =>
+    createMetaHarvestRun: (body: {
+      keywords: string[];
+      label?: string;
+      intentPrompt?: string | null;
+      /** Default `meta` only if omitted. */
+      harvestSources?: HarvestAdLibraryPlatform[];
+    }) =>
       request<{ run: MetaAdHarvestRunRow }>("api/agency/competitor/meta-harvest-runs", { method: "POST", body }),
     suggestMetaHarvestCollectionKeywords: (body: { intentPrompt: string }) =>
       request<{ keywords: string[]; rationale: string }>(

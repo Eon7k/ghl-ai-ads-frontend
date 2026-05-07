@@ -31,6 +31,21 @@ function harvestDiagnosticsLines(d: unknown): string[] {
   return d.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((s) => s.trim());
 }
 
+function harvestStoredAdCount(run: MetaAdHarvestRunRow): number {
+  const summed = (run._count?.ads ?? 0) + (run._count?.linkedInAds ?? 0);
+  const stored = typeof run.adsStored === "number" ? run.adsStored : 0;
+  return Math.max(stored, summed);
+}
+
+function harvestSourcesLabel(raw: unknown): string {
+  if (!Array.isArray(raw)) return "Meta";
+  const parts = raw.filter((x): x is string => x === "meta" || x === "linkedin");
+  if (!parts.length) return "Meta";
+  return [...new Set(parts)]
+    .map((p) => (p === "linkedin" ? "LinkedIn" : "Meta"))
+    .join(" + ");
+}
+
 function isQueuedHarvestResponse(
   x: MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse
 ): x is MetaHarvestReportQueuedResponse {
@@ -58,12 +73,15 @@ function HarvestAdPreview({
   mediaUrl,
   thumbPriority = 0,
   intersectionRoot,
+  creativeOpenLabel = "Open on Meta ↗",
 }: {
   mediaUrl: string | null;
   /** Lower = fetched sooner (grid row index). */
   thumbPriority?: number;
   /** Scroll container for lazy thumbnails; cards beyond the first batch wait until scrolled near. */
   intersectionRoot?: HTMLDivElement | null;
+  /** Footer link when a thumbnail or snapshot is shown. */
+  creativeOpenLabel?: string;
 }) {
   const observeTargetRef = useRef<HTMLDivElement | null>(null);
   const eager = thumbPriority < HARVEST_THUMB_PRELOAD_FIRST;
@@ -186,7 +204,7 @@ function HarvestAdPreview({
           rel="noopener noreferrer"
           className="absolute bottom-0 left-0 right-0 truncate bg-white/95 py-1 text-center text-[10px] font-semibold text-violet-700 hover:bg-white"
         >
-          Open on Meta ↗
+          {creativeOpenLabel}
         </a>
       </div>
     );
@@ -210,7 +228,7 @@ function HarvestAdPreview({
           rel="noopener noreferrer"
           className="absolute bottom-0 left-0 right-0 truncate bg-white/95 py-1 text-center text-[10px] font-semibold text-violet-700 hover:bg-white"
         >
-          Open on Meta ↗
+          {creativeOpenLabel}
         </a>
       </div>
     );
@@ -225,7 +243,7 @@ function HarvestAdPreview({
         >
           <span className="text-[10px] text-zinc-600">Preview loads when scrolled into view</span>
           <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold text-violet-700 hover:underline">
-            Open on Meta ↗
+            {creativeOpenLabel}
           </a>
         </div>
       );
@@ -235,7 +253,7 @@ function HarvestAdPreview({
         {thumbLoading ? <span className="text-[10px] text-zinc-600">Loading thumbnail…</span> : null}
         {!thumbLoading && thumbError ? <span className="text-[10px] text-zinc-600">Thumbnail unavailable</span> : null}
         <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold text-violet-700 hover:underline">
-          Open on Meta ↗
+          {creativeOpenLabel}
         </a>
       </div>
     );
@@ -292,6 +310,8 @@ function HarvestInner() {
   const [collectionKwSuggestBusy, setCollectionKwSuggestBusy] = useState(false);
   const [collectionKwRationale, setCollectionKwRationale] = useState<string | null>(null);
   const [label, setLabel] = useState("");
+  const [harvestIncludeMeta, setHarvestIncludeMeta] = useState(true);
+  const [harvestIncludeLinkedIn, setHarvestIncludeLinkedIn] = useState(false);
   const [harvestBusy, setHarvestBusy] = useState(false);
   const [runs, setRuns] = useState<MetaAdHarvestRunRow[]>([]);
   const [runsLoading, setRunsLoading] = useState(true);
@@ -377,7 +397,7 @@ function HarvestInner() {
   const hasPendingInsights = useMemo(() => insights.some((i) => i.status === "pending"), [insights]);
 
   const completedHarvestRuns = useMemo(
-    () => runs.filter((r) => r.status === "completed" && (r.adsStored > 0 || (r._count?.ads ?? 0) > 0)),
+    () => runs.filter((r) => r.status === "completed" && harvestStoredAdCount(r) > 0),
     [runs]
   );
 
@@ -526,6 +546,10 @@ function HarvestInner() {
       setError("Add at least one keyword (three or more letters each).");
       return;
     }
+    if (!harvestIncludeMeta && !harvestIncludeLinkedIn) {
+      setError("Choose Meta, LinkedIn, or both before collecting.");
+      return;
+    }
     setHarvestBusy(true);
     setError(null);
     setInfo(null);
@@ -534,8 +558,12 @@ function HarvestInner() {
         keywords,
         label: label.trim() || undefined,
         intentPrompt: collectIntentPrompt.trim() || undefined,
+        harvestSources: [
+          ...(harvestIncludeMeta ? (["meta"] as const) : []),
+          ...(harvestIncludeLinkedIn ? (["linkedin"] as const) : []),
+        ],
       });
-      const adsCount = Math.max(run.adsStored ?? 0, run._count?.ads ?? 0);
+      const adsCount = harvestStoredAdCount(run);
       const diagLines = harvestDiagnosticsLines(run.diagnostics);
 
       if (run.status === "failed") {
@@ -546,7 +574,7 @@ function HarvestInner() {
         const hint =
           diagLines.length > 0
             ? diagLines.join(" ")
-            : "No diagnostic lines returned — on the API host confirm META_AD_LIBRARY_TOKEN or META_APP_ID+META_APP_SECRET, clear META_AD_LIBRARY_CONTENT_LANGUAGES if set, or set META_HARVEST_STRICT_KEYWORD_MATCH=false to test.";
+            : "No diagnostic lines returned — on the API host confirm Meta (META_AD_LIBRARY_TOKEN or META_APP_ID+META_APP_SECRET), LinkedIn (LINKEDIN_AD_LIBRARY_ACCESS_TOKEN when LinkedIn is enabled), clear META_AD_LIBRARY_CONTENT_LANGUAGES if Meta returns nothing unexpectedly, or set META_HARVEST_STRICT_KEYWORD_MATCH=false to test.";
         setError(
           `No ads were saved. ${hint} If you use META_AD_LIBRARY_TOKEN (a user long-lived token), it often expires after ~60 days — generate a new one in Meta and update your server env.`
         );
@@ -646,8 +674,8 @@ function HarvestInner() {
     const picks = pickedAdLibraryIds();
     const facebookPageIds = Object.entries(selectedPages)
       .filter(([, v]) => v)
-      .map(([id]) => id.replace(/\D/g, ""))
-      .filter(Boolean);
+      .map(([id]) => (id.startsWith("li-") ? id.slice(0, 40) : id.replace(/\D/g, "")))
+      .filter((id) => id.length >= 4);
     if (!picks.length && !facebookPageIds.length) {
       setError("Select one or more advertisers from the list, or choose specific ads below, before building a focused report.");
       return;
@@ -763,10 +791,11 @@ function HarvestInner() {
         {tab === "collect" && (
           <div className="mt-8 space-y-8">
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-zinc-900">Collect ads from Meta’s ad library</h2>
+              <h2 className="text-lg font-semibold text-zinc-900">Collect ads from ad libraries</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Enter words your customers might search—services, cities, problems you solve. We gather a sample of active ads and group them
-                by advertiser so you can review what shows up for those topics.
+                Enter words your customers might search—services, cities, problems you solve. Turn on{" "}
+                <strong>Meta</strong>, <strong>LinkedIn</strong>, or both; we gather a sample of public creatives and group them by advertiser
+                so you can review what shows up for those topics.
               </p>
               <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="harvest-intent">
                 What are you trying to find? (optional — saves with this collection)
@@ -780,8 +809,49 @@ function HarvestInner() {
                 className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
               />
               <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                AI can turn this into Meta search keywords below. Each successful collection updates a workspace vocabulary so suggestions improve as you pull more ads.
+                AI can turn this into search keywords below. Each successful collection updates a workspace vocabulary so suggestions improve as you pull more ads.
               </p>
+              <div className="mt-4 rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-3">
+                <p className="text-xs font-medium text-zinc-700">Which libraries should this run query?</p>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-8">
+                  <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-800">
+                    <input
+                      type="checkbox"
+                      checked={harvestIncludeMeta}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        if (!next && !harvestIncludeLinkedIn) setHarvestIncludeLinkedIn(true);
+                        setHarvestIncludeMeta(next);
+                      }}
+                      className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                    />
+                    <span>
+                      <span className="font-medium text-zinc-900">Meta Ads Library</span>
+                      <span className="mt-0.5 block text-xs text-zinc-600">
+                        Requires <code className="rounded bg-white px-1 py-0.5 font-mono text-[11px]">META_AD_LIBRARY_TOKEN</code> (or Meta app credentials) on the API host.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-800">
+                    <input
+                      type="checkbox"
+                      checked={harvestIncludeLinkedIn}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        if (!next && !harvestIncludeMeta) setHarvestIncludeMeta(true);
+                        setHarvestIncludeLinkedIn(next);
+                      }}
+                      className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                    />
+                    <span>
+                      <span className="font-medium text-zinc-900">LinkedIn Ad Library</span>
+                      <span className="mt-0.5 block text-xs text-zinc-600">
+                        Requires <code className="rounded bg-white px-1 py-0.5 font-mono text-[11px]">LINKEDIN_AD_LIBRARY_ACCESS_TOKEN</code> plus LinkedIn Ads Library API access on your developer app.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
               <button
                 type="button"
                 disabled={collectionKwSuggestBusy || harvestBusy}
@@ -849,10 +919,10 @@ function HarvestInner() {
                           <span className="capitalize text-zinc-600">{r.status}</span>
                         </div>
                         <span className="text-zinc-500">
-                          {r.adsStored || r._count?.ads || 0} ads · {new Date(r.createdAt).toLocaleString()}
+                          {harvestSourcesLabel(r.harvestSources)} · {harvestStoredAdCount(r)} ads · {new Date(r.createdAt).toLocaleString()}
                         </span>
                       </div>
-                      {(r.adsStored || r._count?.ads || 0) === 0 ? (
+                      {harvestStoredAdCount(r) === 0 ? (
                         <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950">
                           {r.errorMessage ? <p className="font-medium text-amber-950">{r.errorMessage}</p> : null}
                           {harvestDiagnosticsLines(r.diagnostics).length ? (
@@ -947,7 +1017,7 @@ function HarvestInner() {
                 <option value="">— None —</option>
                 {completedHarvestRuns.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {(r.label || "Collection").slice(0, 56)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
+                    {(r.label || "Collection").slice(0, 56)} · {harvestStoredAdCount(r)} ads ·{" "}
                     {new Date(r.createdAt).toLocaleDateString()}
                   </option>
                 ))}
@@ -1037,6 +1107,9 @@ function HarvestInner() {
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         {adPickRows.map((a, idx) => {
                           const pickId = `ad-pick-${a.adLibraryId}`;
+                          const isLi = a.platform === "linkedin";
+                          const previewUrl = isLi ? (a.adPreviewUrl ?? a.mediaUrl) : a.mediaUrl;
+                          const openLabel = isLi ? "Open on LinkedIn ↗" : "Open on Meta ↗";
                           return (
                             <article
                               key={a.id}
@@ -1045,6 +1118,13 @@ function HarvestInner() {
                               <div className="mb-2 flex items-start justify-between gap-2">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-[11px] font-medium text-zinc-400">#{idx + 1}</span>
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                                      isLi ? "bg-sky-100 text-sky-950" : "bg-zinc-100 text-zinc-700"
+                                    }`}
+                                  >
+                                    {isLi ? "LI" : "Meta"}
+                                  </span>
                                   {typeof a.relevanceScore === "number" ? (
                                     <span
                                       className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800"
@@ -1063,7 +1143,12 @@ function HarvestInner() {
                                   className="mt-0.5 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
                                 />
                               </div>
-                              <HarvestAdPreview mediaUrl={a.mediaUrl} thumbPriority={idx} intersectionRoot={thumbScrollRoot} />
+                              <HarvestAdPreview
+                                mediaUrl={previewUrl}
+                                thumbPriority={idx}
+                                intersectionRoot={thumbScrollRoot}
+                                creativeOpenLabel={openLabel}
+                              />
                               <label htmlFor={pickId} className="mt-2 cursor-pointer">
                                 <span className="text-[11px] font-semibold leading-tight text-zinc-900">{a.pageName || "Advertiser"}</span>
                                 <span className="mt-0.5 block truncate font-mono text-[10px] text-zinc-500">{a.facebookPageId}</span>
@@ -1079,14 +1164,14 @@ function HarvestInner() {
                               </div>
                               <p className="mt-2 line-clamp-3 text-[11px] font-semibold text-zinc-900">{a.headline || "—"}</p>
                               <p className="mt-2 truncate font-mono text-[10px] text-zinc-500">ID {a.adLibraryId}</p>
-                              {a.mediaUrl ? (
+                              {previewUrl ? (
                                 <a
-                                  href={a.mediaUrl}
+                                  href={previewUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="mt-2 text-center text-[11px] font-medium text-violet-700 hover:underline"
                                 >
-                                  Open on Meta ↗
+                                  {openLabel}
                                 </a>
                               ) : null}
                             </article>
@@ -1118,7 +1203,7 @@ function HarvestInner() {
                 <option value="">Everything collected in this account (most recent ads first)</option>
                 {completedHarvestRuns.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {(r.label || "Collection").slice(0, 56)} · {r.adsStored || r._count?.ads || 0} ads ·{" "}
+                    {(r.label || "Collection").slice(0, 56)} · {harvestStoredAdCount(r)} ads ·{" "}
                     {new Date(r.createdAt).toLocaleDateString()}
                   </option>
                 ))}
@@ -1196,7 +1281,7 @@ function HarvestInner() {
               {brands.length > 0 && (
                 <ul className="mt-4 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-zinc-100 p-2">
                   {brands.map((b) => (
-                    <li key={b.facebookPageId}>
+                    <li key={`${b.platform ?? "meta"}:${b.facebookPageId}`}>
                       <label className="flex cursor-pointer gap-3 rounded-lg px-2 py-2 hover:bg-zinc-50">
                         <input
                           type="checkbox"
@@ -1205,8 +1290,17 @@ function HarvestInner() {
                           className="mt-1 rounded border-zinc-300 text-violet-600"
                         />
                         <span className="min-w-0">
-                          <span className="block font-medium text-zinc-900">{b.pageName || "Advertiser"}</span>
-                          <span className="text-xs text-zinc-500">{b.adCount} ads in sample · ID {b.facebookPageId}</span>
+                          <span className="flex flex-wrap items-center gap-2 font-medium text-zinc-900">
+                            {b.pageName || "Advertiser"}
+                            {b.platform === "linkedin" ? (
+                              <span className="rounded bg-sky-100 px-1.5 py-0 text-[10px] font-semibold uppercase text-sky-950">
+                                LinkedIn
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="text-xs text-zinc-500">
+                            {b.adCount} ads in sample · ID {b.facebookPageId}
+                          </span>
                         </span>
                       </label>
                     </li>
