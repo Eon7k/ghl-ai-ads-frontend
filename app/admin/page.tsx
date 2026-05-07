@@ -961,7 +961,8 @@ export default function AdminPage() {
           <section className="rounded-xl border border-amber-200 bg-amber-50/50 p-6">
             <h2 className="text-lg font-semibold text-amber-900">Admin access</h2>
             <p className="mt-2 text-sm text-amber-800">
-              This page is only visible to you because your email is listed in the backend <code className="rounded bg-amber-100 px-1">ADMIN_EMAILS</code> environment variable. Add your email there (comma-separated for multiple admins) to enable this view.
+              This area is intentionally limited. Someone with server access assigns who can view it—you do not invite other
+              admins from this screen alone.
             </p>
           </section>
         </div>

@@ -79,7 +79,7 @@ function LandingPagesListPageInner() {
         setLastScanSummary(r.synthesis);
         setBuilderInfo("Analysis ready — review below. Generate a page to fold these insights into copy.");
       } else if (!r.error) {
-        setBuilderError("No synthesis returned — confirm URLs load publicly and OPENAI_API_KEY is set on the API.");
+        setBuilderError("No synthesis returned — confirm the URLs are public and load in a browser, then try again.");
       }
       const failed = r.sites.filter((s) => !s.ok).length;
       if (failed > 0) {

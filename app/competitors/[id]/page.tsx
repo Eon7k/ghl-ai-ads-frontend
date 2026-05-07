@@ -417,15 +417,20 @@ function CompetitorDetailInner() {
 
         <p className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
           <strong className="text-zinc-800">Website + competitor name / keywords</strong> are enough for{" "}
-          <strong className="text-zinc-800">keyword-only Meta ads</strong> (no Facebook Page id required). With a Page id, scans prefer Page-scoped ads. Save settings in{" "}
-          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a>, then run a scan. Env help:{" "}
-          <Link href="/competitors/watches#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">Competitor watches</Link>.
+          <strong className="text-zinc-800">keyword-only Meta ads</strong> (no Facebook Page id required). With a Page id,
+          scans prefer Page-scoped ads. Save settings in{" "}
+          <a href="#competitor-watch-settings" className="font-medium text-violet-700 hover:underline">Watch settings</a>,{" "}
+          then run a scan. For setup tips, see{" "}
+          <Link href="/competitors/watches#competitor-watch-howto" className="font-medium text-violet-700 hover:underline">
+            Competitor watches
+          </Link>
+          .
         </p>
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-zinc-900">{watch.competitorName}</h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-zinc-600">
               {isActive ? (
                 <span className="text-emerald-700">Active watch</span>
               ) : (
@@ -487,51 +492,22 @@ function CompetitorDetailInner() {
                   : `Scan finished — ${lastScanLogAdsCount} ad(s) in this watch`}
               </p>
               <p className="mt-1 text-xs text-zinc-600">
-                This is the server&rsquo;s step-by-step log (not an error from your browser). If you expected ads, read the list below, then
-                check the API host: <code className="rounded bg-zinc-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> is used first when set; otherwise{" "}
-                <code className="rounded bg-zinc-100/80 px-0.5">META_APP_ID</code> + <code className="rounded bg-zinc-100/80 px-0.5">META_APP_SECRET</code>{" "}
-                (<code className="rounded bg-zinc-100/80 px-0.5">APP_ID|APP_SECRET</code>).
+                If you expected new ads here, use the notes below. Permission errors usually mean the connected Meta app needs Ad Library API access in Meta for Developers — your workspace admin can verify that.
               </p>
               {adLibPermissionDenied && (
                 <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs text-violet-950">
                   <p className="font-medium text-violet-900">What this usually means</p>
                   <p className="mt-1 leading-relaxed text-violet-900/90">
-                    Meta&rsquo;s <code className="rounded bg-violet-100/80 px-0.5">ads_archive</code> request must use a token from an app
-                    that has the right <strong>Ad Library API</strong> access in{" "}
-                    <a
-                      href="https://developers.facebook.com/apps/"
-                      className="font-medium text-violet-800 underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Meta for Developers
-                    </a>
-                    . When <code className="rounded bg-violet-100/80 px-0.5">META_AD_LIBRARY_TOKEN</code> is set on the server, those calls use it; otherwise{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">META_APP_ID</code> +{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">META_APP_SECRET</code> (app access{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">APP_ID|APP_SECRET</code>). Confirm the app has completed{" "}
-                    <strong>Ad Library API</strong> onboarding and is in the right mode. Official:{" "}
+                    Ask your administrator to confirm your Meta app includes <strong>Ad Library API</strong> access (
                     <a
                       href="https://www.facebook.com/ads/library/api/"
                       className="font-medium text-violet-800 underline"
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Ad Library API
+                      Meta Ad Library API
                     </a>
-                    . Test a token in{" "}
-                    <a
-                      href="https://developers.facebook.com/tools/explorer/"
-                      className="font-medium text-violet-800 underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Graph API Explorer
-                    </a>{" "}
-                    with a <code className="rounded bg-violet-100/80 px-0.5">GET</code> to{" "}
-                    <code className="rounded bg-violet-100/80 px-0.5">/v25.0/ads_archive</code> and the same
-                    query params your server uses, until you get 200 and <code className="rounded bg-violet-100/80 px-0.5">data</code> not
-                    empty.
+                    ). After that, reconnect Meta in this product and scan again.
                   </p>
                 </div>
               )}
@@ -577,7 +553,7 @@ function CompetitorDetailInner() {
               placeholder="https://"
               className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
             />
-            <p className="form-hint mt-1 text-xs text-zinc-500">We fetch this URL from our servers (private IPs blocked).</p>
+            <p className="form-hint mt-1 text-xs">We fetch this URL from our servers (private IPs blocked).</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700" htmlFor="competitor-facebook-page-id">
@@ -618,11 +594,9 @@ function CompetitorDetailInner() {
               {fbResolveMsg && <span className="text-sm text-emerald-800">{fbResolveMsg}</span>}
             </div>
             <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2">
-              <p className="text-xs font-medium text-zinc-700">Test: Page id from one Ad Library <strong>ad</strong> id</p>
-              <p className="mt-0.5 text-xs text-zinc-500">
-                Paste the numeric <code className="rounded bg-zinc-100 px-0.5">id</code> of a single ad (same as Graph Archived Ad). The
-                server calls <code className="rounded bg-zinc-100 px-0.5">GET /&#123;id&#125;?fields=page_id</code> then fills the Page id
-                above for scans.
+              <p className="text-xs font-medium text-zinc-700">Get Page id from one Ad Library ad id</p>
+              <p className="mt-0.5 text-xs text-zinc-600">
+                Paste the numeric id of one ad — we resolve the advertiser Page automatically and fill the field above.
               </p>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
@@ -710,14 +684,9 @@ function CompetitorDetailInner() {
                 </select>
               </div>
             )}
-            <p id="competitor-facebook-page-id-hint" className="form-hint mt-1 text-xs text-zinc-500">
-              <strong>Find Page id from website</strong> walks many same-domain pages (not only the home page), up to a
-              time/size cap, and looks for <code className="rounded bg-zinc-100 px-0.5">facebook.com</code> in the HTML. With{" "}
-              <code className="rounded bg-zinc-100 px-0.5">GOOGLE_PLACES_API_KEY</code> on the API, we also run Google Places
-              (New) for the <strong>competitor name</strong> to find an official website + Google Maps link — Google does
-              <strong> not</strong> return Facebook in that API, but the listed website is fetched once for extra
-              social links. <strong>Look up (paste text)</strong> is for a Page URL, Ad Library link, or @handle. Then{" "}
-              <strong>Save settings</strong>.
+            <p id="competitor-facebook-page-id-hint" className="form-hint mt-1 text-xs">
+              <strong>Find Page id from website</strong> scans your competitor site for Facebook links.{" "}
+              <strong>Look up (paste text)</strong> accepts a Page URL, Ad Library link, or @handle — then save settings.
             </p>
           </div>
           {metaLibraryUrl && (
@@ -763,21 +732,18 @@ function CompetitorDetailInner() {
         </div>
 
         <p className="mt-6 text-sm text-zinc-600">
-          <strong>Run scan</strong> fetches the public website (if set), Meta Ad Library when configured (Facebook Page id <strong>or</strong> competitor name + keywords), and stores an AI brief when OpenAI is set. This tool <strong>does not</strong> post to Facebook — it only
-          reads public data and saves to your account.
+          <strong>Run scan</strong> loads the public website (if set), queries Meta Ad Library when you have a Page or use name + keywords, and saves an AI brief. Nothing is posted to Facebook — it only reads public data.
         </p>
 
         <section className="mt-10" aria-label="Competitor ads from Meta Ad Library">
           <h2 className="text-lg font-semibold text-zinc-900">What they are running (Meta Ad Library)</h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-600">
             These are <strong>public creative snapshots</strong> from Meta Ad Library (Page-scoped or keyword discovery). Not a full Ads Manager export — closest live view without their login.
           </p>
           {(watch.ads ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">
-              No Meta ads stored yet. Either add a <strong>Facebook Page</strong> for Page-level pulls, or leave Page blank and use <strong>competitor name</strong> +{" "}
-              <strong>keywords</strong> (keyword-only mode — server filters unrelated ads). Set tokens on the API host (
-              <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_TOKEN</code> or{" "}
-              <code className="rounded bg-zinc-100 px-1">META_APP_ID</code> + <code className="rounded bg-zinc-100 px-1">META_APP_SECRET</code>), then run a scan. If you see ads on{" "}
+              No Meta ads stored yet. Add a Facebook Page for Page-level pulls, or leave Page blank and rely on competitor name + keywords (the scan filters noise).{" "}
+              If you already see creatives in{" "}
               <a
                 className="font-medium text-violet-700 hover:underline"
                 href="https://www.facebook.com/ads/library"
@@ -786,17 +752,14 @@ function CompetitorDetailInner() {
               >
                 Meta&apos;s public Ad Library
               </a>{" "}
-              but not here, their ads may run under a <strong>different</strong> Facebook Page — use{" "}
-              <strong>Search advertisers by keyword</strong> or <strong>Get Page id from ad id</strong> in Watch settings.
-              Also confirm <code className="rounded bg-zinc-100 px-1">META_AD_LIBRARY_COUNTRIES</code> includes regions their ads target (e.g.{" "}
-              <code className="rounded bg-zinc-100 px-0.5">US,GB,DE</code>).
+              but not here, try <strong>Search advertisers by keyword</strong> or <strong>Get Page id from ad id</strong> in Watch settings to pick the right Page. Still stuck? Confirm Meta is connected under Integrations or contact your administrator.
             </p>
           ) : (
             <ul className="mt-4 space-y-4">
               {(watch.ads ?? []).map((ad) => (
                 <li key={ad.id} className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm shadow-sm">
-                  <p className="text-xs font-medium uppercase text-zinc-500">Meta</p>
-                  <p className="mt-0.5 font-mono text-xs text-zinc-500">Library id: {ad.adLibraryId}</p>
+                  <p className="text-xs font-medium uppercase text-zinc-600">Meta</p>
+                  <p className="mt-0.5 font-mono text-xs text-zinc-600">Library id: {ad.adLibraryId}</p>
                   {ad.headline && <p className="mt-1 font-medium text-zinc-900">{ad.headline}</p>}
                   {ad.bodyText && <p className="mt-1 text-zinc-700">{ad.bodyText}</p>}
                   <div className="mt-2 flex flex-wrap gap-3 text-xs">
@@ -824,7 +787,7 @@ function CompetitorDetailInner() {
 
         <section id="competitor-insights" className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-900">Intelligence & history</h2>
-          <p className="mt-1 text-sm text-zinc-500">Newest first. Each run is a full snapshot; compare over time to see shifts in messaging and ads.</p>
+          <p className="mt-1 text-sm text-zinc-600">Newest first. Each run is a full snapshot; compare over time to see shifts in messaging and ads.</p>
           {(watch.insights ?? []).length === 0 ? (
             <p className="mt-2 text-sm text-zinc-600">Run a scan to generate the first brief.</p>
           ) : (
@@ -840,7 +803,7 @@ function CompetitorDetailInner() {
                     className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
                   >
                     <div className="border-b border-zinc-100 bg-zinc-50/80 px-4 py-2">
-                      <p className="text-xs text-zinc-500">{new Date(ins.generatedAt).toLocaleString()}</p>
+                      <p className="text-xs text-zinc-600">{new Date(ins.generatedAt).toLocaleString()}</p>
                     </div>
                     <div className="p-4">
                       {renderInsightSummaryText(ins.summary)}
@@ -876,7 +839,7 @@ function CompetitorDetailInner() {
                           {pack.yourCampaigns.length > 0 && (
                             <div>
                               <h3 className="text-sm font-semibold text-zinc-900">Campaigns you can run (starter copy)</h3>
-                              <p className="mt-1 text-xs text-zinc-500">Use a suggestion below — we will open <strong>Home</strong> with the text filled into a new campaign draft.</p>
+                              <p className="form-hint mt-1 text-xs">Pick a suggestion to open <strong>Home</strong> with copy filled into a new campaign draft.</p>
                               <ul className="mt-3 space-y-4">
                                 {pack.yourCampaigns.map((idea, k) => (
                                   <li key={k} className="rounded-xl border border-violet-200 bg-violet-50/30 p-4">
@@ -903,7 +866,7 @@ function CompetitorDetailInner() {
                       )}
                       {themes.length > 0 && (
                         <div className="mt-4">
-                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Themes</h3>
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Themes</h3>
                           <ul className="mt-2 flex flex-wrap gap-2">
                             {themes.map((t) => (
                               <li
@@ -918,7 +881,7 @@ function CompetitorDetailInner() {
                       )}
                       {angles.length > 0 && (
                         <div className="mt-4">
-                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Your counter-angles</h3>
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Your counter-angles</h3>
                           <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-sm text-zinc-800">
                             {angles.map((a) => (
                               <li key={a}>{a}</li>
@@ -928,7 +891,7 @@ function CompetitorDetailInner() {
                       )}
                       {strong.length > 0 && (
                         <div className="mt-4">
-                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Strongest ad signals</h3>
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Strongest ad signals</h3>
                           <ul className="mt-2 space-y-2">
                             {strong.map((s, j) => (
                               <li key={j} className="rounded-lg border border-zinc-100 bg-zinc-50/50 px-3 py-2 text-sm text-zinc-800">

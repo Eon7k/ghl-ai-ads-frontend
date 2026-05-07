@@ -455,7 +455,7 @@ export function HomeClient() {
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             <p>{decodeURIComponent(errorParam)}</p>
             <p className="mt-2 text-xs text-red-700">
-              If integrations sign-in keeps failing, check: you’re logged in, <strong>NEXT_PUBLIC_BACKEND_URL</strong> is set in the frontend (and redeployed on Vercel), backend has <strong>BACKEND_URL</strong>, <strong>FRONTEND_URL</strong>, and the platform’s app ID/secret (e.g. META_APP_ID, LINKEDIN_CLIENT_ID). The redirect URI in the developer console must match <strong>BACKEND_URL/integrations/&lt;platform&gt;/callback</strong> (meta, google, tiktok, linkedin). See INTEGRATIONS_SIGNIN_TROUBLESHOOTING.md for details.
+              If this keeps happening, sign out and back in, try Connect again, or open <strong>Help</strong> — your workspace admin may need to finish platform setup.
             </p>
           </div>
         )}
@@ -554,7 +554,7 @@ export function HomeClient() {
           </div>
           {!BACKEND_URL && (
             <p className="mt-2 text-sm text-amber-700">
-              Set <strong>NEXT_PUBLIC_BACKEND_URL</strong> (or NEXT_PUBLIC_API_URL) to your backend URL so Connect can redirect there. Use .env.local locally (e.g. <code className="rounded bg-amber-100 px-1">NEXT_PUBLIC_BACKEND_URL=http://localhost:4000</code>) and add it in Vercel → Environment Variables for production, then redeploy.
+              Connecting ad accounts requires the app to reach your data service. If Connect stays disabled, contact your administrator.
             </p>
           )}
         </section>

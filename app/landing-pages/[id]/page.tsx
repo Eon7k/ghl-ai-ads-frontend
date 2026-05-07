@@ -132,7 +132,7 @@ function LandingPageEditorPageInner() {
     try {
       const r = await expansion.landingPages.competitorScan({ urlsText: competitorUrlsScan });
       if (r.synthesis) setCompetitorBrief(r.synthesis);
-      else setSaveError(r.error ?? "No synthesis — check OPENAI_API_KEY on the API.");
+      else setSaveError(r.error ?? "We couldn’t generate a synthesis. Try again, or contact your administrator if this persists.");
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Scan failed");
     } finally {

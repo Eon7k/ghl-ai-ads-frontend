@@ -1,8 +1,4 @@
-/**
- * Simple check: can the Vercel server reach your Render backend?
- * Open: https://your-app.vercel.app/api/backend-check
- * Use this to debug 502s when BACKEND_URL is already set.
- */
+/** Connectivity check between this deployment and the configured API URL. */
 export const maxDuration = 60;
 
 const TIMEOUT_MS = 58_000;
@@ -17,8 +13,11 @@ export async function GET() {
   if (!base || base.startsWith("http://localhost")) {
     return Response.json({
       ok: false,
-      error: "BACKEND_URL (or NEXT_PUBLIC_API_URL) is not set in Vercel.",
-      hint: "Add it in Vercel → Project → Settings → Environment Variables, then redeploy.",
+      error: "This check could not reach a configured backend URL.",
+      hint:
+        process.env.NODE_ENV === "development"
+          ? "For local debugging: set BACKEND_URL or NEXT_PUBLIC_API_URL."
+          : "If you are troubleshooting deployment, verify environment variables with your administrator.",
     });
   }
 
@@ -30,7 +29,7 @@ export async function GET() {
     });
     return Response.json({
       ok: true,
-      message: "Backend is reachable from Vercel.",
+      message: "Backend responded successfully.",
       backendStatus: res.status,
     });
   } catch (err: unknown) {
@@ -47,8 +46,8 @@ export async function GET() {
       ok: false,
       error: message,
       hint: isTimeout
-        ? "Render may be waking up (free tier). Wait 30–60 seconds and try again, or check the backend URL."
-        : "Check that BACKEND_URL is exactly your Render URL (no trailing slash) and that the service is running on Render.",
+        ? "The server may still be starting. Wait a minute and try again, or contact your administrator if it persists."
+        : "Contact your administrator so they can confirm the API URL and that the service is running.",
     });
   }
 }

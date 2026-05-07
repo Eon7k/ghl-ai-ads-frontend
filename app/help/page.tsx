@@ -178,9 +178,8 @@ export default function HelpPage() {
               <li>Choose how much the AI should write (full copy vs ideas only) and the time range (one post, a week, a month).</li>
               <li>Click generate and read the result; copy it into your real social schedulers or docs.</li>
             </ol>
-            <p>
-              <strong>Backend:</strong> Needs <code className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs">ANTHROPIC_API_KEY</code> on the
-              server.
+            <p className="text-sm text-zinc-600">
+              If Generate is unavailable or returns an error, your workspace may still need AI features turned on server-side — ask whoever administers your product.
             </p>
           </Section>
 
@@ -203,13 +202,14 @@ export default function HelpPage() {
           </Section>
 
           <Section id="integrations" title="Connecting ad accounts">
-            <p>
-              OAuth opens in a new window or tab. You must return to <strong>this</strong> app. If something fails, check:{" "}
-              <strong>BACKEND_URL</strong> and <strong>FRONTEND_URL</strong> in your deployment, and that the redirect URL in
-              Meta / Google / TikTok / LinkedIn developer settings matches <code className="rounded bg-zinc-200 px-1.5">BACKEND_URL/integrations/&lt;platform&gt;/callback</code>.
+            <p className="text-zinc-700">
+              OAuth usually opens in a new window — finish there, then come back <strong>to this tab</strong>. If the popup
+              closes but nothing connects, retry from <strong>Home</strong> and allow pop-ups for this site. Still stuck after
+              a few tries? Contact whoever admins your integrations; they verify callback URLs and app approval with Meta,
+              Google, TikTok, or LinkedIn.
             </p>
-            <p>
-              The Home page also shows a longer hint when an error is passed in the URL after a failed return.
+            <p className="mt-3 text-zinc-600">
+              When OAuth fails, Home may show a short error message explaining what broke—read it literally and reconnect.
             </p>
           </Section>
 
@@ -232,9 +232,8 @@ export default function HelpPage() {
             </p>
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                You only see <strong>Admin</strong> in the top bar if your email is allowed in the backend (for example via{" "}
-                <code className="rounded bg-zinc-200 px-1.5">ADMIN_EMAILS</code>). It is for user lists, product toggles, and
-                diagnostics.
+                You only see <strong>Admin</strong> in the top bar if whoever runs your account explicitly enabled it for
+                your email. It is for user lists, product toggles, and diagnostics—not day-to-day ad building.
               </li>
               <li>Day-to-day ad work is done on <strong>Home</strong> and on each <strong>campaign</strong> page, not in Admin.</li>
             </ul>
@@ -243,13 +242,13 @@ export default function HelpPage() {
           <Section id="problems" title="When something goes wrong">
             <ul className="list-disc space-y-2 pl-5">
               <li>
-                <strong>“Database” or login errors after an update:</strong> Your host may need a schema sync. Whoever runs
-                the backend should run <code className="rounded bg-zinc-200 px-1.5">npx prisma db push</code> against the
-                same database your app uses, or add missing columns in the Neon SQL editor (see your team’s runbook).
+                <strong>“Database” or login errors after an update:</strong> Something on the hosting side likely needs an
+                update. Ask whoever runs your product to investigate; this is not something you fix from the browser.
               </li>
               <li>
-                <strong>Empty ad account list:</strong> Reconnect the integration; confirm you use the ad account on the
-                right business profile. For LinkedIn, scopes and “Marketing / Ads” product must be approved for your app.
+                <strong>Empty ad account list:</strong> Reconnect the integration; confirm you pick the right ad account
+                and page. If LinkedIn stays empty after reconnecting, whoever administers integrations may still need to
+                finish setup on LinkedIn&apos;s side.
               </li>
               <li>
                 <strong>Launch fails with a long error message:</strong> Read the first clear sentence; it often names a

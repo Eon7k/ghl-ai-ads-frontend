@@ -2,24 +2,30 @@
  * Proxy API requests to the backend so the browser only talks to same origin.
  * This avoids CORS issues when the app is embedded in GHL iframe.
  *
- * Vercel env (required): set BACKEND_URL or NEXT_PUBLIC_API_URL to your Render backend URL
- * (e.g. https://your-app.onrender.com — no trailing slash).
- * If you get 502: check that this is set in Vercel → Project → Settings → Environment Variables.
- *
- * Creating campaigns calls the backend for AI variant generation — that can take 30–90s with many
- * variants. **Vercel Hobby** caps serverless routes at **10s** unless you upgrade; use fewer variants
- * or Vercel Pro (60s max below) for reliable creates.
+ * Operators: configure BACKEND_URL or NEXT_PUBLIC_API_URL (no trailing slash). Serverless timeouts may apply for long AI runs.
  */
-/** Allow long-running POST (e.g. AI). Vercel Hobby max is 10s; Pro supports up to 60s+ per plan. */
+/** Allow long-running POST (e.g. AI variant generation). */
 export const maxDuration = 60;
 
-const PROXY_TIMEOUT_MS = 58_000; // Stay just under maxDuration; Render cold start + AI can be slow
+const PROXY_TIMEOUT_MS = 58_000; // Stay just under maxDuration; cold start + AI can be slow
+const IS_DEV = process.env.NODE_ENV === "development";
+
+function backendUrlNotSetMessage(): string {
+  return IS_DEV
+    ? "Backend URL not configured locally. Add BACKEND_URL or NEXT_PUBLIC_API_URL (for example in .env.local)."
+    : "This app isn't connected to its server configuration yet. Ask your administrator.";
+}
+
+/** Shown when the upstream request hits our proxy/network timeout — keep wording end-user friendly. */
+function proxyTimeoutUserMessage(): string {
+  return "This took too long to finish. Try again with fewer options, wait a minute, or contact your administrator if it keeps happening.";
+}
 
 function getBackendUrl(): string {
   const url =
     process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    (process.env.NODE_ENV === "development" ? "http://localhost:3001" : "");
+    (IS_DEV ? "http://localhost:3001" : "");
   return url.replace(/\/$/, "");
 }
 
@@ -34,7 +40,7 @@ function fail502(code: string, error: string) {
   return Response.json({ error, code }, { status: 502 });
 }
 
-/** Backend sometimes returns plain text or HTML (e.g. Render 503). Parse JSON when possible; otherwise a clear message (not always Prisma). */
+/** Backend sometimes returns plain text or HTML (e.g. 503 HTML). Parse JSON when possible; otherwise a clear message. */
 function formatNonJsonBackendError(status: number, rawBody: string): { error: string } {
   const t = rawBody.trim();
   const isHtml = t.startsWith("<!") || /^<html/i.test(t);
@@ -44,18 +50,13 @@ function formatNonJsonBackendError(status: number, rawBody: string): { error: st
   if (snippet) {
     chunks.push(snippet);
   } else {
-    chunks.push(`Backend returned HTTP ${status} with a non-JSON body.`);
+    chunks.push(`The server returned HTTP ${status} with an unexpected response.`);
   }
   if (status === 503) {
-    chunks.push(
-      "This often means the API is waking up or busy (Render free tier can take a minute after sleep). Retry shortly."
-    );
+    chunks.push("The API may still be waking up or is busy—wait a minute and try again.");
   }
   if (status === 502) {
-    chunks.push("Check Vercel BACKEND_URL and that your Render web service is running.");
-  }
-  if (/prisma|P20\d{2}|column .*does not exist|relation .* does not exist|db push|migrate/i.test(t)) {
-    chunks.push('If the backend logs mention a missing DB column, run `npx prisma db push` against production.');
+    chunks.push("Ask your administrator to confirm the API is running and reachable.");
   }
   return { error: chunks.join(" ") };
 }
@@ -70,7 +71,7 @@ async function readBackendProxyBody(res: Response): Promise<unknown> {
   } catch {
     return res.status >= 400
       ? formatNonJsonBackendError(res.status, text)
-      : { error: "Backend did not return valid JSON.", preview: text.slice(0, 200) };
+      : { error: "The server did not return valid JSON.", preview: text.slice(0, 200) };
   }
 }
 
@@ -81,10 +82,7 @@ export async function GET(
   try {
     const base = getBackendUrl();
     if (!base || base.startsWith("http://localhost")) {
-      return fail502(
-        "BACKEND_URL_NOT_SET",
-        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
-      );
+      return fail502("BACKEND_URL_NOT_SET", backendUrlNotSetMessage());
     }
     const { path } = await params;
     const search = new URL(request.url).search || "";
@@ -111,8 +109,8 @@ export async function GET(
     const data = isJson
       ? await res.json().catch(() => ({ error: "Invalid JSON from backend" }))
       : res.status >= 400
-        ? { error: `Backend returned ${res.status}. If using Render, the service may be starting—try again in a moment.` }
-        : { error: "Backend did not return JSON." };
+        ? { error: `The server returned ${res.status}. It may still be starting—try again in a moment.` }
+        : { error: "The server did not return JSON." };
     return Response.json(data, { status: res.status });
   } catch (err: unknown) {
     const message =
@@ -126,9 +124,7 @@ export async function GET(
       err instanceof Error && (err.name === "TimeoutError" || err.message?.includes("timeout"));
     return fail502(
       "BACKEND_UNREACHABLE",
-      isTimeout
-        ? "Backend took too long (proxy timeout). If you had many AI variants, try 1–3 first. Render free tier can be slow to wake; Vercel Hobby only allows ~10s unless you upgrade to Pro."
-        : `Cannot reach backend: ${message}`
+      isTimeout ? proxyTimeoutUserMessage() : `Cannot reach backend: ${message}`
     );
   }
 }
@@ -140,10 +136,7 @@ export async function POST(
   try {
     const base = getBackendUrl();
     if (!base || base.startsWith("http://localhost")) {
-      return fail502(
-        "BACKEND_URL_NOT_SET",
-        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
-      );
+      return fail502("BACKEND_URL_NOT_SET", backendUrlNotSetMessage());
     }
     const { path } = await params;
     const url = buildUrl(path);
@@ -176,9 +169,7 @@ export async function POST(
       err instanceof Error && (err.name === "TimeoutError" || err.message?.includes("timeout"));
     return fail502(
       "BACKEND_UNREACHABLE",
-      isTimeout
-        ? "Backend took too long (proxy timeout). If you had many AI variants, try fewer. Vercel Hobby limits routes to ~10s; Pro allows longer."
-        : `Cannot reach backend: ${message}`
+      isTimeout ? proxyTimeoutUserMessage() : `Cannot reach backend: ${message}`
     );
   }
 }
@@ -190,10 +181,7 @@ export async function PUT(
   try {
     const base = getBackendUrl();
     if (!base || base.startsWith("http://localhost")) {
-      return fail502(
-        "BACKEND_URL_NOT_SET",
-        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
-      );
+      return fail502("BACKEND_URL_NOT_SET", backendUrlNotSetMessage());
     }
     const { path } = await params;
     const url = buildUrl(path);
@@ -222,7 +210,12 @@ export async function PUT(
           : err.message
         : "Proxy request failed";
     console.error("[proxy PUT]", err);
-    return fail502("BACKEND_UNREACHABLE", `Cannot reach backend: ${message}`);
+    const isTimeout =
+      err instanceof Error && (err.name === "TimeoutError" || err.message?.includes("timeout"));
+    return fail502(
+      "BACKEND_UNREACHABLE",
+      isTimeout ? proxyTimeoutUserMessage() : `Cannot reach backend: ${message}`
+    );
   }
 }
 
@@ -233,10 +226,7 @@ export async function PATCH(
   try {
     const base = getBackendUrl();
     if (!base || base.startsWith("http://localhost")) {
-      return fail502(
-        "BACKEND_URL_NOT_SET",
-        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
-      );
+      return fail502("BACKEND_URL_NOT_SET", backendUrlNotSetMessage());
     }
     const { path } = await params;
     const url = buildUrl(path);
@@ -269,9 +259,7 @@ export async function PATCH(
       err instanceof Error && (err.name === "TimeoutError" || err.message?.includes("timeout"));
     return fail502(
       "BACKEND_UNREACHABLE",
-      isTimeout
-        ? "Backend took too long (proxy timeout). Render may be waking up; Vercel Hobby limits routes to ~10s."
-        : `Cannot reach backend: ${message}`
+      isTimeout ? proxyTimeoutUserMessage() : `Cannot reach backend: ${message}`
     );
   }
 }
@@ -283,10 +271,7 @@ export async function DELETE(
   try {
     const base = getBackendUrl();
     if (!base || base.startsWith("http://localhost")) {
-      return fail502(
-        "BACKEND_URL_NOT_SET",
-        "Backend URL not set. In Vercel, add BACKEND_URL (or NEXT_PUBLIC_API_URL) with your Render URL (e.g. https://your-app.onrender.com)."
-      );
+      return fail502("BACKEND_URL_NOT_SET", backendUrlNotSetMessage());
     }
     const { path } = await params;
     const url = buildUrl(path);
@@ -315,9 +300,7 @@ export async function DELETE(
       err instanceof Error && (err.name === "TimeoutError" || err.message?.includes("timeout"));
     return fail502(
       "BACKEND_UNREACHABLE",
-      isTimeout
-        ? "Backend took too long (proxy timeout). Render may be waking up; Vercel Hobby limits routes to ~10s."
-        : `Cannot reach backend: ${message}`
+      isTimeout ? proxyTimeoutUserMessage() : `Cannot reach backend: ${message}`
     );
   }
 }

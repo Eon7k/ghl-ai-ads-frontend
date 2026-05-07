@@ -46,6 +46,22 @@ function harvestSourcesLabel(raw: unknown): string {
     .join(" + ");
 }
 
+/** Keeps harmless status lines; strips env-variable / operator trivia from surfaced diagnostics. */
+function sanitizeHarvestDiagnosticsForUi(lines: string[]): string[] {
+  const operatorish =
+    /\b(META_[A-Z0-9_]+|LINKEDIN_[A-Z0-9_]+|OPENAI_[A-Z0-9_]+|NEXT_PUBLIC_[A-Z0-9_]+|DATABASE_URL|ADMIN_EMAILS|META_HARVEST|META_AD_LIBRARY_CONTENT|META_GRAPH|CLIENT_SECRET|APP_SECRET|skipped — set|API server\b|API host\b|environment variable\b|process\.env|\.env\b)/i;
+  return lines.filter((l) => !operatorish.test(l));
+}
+
+const HARVEST_CONTROL =
+  "rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2";
+const HARVEST_FIELD = `mt-1 w-full ${HARVEST_CONTROL}`;
+const HARVEST_FIELD_MT3 = `mt-3 w-full ${HARVEST_CONTROL}`;
+const HARVEST_FIELD_INLINE = `min-w-0 flex-1 ${HARVEST_CONTROL}`;
+const HARVEST_CONTROL_LG =
+  "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-600 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2";
+const HARVEST_FIELD_LG = `mt-1 w-full ${HARVEST_CONTROL_LG}`;
+
 function isQueuedHarvestResponse(
   x: MetaHarvestReportSyncResponse | MetaHarvestReportQueuedResponse
 ): x is MetaHarvestReportQueuedResponse {
@@ -327,7 +343,7 @@ function HarvestInner() {
 
   const [excludeInput, setExcludeInput] = useState("");
   const [strictFilter, setStrictFilter] = useState(true);
-  /** Default on: landscape/report OpenAI work often exceeds hosted proxy limits (e.g. Vercel) if we wait synchronously. */
+  /** Default on: large report jobs can exceed synchronous proxy timeouts; background mode avoids blocking the UI. */
   const [runInBackground, setRunInBackground] = useState(true);
 
   const [landscapeRunId, setLandscapeRunId] = useState("");
@@ -482,7 +498,7 @@ function HarvestInner() {
         intentPrompt: pickIntentPrompt.trim() || undefined,
       });
       if (keywords.length) setPickRankingKwInput(keywords.join(", "));
-      else setInfo("No AI phrases returned — write intent above or confirm OPENAI_API_KEY on your API server.");
+      else setInfo("No AI phrases returned — add more detail above, or try again in a moment.");
     } catch (e) {
       setError(userFacingError(e));
     } finally {
@@ -528,7 +544,7 @@ function HarvestInner() {
       if (keywords.length) {
         setInfo("Suggestion applied — edit the keyword box if needed, then collect.");
       } else {
-        setError("AI returned no keywords. Check OPENAI_API_KEY on your API server or try a richer description.");
+        setError("AI didn’t return usable keywords — try a slightly longer, more concrete description.");
       }
     } catch (e) {
       setError(userFacingError(e));
@@ -571,13 +587,11 @@ function HarvestInner() {
         setError([run.errorMessage, diagLines.join(" ")].filter(Boolean).join(" — ") || "Collection failed.");
       } else if (adsCount === 0) {
         setInfo(null);
+        const safeDiag = sanitizeHarvestDiagnosticsForUi(diagLines).join(" ").trim();
         const hint =
-          diagLines.length > 0
-            ? diagLines.join(" ")
-            : "No diagnostic lines returned — on the API host confirm Meta (META_AD_LIBRARY_TOKEN or META_APP_ID+META_APP_SECRET), LinkedIn (LINKEDIN_AD_LIBRARY_ACCESS_TOKEN when LinkedIn is enabled), clear META_AD_LIBRARY_CONTENT_LANGUAGES if Meta returns nothing unexpectedly, or set META_HARVEST_STRICT_KEYWORD_MATCH=false to test.";
-        setError(
-          `No ads were saved. ${hint} If you use META_AD_LIBRARY_TOKEN (a user long-lived token), it often expires after ~60 days — generate a new one in Meta and update your server env.`
-        );
+          safeDiag ||
+          "Try broader keywords, make sure Meta and/or LinkedIn is connected under Integrations, then run another collection.";
+        setError(`No ads were saved. ${hint}`);
       } else {
         setError(null);
         setInfo("Collection finished. New ads are ready to browse and report on.");
@@ -740,9 +754,8 @@ function HarvestInner() {
 
         <h1 className="mt-6 text-2xl font-bold tracking-tight text-zinc-900">Ads Library research</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
-          Collect public Meta ads by topic, spot what competitors are saying, then get plain-language summaries—either across the whole
-          collection or for hand-picked advertisers. Irrelevant sponsors (for example clinics you do not compete with) can be filtered out
-          before summaries are written.
+          Search public Meta and LinkedIn ads by topic, skim what competitors show, then get short written summaries—for a whole saved
+          sweep or selected advertisers. Narrow with exclude phrases before summaries run.
         </p>
 
         <div
@@ -797,7 +810,7 @@ function HarvestInner() {
                 <strong>Meta</strong>, <strong>LinkedIn</strong>, or both; we gather a sample of public creatives and group them by advertiser
                 so you can review what shows up for those topics.
               </p>
-              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="harvest-intent">
+              <label className="form-label mt-4 block" htmlFor="harvest-intent">
                 What are you trying to find? (optional — saves with this collection)
               </label>
               <textarea
@@ -806,13 +819,14 @@ function HarvestInner() {
                 onChange={(e) => setCollectIntentPrompt(e.target.value)}
                 rows={3}
                 placeholder="Example: Active ads from boutique cryotherapy studios and cold plunge brands targeting wellness shoppers in Texas—not generic gym chains."
-                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
               />
-              <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                AI can turn this into search keywords below. Each successful collection updates a workspace vocabulary so suggestions improve as you pull more ads.
+              <p className="form-hint mt-2 text-xs">
+                You can click “Suggest keywords from description” to turn this into search terms below. The more pulls you save, the better
+                later suggestions tend to fit your workspace.
               </p>
               <div className="mt-4 rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-3">
-                <p className="text-xs font-medium text-zinc-700">Which libraries should this run query?</p>
+                <p className="text-xs font-medium text-zinc-700">Sources</p>
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-8">
                   <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-800">
                     <input
@@ -827,9 +841,7 @@ function HarvestInner() {
                     />
                     <span>
                       <span className="font-medium text-zinc-900">Meta Ads Library</span>
-                      <span className="mt-0.5 block text-xs text-zinc-600">
-                        Requires <code className="rounded bg-white px-1 py-0.5 font-mono text-[11px]">META_AD_LIBRARY_TOKEN</code> (or Meta app credentials) on the API host.
-                      </span>
+                      <span className="mt-0.5 block text-xs text-zinc-600">Uses your connected Meta account from Integrations when available.</span>
                     </span>
                   </label>
                   <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-800">
@@ -845,9 +857,7 @@ function HarvestInner() {
                     />
                     <span>
                       <span className="font-medium text-zinc-900">LinkedIn Ad Library</span>
-                      <span className="mt-0.5 block text-xs text-zinc-600">
-                        Requires <code className="rounded bg-white px-1 py-0.5 font-mono text-[11px]">LINKEDIN_AD_LIBRARY_ACCESS_TOKEN</code> plus LinkedIn Ads Library API access on your developer app.
-                      </span>
+                      <span className="mt-0.5 block text-xs text-zinc-600">Uses your LinkedIn connection from Integrations when available.</span>
                     </span>
                   </label>
                 </div>
@@ -866,7 +876,7 @@ function HarvestInner() {
                   {collectionKwRationale}
                 </div>
               ) : null}
-              <label className="mt-6 block text-xs font-medium text-zinc-500" htmlFor="harvest-keywords">
+              <label className="form-label mt-6 block text-xs font-medium text-zinc-700" htmlFor="harvest-keywords">
                 Keywords (comma or line separated, up to 12)
               </label>
               <textarea
@@ -874,15 +884,13 @@ function HarvestInner() {
                 value={kwInput}
                 onChange={(e) => setKwInput(e.target.value)}
                 rows={3}
-                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
                 placeholder="Example: dental implants Austin, smile makeover"
               />
-              <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                Meta surfaces creatives in the languages they target—English searches can still return Spanish copy. Write keywords in the language you want when possible. Your backend can restrict{" "}
-                <strong>new</strong> pulls with env{" "}
-                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono">META_AD_LIBRARY_CONTENT_LANGUAGES=en</code> (comma-separated ISO codes).
+              <p className="form-hint mt-2 text-xs">
+                Platforms often return creatives in multiple languages — write keywords in the language you care about most.
               </p>
-              <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="harvest-label">
+              <label className="form-label mt-3 block text-xs font-medium text-zinc-700" htmlFor="harvest-label">
                 Friendly name (optional)
               </label>
               <input
@@ -890,7 +898,7 @@ function HarvestInner() {
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Example: Spring competitor sweep"
-                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
               />
               <button
                 type="button"
@@ -925,26 +933,43 @@ function HarvestInner() {
                       {harvestStoredAdCount(r) === 0 ? (
                         <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950">
                           {r.errorMessage ? <p className="font-medium text-amber-950">{r.errorMessage}</p> : null}
-                          {harvestDiagnosticsLines(r.diagnostics).length ? (
-                            <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                              {harvestDiagnosticsLines(r.diagnostics).slice(0, 10).map((line, idx) => (
-                                <li key={idx}>{line}</li>
-                              ))}
-                            </ul>
-                          ) : !r.errorMessage ? (
-                            <p className="text-amber-900/90">
-                              No detailed diagnostics — if this happens again, check Meta env on the API server (token, languages filter, strict
-                              keyword match).
-                            </p>
-                          ) : null}
+                          {(() => {
+                            const raw = harvestDiagnosticsLines(r.diagnostics);
+                            const diagUi = sanitizeHarvestDiagnosticsForUi(raw);
+                            if (diagUi.length > 0) {
+                              return (
+                                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                                  {diagUi.slice(0, 8).map((line, idx) => (
+                                    <li key={idx}>{line}</li>
+                                  ))}
+                                </ul>
+                              );
+                            }
+                            if (!r.errorMessage && raw.length > 0) {
+                              return (
+                                <p className="mt-1 text-amber-900/90">
+                                  This collection didn&apos;t finish with saved ads — try adjusting keywords or sources, reconnect Meta or LinkedIn under
+                                  Integrations, or ask your administrator to review the workspace setup.
+                                </p>
+                              );
+                            }
+                            if (!r.errorMessage) {
+                              return (
+                                <p className="mt-1 text-amber-900/90">
+                                  No extra detail available. Adjust keywords or try again; contact your administrator if it keeps failing.
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       ) : null}
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="mt-4 text-xs text-zinc-500">
-                Large searches can take a little while. When the status shows completed, switch to Summaries to analyze what you collected.
+              <p className="form-hint mt-4 text-xs">
+                Large searches can take a moment. When a run shows completed, switch to Summaries for reports.
               </p>
             </section>
           </div>
@@ -963,7 +988,7 @@ function HarvestInner() {
                 value={excludeInput}
                 onChange={(e) => setExcludeInput(e.target.value)}
                 rows={2}
-                className="mt-3 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD_MT3}
                 placeholder="Example: sperm bank, fertility clinic, egg freezing"
               />
               <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-zinc-800">
@@ -990,8 +1015,7 @@ function HarvestInner() {
                 <span>
                   <span className="font-medium text-zinc-900">Generate in the background</span>
                   <span className="mt-0.5 block text-zinc-600">
-                    Recommended. Market overview and advertiser reports call the model for a while; waiting in the browser often hits a
-                    gateway timeout. Off: you get an on-page preview when it finishes, if your hosting allows long requests.
+                    Long summaries can time out in the browser — leaving this on avoids losing your place.
                   </span>
                 </span>
               </label>
@@ -1000,19 +1024,16 @@ function HarvestInner() {
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-zinc-900">Pick specific ads (optional)</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                Ads sort by <strong>relevance score</strong> (collection keywords + phrases/intent below + soft boosts from advertisers you&apos;ve picked before on normal accounts). Cards lay out <strong>four per row</strong> on wide screens (fewer on tablets/phones)—scroll inside the bordered panel to skim many ads quickly. Creative previews load through our API (max four at a time, top ads first): we extract image URLs from Meta’s snapshot HTML when we can; otherwise we embed a sanitized snapshot (scripts removed) when the HTML already includes images or video tags—cards farther down fetch when you scroll near them so the grid stays responsive.{" "}
-                <strong>New collections</strong> keep ads whose copy/Page name mentions your keywords; random listings like unrelated music merch should disappear unless your backend sets{" "}
-                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_HARVEST_STRICT_KEYWORD_MATCH=false</code>. Optional{" "}
-                <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs">META_AD_LIBRARY_CONTENT_LANGUAGES=en</code> narrows Meta&apos;s search by language.
+                Choose a collection, then skim ads ranked by relevance. Select individual cards for focused summaries or a market overview, or combine with filters above.
               </p>
-              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="ad-pick-run">
+              <label className="form-label mt-4 block text-xs font-medium text-zinc-700" htmlFor="ad-pick-run">
                 Collection to browse
               </label>
               <select
                 id="ad-pick-run"
                 value={adPickRunId}
                 onChange={(e) => setAdPickRunId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
               >
                 <option value="">— None —</option>
                 {completedHarvestRuns.map((r) => (
@@ -1033,11 +1054,9 @@ function HarvestInner() {
                   <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50/50 p-4 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wide text-violet-900">Ranking & intent</p>
                     <p className="mt-1 text-xs leading-snug text-zinc-600">
-                      Tell the system what you care about in this collection. Save extra phrases here or generate them from your intent with AI.
-                      Intent text is logged for this workspace (skipped for API admin emails in{" "}
-                      <code className="rounded bg-white px-1 py-0.5 font-mono text-[10px]">ADMIN_EMAILS</code>) and helps sort ads plus steer future summary prompts.
+                      Describe what you want at the top of the list and save phrases that should boost ranking. AI can propose phrases from your intent.
                     </p>
-                    <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="pick-intent">
+                    <label className="form-label mt-3 block text-xs font-medium text-zinc-700" htmlFor="pick-intent">
                       What ads do you want at the top?
                     </label>
                     <textarea
@@ -1046,9 +1065,9 @@ function HarvestInner() {
                       onChange={(e) => setPickIntentPrompt(e.target.value)}
                       rows={2}
                       placeholder="Example: wellness studios promoting cryotherapy packages to women 35–55 in Texas—not generic gyms."
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                      className={HARVEST_FIELD_LG}
                     />
-                    <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="pick-ranking-kw">
+                    <label className="form-label mt-3 block text-xs font-medium text-zinc-700" htmlFor="pick-ranking-kw">
                       Extra ranking phrases (comma-separated, saved with this collection)
                     </label>
                     <textarea
@@ -1057,7 +1076,7 @@ function HarvestInner() {
                       onChange={(e) => setPickRankingKwInput(e.target.value)}
                       rows={2}
                       placeholder="cryotherapy package, body contouring, localized fat loss"
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                      className={HARVEST_FIELD_LG}
                     />
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
@@ -1098,10 +1117,8 @@ function HarvestInner() {
                       Clear selection
                     </button>
                   </div>
-                  <p className="mt-2 text-xs text-zinc-500">
-                    {adPickRows.length} ads · {pickedAdLibraryIds().length} selected · up to {BRAND_AD_PICK_CAP} for focused summary · up to{" "}
-                    {LANDSCAPE_AD_PICK_CAP} for market overview
-                  </p>
+                  <p className="form-hint mt-2 text-xs">{adPickRows.length} ads · {pickedAdLibraryIds().length} selected · up to {BRAND_AD_PICK_CAP} for focused summary · up to{" "}
+                    {LANDSCAPE_AD_PICK_CAP} for market overview</p>
                   <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 shadow-sm">
                     <div ref={setThumbScrollRoot} className="max-h-[min(88vh,960px)] overflow-y-auto pr-1">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1191,14 +1208,14 @@ function HarvestInner() {
                 or in campaign structure. If you selected specific ads under &ldquo;Pick specific ads,&rdquo; the overview uses those (and the
                 collection you chose there); otherwise it follows the scope below.
               </p>
-              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="overview-scope">
+              <label className="form-label mt-4 block text-xs font-medium text-zinc-700" htmlFor="overview-scope">
                 Which ads should we include?
               </label>
               <select
                 id="overview-scope"
                 value={landscapeRunId}
                 onChange={(e) => setLandscapeRunId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
               >
                 <option value="">Everything collected in this account (most recent ads first)</option>
                 {completedHarvestRuns.map((r) => (
@@ -1208,7 +1225,7 @@ function HarvestInner() {
                   </option>
                 ))}
               </select>
-              <label className="mt-3 block text-xs font-medium text-zinc-500" htmlFor="overview-topic">
+              <label className="form-label mt-3 block text-xs font-medium text-zinc-700" htmlFor="overview-topic">
                 Short label for this overview (optional)
               </label>
               <input
@@ -1216,7 +1233,7 @@ function HarvestInner() {
                 value={landscapeTopic}
                 onChange={(e) => setLandscapeTopic(e.target.value)}
                 placeholder="Example: Cryotherapy studios — Dallas area"
-                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
               />
               <button
                 type="button"
@@ -1256,7 +1273,7 @@ function HarvestInner() {
                   value={brandQ}
                   onChange={(e) => setBrandQ(e.target.value)}
                   placeholder="Search by advertiser name"
-                  className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                  className={HARVEST_FIELD_INLINE}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void searchBrands();
                   }}
@@ -1308,7 +1325,7 @@ function HarvestInner() {
                 </ul>
               )}
 
-              <label className="mt-4 block text-xs font-medium text-zinc-500" htmlFor="brand-label">
+              <label className="form-label mt-4 block text-xs font-medium text-zinc-700" htmlFor="brand-label">
                 How should we refer to this group? (optional)
               </label>
               <input
@@ -1316,7 +1333,7 @@ function HarvestInner() {
                 value={reportName}
                 onChange={(e) => setReportName(e.target.value)}
                 placeholder="Example: Top three local rivals"
-                className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2"
+                className={HARVEST_FIELD}
               />
               <button
                 type="button"
