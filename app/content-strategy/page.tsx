@@ -35,6 +35,14 @@ export default function ContentStrategyPage() {
   const [ghlGenLoading, setGhlGenLoading] = useState(false);
   const [ghlPushLoading, setGhlPushLoading] = useState(false);
   const [ghlPushMsg, setGhlPushMsg] = useState<string | null>(null);
+  const [ghlImageNote, setGhlImageNote] = useState<string | null>(null);
+
+  const [includeAiImages, setIncludeAiImages] = useState(true);
+  const [planImages, setPlanImages] = useState<{ index: number; postAtSpecificTime: string; imageUrl: string | null }[]>(
+    []
+  );
+  const [planImageErrors, setPlanImageErrors] = useState<string[]>([]);
+  const [organicAiImageLoading, setOrganicAiImageLoading] = useState(false);
 
   const profileSkipped = Boolean(
     businessModelProfile && (businessModelProfile as { skipped?: boolean }).skipped === true
@@ -66,17 +74,31 @@ export default function ContentStrategyPage() {
       .catch(() => setGhlConfigured(false));
   }, [user]);
 
+  function stripMarkdownForCaption(md: string): string {
+    return md
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/^#+\s.*/gm, " ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   async function generate() {
     setGenLoading(true);
     setError(null);
     setResult(null);
+    setPlanImages([]);
+    setPlanImageErrors([]);
     try {
-      const { markdown } = await api.contentStrategy.generate({
+      const r = await api.contentStrategy.generate({
         userPrompt,
         mode,
         horizon,
+        generateImages: includeAiImages,
       });
-      setResult(markdown);
+      setResult(r.markdown);
+      setPlanImages(r.generatedImages ?? []);
+      setPlanImageErrors(r.imageErrors ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -89,13 +111,20 @@ export default function ContentStrategyPage() {
     setError(null);
     setGhlPushMsg(null);
     setGhlCsv(null);
+    setGhlImageNote(null);
     try {
       const r = await api.contentStrategy.generateForGhl({
         userPrompt,
         mode,
         horizon,
+        generateImages: includeAiImages,
       });
       setGhlCsv(r.csv);
+      if (r.imageErrors?.length) {
+        setGhlImageNote(
+          `Some images failed (${r.imageErrors.length}). Rows still export; check missing imageUrls in CSV.`
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "CSV generation failed");
     } finally {
@@ -128,6 +157,27 @@ export default function ContentStrategyPage() {
       setError(e instanceof Error ? e.message : "Push to Go High Level failed");
     } finally {
       setGhlPushLoading(false);
+    }
+  }
+
+  async function generateAiImageForLinkedIn() {
+    setOrganicError(null);
+    const textToUse = organicText.trim() || (result ? stripMarkdownForCaption(result) : "");
+    if (!textToUse) {
+      setOrganicError("Add post text, or generate a plan first, so we have a caption to illustrate.");
+      return;
+    }
+    setOrganicAiImageLoading(true);
+    try {
+      const r = await api.contentStrategy.generateOrganicImage({
+        caption: textToUse.slice(0, 2000),
+      });
+      setOrganicImageDataUrl(r.imageDataUrl);
+      setOrganicImageName("ai-generated.png");
+    } catch (e) {
+      setOrganicError(e instanceof Error ? e.message : "Could not generate image");
+    } finally {
+      setOrganicAiImageLoading(false);
     }
   }
 
@@ -179,6 +229,7 @@ export default function ContentStrategyPage() {
         steps={[
           "This is for organic social content ideas and copy — not the same as launching a paid ad campaign. Paid ads are created from Home and edited on a campaign page.",
           "Type what you need (topic, time window, product launch, tone). Choose whether you want full posts, text plus a to-do list, or ideas only, and pick a time range.",
+          "Optional: keep “Include AI images” on to create a DALL·E image per slot (uses OpenAI). That fills the Go High Level CSV image column and shows matching images under your markdown plan.",
           "For Go High Level: an administrator saves Location id + Private Integration token per portal account (Admin tab). Then generate CSV here and Push or download — Marketing → Social Planner.",
           "If LinkedIn is connected, use the “Post to LinkedIn” section to publish to your Company Page, or still copy the result anywhere you like. The business profile (link below) gives the AI more context about your business.",
         ]}
@@ -288,21 +339,42 @@ export default function ContentStrategyPage() {
           </div>
         </div>
 
+        <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-3">
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-800">
+            <input
+              type="checkbox"
+              checked={includeAiImages}
+              onChange={(e) => setIncludeAiImages(e.target.checked)}
+              className="mt-1 rounded border-zinc-400"
+            />
+            <span>
+              <span className="font-medium">Include AI images (DALL·E)</span> — one image per scheduled slot for the Go High
+              Level CSV and thumbnails below your markdown plan (uses OpenAI alongside Claude). Uncheck to only generate text
+              faster and more cheaply.
+            </span>
+          </label>
+        </div>
+
         <button
           type="button"
           onClick={generate}
           disabled={genLoading}
           className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-violet-800 disabled:opacity-50"
         >
-          {genLoading ? "Generating with Claude…" : "Generate plan"}
+          {genLoading
+            ? includeAiImages
+              ? "Generating plan + images…"
+              : "Generating with Claude…"
+            : "Generate plan"}
         </button>
       </div>
 
       <section className="mt-10 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
         <h2 className="text-base font-semibold text-emerald-950">Go High Level — Social Planner CSV</h2>
         <p className="form-hint mt-1 max-w-2xl text-emerald-950/90">
-          Claude builds rows matching HighLevel&apos;s <strong>Basic CSV</strong> (scheduled time + caption + optional links).
-          Only an <strong>administrator</strong> can attach each workspace&apos;s Location id and Private Integration token (
+          Claude builds rows matching HighLevel&apos;s <strong>Basic CSV</strong> (scheduled time, caption, optional link, and when enabled,{" "}
+          <strong>image URLs</strong> HighLevel can fetch). Only an <strong>administrator</strong> can attach each
+          workspace&apos;s Location id and Private Integration token (
           <Link href="/admin" className="font-medium text-emerald-900 underline">
             Admin → Go High Level
           </Link>
@@ -330,7 +402,7 @@ export default function ContentStrategyPage() {
             disabled={ghlGenLoading}
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-950 shadow-sm ring-1 ring-emerald-300 hover:bg-emerald-100/80 disabled:opacity-50"
           >
-            {ghlGenLoading ? "Building CSV rows…" : "Generate for Go High Level (CSV)"}
+            {ghlGenLoading ? "Building CSV + images…" : "Generate for Go High Level (CSV)"}
           </button>
           <button
             type="button"
@@ -366,6 +438,7 @@ export default function ContentStrategyPage() {
           </p>
         )}
         {ghlPushMsg ? <p className="mt-2 text-sm text-emerald-900">{ghlPushMsg}</p> : null}
+        {ghlImageNote ? <p className="mt-2 text-sm text-amber-900">{ghlImageNote}</p> : null}
       </section>
 
       {linkedInConnected && (
@@ -428,6 +501,19 @@ export default function ContentStrategyPage() {
               {organicImageName ? (
                 <p className="form-hint mt-1">Attached: {organicImageName}</p>
               ) : null}
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => void generateAiImageForLinkedIn()}
+                  disabled={organicAiImageLoading}
+                  className="rounded-lg border border-sky-500 bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100 disabled:opacity-50"
+                >
+                  {organicAiImageLoading ? "Generating image…" : "Generate image with AI"}
+                </button>
+                <p className="form-hint mt-1">
+                  Creates a PNG from your post text (and business profile); you can publish it with LinkedIn below.
+                </p>
+              </div>
             </div>
             {organicError && <p className="text-sm text-red-700">{organicError}</p>}
             {organicSuccess && <p className="text-sm text-green-800">{organicSuccess}</p>}
@@ -446,11 +532,47 @@ export default function ContentStrategyPage() {
       {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
 
       {result && (
-        <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-zinc-800">Result (Markdown)</h2>
-          <pre className="mt-3 max-h-[70vh] overflow-auto whitespace-pre-wrap break-words font-sans text-sm text-zinc-800">
-            {result}
-          </pre>
+        <div className="mt-8 space-y-6">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-zinc-800">Result (Markdown)</h2>
+            <pre className="mt-3 max-h-[70vh] overflow-auto whitespace-pre-wrap break-words font-sans text-sm text-zinc-800">
+              {result}
+            </pre>
+          </div>
+          {planImages.some((x) => x.imageUrl) ? (
+            <div className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-zinc-800">AI images aligned to slots</h3>
+              <p className="form-hint mt-1">
+                These are the same style of assets appended to Go High Level CSV rows when images are enabled. Open in a new
+                tab to download if needed.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {planImages.map((slot) =>
+                  slot.imageUrl ? (
+                    <div key={`${slot.index}-${slot.postAtSpecificTime}`} className="rounded-lg border border-zinc-100 p-2">
+                      <p className="mb-2 text-[11px] font-medium uppercase text-zinc-500">{slot.postAtSpecificTime}</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={slot.imageUrl}
+                        alt=""
+                        className="aspect-square w-full rounded-md object-cover"
+                      />
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </div>
+          ) : null}
+          {planImageErrors.length > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+              <p className="font-medium">Some images failed (plan text is still available)</p>
+              <ul className="mt-2 list-disc pl-5">
+                {planImageErrors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

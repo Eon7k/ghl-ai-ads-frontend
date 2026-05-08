@@ -138,12 +138,21 @@ export const api = {
       userPrompt?: string;
       mode: "full" | "text_plus_prompts" | "ideas_only";
       horizon: "single" | "week" | "month";
-    }) => request<{ markdown: string }>("content-strategy/generate", { method: "POST", body }),
+      /** When true (default), also runs OpenAI DALL·E per slot and returns public image URLs aligned to the plan. */
+      generateImages?: boolean;
+    }) =>
+      request<{
+        markdown: string;
+        generatedImages?: { index: number; postAtSpecificTime: string; imageUrl: string | null }[];
+        imageErrors?: string[];
+      }>("content-strategy/generate", { method: "POST", body }),
     /** Structured posts + Basic CSV for Go High Level Social Planner. */
     generateForGhl: (body: {
       userPrompt?: string;
       mode: "full" | "text_plus_prompts" | "ideas_only";
       horizon: "single" | "week" | "month";
+      /** When true (default), fills each row’s imageUrls with an AI-generated PNG URL HighLevel can import. */
+      generateImages?: boolean;
     }) =>
       request<{
         posts: {
@@ -155,7 +164,11 @@ export const api = {
           videoUrls?: string;
         }[];
         csv: string;
+        imageErrors?: string[];
       }>("content-strategy/generate-for-ghl", { method: "POST", body }),
+    /** Single PNG as data URL for LinkedIn organic (or download); uses OPENAI on server. */
+    generateOrganicImage: (body: { caption: string }) =>
+      request<{ imageDataUrl: string }>("content-strategy/generate-organic-image", { method: "POST", body }),
   },
 
   /** Admin-only: overview, AI performance, users, and agency clients. */
