@@ -112,6 +112,25 @@ export type MetaPermissionTestsResponse = {
   results: MetaPermissionTestRow[];
 };
 
+export type ContentStrategyJobPoll = {
+  status: string;
+  progress?: string | null;
+  kind?: string;
+  error?: string | null;
+  markdown?: string;
+  csv?: string;
+  posts?: {
+    postAtSpecificTime: string;
+    content: string;
+    link?: string;
+    imageUrls?: string;
+    gifUrl?: string;
+    videoUrls?: string;
+  }[];
+  generatedImages?: { index: number; postAtSpecificTime: string; imageUrl: string | null }[] | null;
+  imageErrors?: string[] | null;
+};
+
 export const api = {
   /** Register; returns token and user. Use skipAuth so we don't require a token. */
   auth: {
@@ -132,41 +151,59 @@ export const api = {
       }>("auth/business-model", { method: "PATCH", body }),
   },
 
-  /** Claude-powered plan (ANTHROPIC_API_KEY on backend; optional ANTHROPIC_CONTENT_STRATEGY_MODEL). */
+  /** Claude-powered plan (ANTHROPIC_API_KEY on backend). With images → 202 + background job + poll (avoids timeouts). */
   contentStrategy: {
     generate: (body: {
       userPrompt?: string;
       mode: "full" | "text_plus_prompts" | "ideas_only";
       horizon: "single" | "week" | "month";
-      /** When true (default), also runs OpenAI DALL·E per slot and returns public image URLs aligned to the plan. */
       generateImages?: boolean;
     }) =>
-      request<{
-        markdown: string;
-        generatedImages?: { index: number; postAtSpecificTime: string; imageUrl: string | null }[];
-        imageErrors?: string[];
-      }>("content-strategy/generate", { method: "POST", body }),
-    /** Structured posts + Basic CSV for Go High Level Social Planner. */
+      request<
+        | { markdown: string }
+        | { jobId: string; status: string }
+      >("content-strategy/generate", { method: "POST", body }),
     generateForGhl: (body: {
       userPrompt?: string;
       mode: "full" | "text_plus_prompts" | "ideas_only";
       horizon: "single" | "week" | "month";
-      /** When true (default), fills each row’s imageUrls with an AI-generated PNG URL HighLevel can import. */
       generateImages?: boolean;
     }) =>
-      request<{
-        posts: {
-          postAtSpecificTime: string;
-          content: string;
-          link?: string;
-          imageUrls?: string;
-          gifUrl?: string;
-          videoUrls?: string;
-        }[];
-        csv: string;
-        imageErrors?: string[];
-      }>("content-strategy/generate-for-ghl", { method: "POST", body }),
-    /** Single PNG as data URL for LinkedIn organic (or download); uses OPENAI on server. */
+      request<
+        | {
+            posts: {
+              postAtSpecificTime: string;
+              content: string;
+              link?: string;
+              imageUrls?: string;
+              gifUrl?: string;
+              videoUrls?: string;
+            }[];
+            csv: string;
+            imageErrors: string[];
+          }
+        | { jobId: string; status: string }
+      >("content-strategy/generate-for-ghl", { method: "POST", body }),
+    getJob: (jobId: string) =>
+      request<ContentStrategyJobPoll>(`content-strategy/jobs/${encodeURIComponent(jobId)}`),
+    pollJobUntilComplete: async (
+      jobId: string,
+      onTick?: (progress: string | null, status: string) => void
+    ): Promise<ContentStrategyJobPoll> => {
+      const deadline = Date.now() + 16 * 60 * 1000;
+      while (Date.now() < deadline) {
+        const s = await request<ContentStrategyJobPoll>(`content-strategy/jobs/${encodeURIComponent(jobId)}`);
+        onTick?.(typeof s.progress === "string" ? s.progress : null, s.status);
+        if (s.status === "failed") {
+          throw new Error(typeof s.error === "string" && s.error ? s.error : "Generation failed.");
+        }
+        if (s.status === "completed") return s;
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+      throw new Error(
+        "Timed out waiting for your content—generating many images can take several minutes. Try again shortly or disable AI images for a faster CSV."
+      );
+    },
     generateOrganicImage: (body: { caption: string }) =>
       request<{ imageDataUrl: string }>("content-strategy/generate-organic-image", { method: "POST", body }),
   },

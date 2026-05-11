@@ -5,9 +5,9 @@
  * Operators: configure BACKEND_URL or NEXT_PUBLIC_API_URL (no trailing slash). Serverless timeouts may apply for long AI runs.
  */
 /** Allow long-running POST (e.g. AI variant generation). */
-export const maxDuration = 60;
+export const maxDuration = 120;
 
-const PROXY_TIMEOUT_MS = 58_000; // Stay just under maxDuration; cold start + AI can be slow
+const PROXY_TIMEOUT_MS = 118_000; // Stay just under maxDuration; cold start + AI can be slow
 const IS_DEV = process.env.NODE_ENV === "development";
 
 function backendUrlNotSetMessage(): string {

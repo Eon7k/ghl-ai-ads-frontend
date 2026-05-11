@@ -43,6 +43,8 @@ export default function ContentStrategyPage() {
   );
   const [planImageErrors, setPlanImageErrors] = useState<string[]>([]);
   const [organicAiImageLoading, setOrganicAiImageLoading] = useState(false);
+  /** Shown while polling long-running content jobs (DALL-E batch). */
+  const [jobProgress, setJobProgress] = useState<string | null>(null);
 
   const profileSkipped = Boolean(
     businessModelProfile && (businessModelProfile as { skipped?: boolean }).skipped === true
@@ -89,6 +91,7 @@ export default function ContentStrategyPage() {
     setResult(null);
     setPlanImages([]);
     setPlanImageErrors([]);
+    setJobProgress(null);
     try {
       const r = await api.contentStrategy.generate({
         userPrompt,
@@ -96,13 +99,31 @@ export default function ContentStrategyPage() {
         horizon,
         generateImages: includeAiImages,
       });
-      setResult(r.markdown);
-      setPlanImages(r.generatedImages ?? []);
-      setPlanImageErrors(r.imageErrors ?? []);
+      if ("jobId" in r && r.jobId) {
+        setJobProgress("Queued…");
+        const done = await api.contentStrategy.pollJobUntilComplete(r.jobId, (p, st) => {
+          setJobProgress(p || (st === "running" ? "Working…" : st));
+        });
+        setResult(done.markdown ?? "");
+        const gi = done.generatedImages;
+        setPlanImages(
+          Array.isArray(gi)
+            ? gi.filter(
+                (x): x is { index: number; postAtSpecificTime: string; imageUrl: string | null } =>
+                  Boolean(x && typeof x.index === "number" && typeof x.postAtSpecificTime === "string" && x.imageUrl)
+              )
+            : []
+        );
+        const ie = done.imageErrors;
+        setPlanImageErrors(Array.isArray(ie) ? ie : []);
+      } else if ("markdown" in r) {
+        setResult(r.markdown);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenLoading(false);
+      setJobProgress(null);
     }
   }
 
@@ -112,6 +133,7 @@ export default function ContentStrategyPage() {
     setGhlPushMsg(null);
     setGhlCsv(null);
     setGhlImageNote(null);
+    setJobProgress(null);
     try {
       const r = await api.contentStrategy.generateForGhl({
         userPrompt,
@@ -119,16 +141,31 @@ export default function ContentStrategyPage() {
         horizon,
         generateImages: includeAiImages,
       });
-      setGhlCsv(r.csv);
-      if (r.imageErrors?.length) {
-        setGhlImageNote(
-          `Some images failed (${r.imageErrors.length}). Rows still export; check missing imageUrls in CSV.`
-        );
+      if ("jobId" in r && r.jobId) {
+        setJobProgress("Queued…");
+        const done = await api.contentStrategy.pollJobUntilComplete(r.jobId, (p, st) => {
+          setJobProgress(p || (st === "running" ? "Working…" : st));
+        });
+        setGhlCsv(done.csv ?? "");
+        const ie = done.imageErrors;
+        if (Array.isArray(ie) && ie.length) {
+          setGhlImageNote(
+            `Some images failed (${ie.length}). Rows still export; check missing imageUrls in CSV.`
+          );
+        }
+      } else if ("csv" in r) {
+        setGhlCsv(r.csv);
+        if (r.imageErrors?.length) {
+          setGhlImageNote(
+            `Some images failed (${r.imageErrors.length}). Rows still export; check missing imageUrls in CSV.`
+          );
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "CSV generation failed");
     } finally {
       setGhlGenLoading(false);
+      setJobProgress(null);
     }
   }
 
@@ -229,7 +266,7 @@ export default function ContentStrategyPage() {
         steps={[
           "This is for organic social content ideas and copy — not the same as launching a paid ad campaign. Paid ads are created from Home and edited on a campaign page.",
           "Type what you need (topic, time window, product launch, tone). Choose whether you want full posts, text plus a to-do list, or ideas only, and pick a time range.",
-          "Optional: keep “Include AI images” on to create a DALL·E image per slot (uses OpenAI). That fills the Go High Level CSV image column and shows matching images under your markdown plan.",
+          "Optional: keep “Include AI images” on — work runs on the server in the background (with progress text) so long DALL·E batches don’t time out your browser.",
           "For Go High Level: an administrator saves Location id + Private Integration token per portal account (Admin tab). Then generate CSV here and Push or download — Marketing → Social Planner.",
           "If LinkedIn is connected, use the “Post to LinkedIn” section to publish to your Company Page, or still copy the result anywhere you like. The business profile (link below) gives the AI more context about your business.",
         ]}
@@ -272,9 +309,12 @@ export default function ContentStrategyPage() {
 
       <div className="mt-6 space-y-4">
         <div>
-          <label className="text-sm font-medium text-zinc-800">Context or focus for this run</label>
+          <label className="form-label" htmlFor="content-strategy-prompt">
+            Context or focus for this run
+          </label>
           <textarea
-            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+            id="content-strategy-prompt"
+            className="app-textarea mt-1"
             rows={4}
             value={userPrompt}
             onChange={(e) => setUserPrompt(e.target.value)}
@@ -349,8 +389,9 @@ export default function ContentStrategyPage() {
             />
             <span>
               <span className="font-medium">Include AI images (DALL·E)</span> — one image per scheduled slot for the Go High
-              Level CSV and thumbnails below your markdown plan (uses OpenAI alongside Claude). Uncheck to only generate text
-              faster and more cheaply.
+              Level CSV and thumbnails below your markdown plan (uses OpenAI alongside Claude). This runs as a{" "}
+              <strong>background job</strong> with live status text so requests don&apos;t time out in the browser. Uncheck for
+              text-only output (faster and cheaper).
             </span>
           </label>
         </div>
@@ -362,9 +403,8 @@ export default function ContentStrategyPage() {
           className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-violet-800 disabled:opacity-50"
         >
           {genLoading
-            ? includeAiImages
-              ? "Generating plan + images…"
-              : "Generating with Claude…"
+            ? jobProgress ||
+              (includeAiImages ? "Starting (background job)…" : "Generating with Claude…")
             : "Generate plan"}
         </button>
       </div>
@@ -402,7 +442,9 @@ export default function ContentStrategyPage() {
             disabled={ghlGenLoading}
             className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-emerald-950 shadow-sm ring-1 ring-emerald-300 hover:bg-emerald-100/80 disabled:opacity-50"
           >
-            {ghlGenLoading ? "Building CSV + images…" : "Generate for Go High Level (CSV)"}
+            {ghlGenLoading
+              ? jobProgress || (includeAiImages ? "Starting CSV + images (background)…" : "Building CSV rows…")
+              : "Generate for Go High Level (CSV)"}
           </button>
           <button
             type="button"
@@ -452,9 +494,12 @@ export default function ContentStrategyPage() {
           </p>
           <div className="mt-4 space-y-3">
             <div>
-              <label className="text-sm font-medium text-zinc-800">Company Page (number or urn:li:organization:…)</label>
+              <label className="form-label" htmlFor="linkedin-org-urn">
+                Company Page (number or urn:li:organization:…)
+              </label>
               <input
-                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+                id="linkedin-org-urn"
+                className="app-input mt-1 w-full"
                 value={linkedinOrgUrn}
                 onChange={(e) => setLinkedinOrgUrn(e.target.value)}
                 placeholder="e.g. 1234567890"
@@ -462,9 +507,12 @@ export default function ContentStrategyPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-zinc-800">Post text (optional if you will use generated result)</label>
+              <label className="form-label" htmlFor="linkedin-organic-text">
+                Post text (optional if you will use generated result)
+              </label>
               <textarea
-                className="mt-1 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+                id="linkedin-organic-text"
+                className="app-textarea mt-1"
                 rows={5}
                 value={organicText}
                 onChange={(e) => setOrganicText(e.target.value)}
