@@ -9,12 +9,15 @@ export default function AdPreview({
   copy,
   platform = "meta",
   imageUrl,
-  /** When false, the creative image won’t start its own browser drag (use when the parent handles drag-to-swap). */
+  /** When "video", `imageUrl` is used as the `<video src>` (object URL or stream URL). */
+  creativeMediaKind = "image",
+  /** When false, the creative won’t start its own browser drag (use when the parent handles drag-to-swap). */
   imageDraggable = true,
 }: {
   copy: string;
   platform?: string;
   imageUrl?: string | null;
+  creativeMediaKind?: "image" | "video";
   imageDraggable?: boolean;
 }) {
   const text = (copy || "").trim() || "Your ad copy will appear here.";
@@ -34,9 +37,19 @@ export default function AdPreview({
         )}
       </div>
 
-      {/* Image: AI-generated creative or placeholder */}
+      {/* Image or video creative or placeholder */}
       <div className="relative aspect-[1.91/1] bg-zinc-100 flex items-center justify-center overflow-hidden">
-        {imageUrl ? (
+        {imageUrl && creativeMediaKind === "video" ? (
+          <video
+            src={imageUrl}
+            className="absolute inset-0 h-full w-full object-cover select-none pointer-events-none"
+            muted
+            playsInline
+            loop
+            preload="metadata"
+            autoPlay
+          />
+        ) : imageUrl ? (
           <img
             src={imageUrl}
             alt="Ad creative"
@@ -44,7 +57,7 @@ export default function AdPreview({
             className={`absolute inset-0 h-full w-full object-cover select-none ${imageDraggable ? "" : "pointer-events-none"}`}
           />
         ) : (
-          <span className="text-xs text-zinc-400">Image / creative</span>
+          <span className="text-xs text-zinc-400">Image / video</span>
         )}
       </div>
 

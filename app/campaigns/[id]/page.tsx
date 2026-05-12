@@ -7,7 +7,7 @@ import { api, type MetaAdAccount } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Experiment, AdVariant, Creative, AiOptimizationMode } from "@/lib/types";
-import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
+import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile, isLikelyVideoFile, fileToUploadableVideoDataUrl } from "@/lib/imageUpload";
 import { PageGuide } from "@/components/PageGuide";
 
 import type { CampaignMetricsResponse } from "@/lib/api";
@@ -370,7 +370,8 @@ export default function CampaignDetailPage() {
       for (const v of experiment.variants!) {
         if (!v.hasCreative) continue;
         try {
-          const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id);
+          const kind = v.creativeMediaKind ?? "image";
+          const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id, kind);
           if (!cancelled) urls[v.id] = url;
         } catch {
           // ignore
@@ -386,7 +387,11 @@ export default function CampaignDetailPage() {
       Object.values(creativeUrlsRef.current).forEach(URL.revokeObjectURL);
       creativeUrlsRef.current = {};
     };
-  }, [experiment?.id, experiment?.variants?.filter((v) => v.hasCreative).length]);
+    // Reload blobs when variant creative type or membership changes (e.g. image ↔ video swap).
+  }, [
+    experiment?.id,
+    experiment?.variants?.map((v) => `${v.id}:${v.hasCreative ? "1" : "0"}:${v.creativeMediaKind ?? ""}`).join("|"),
+  ]);
 
   const creativeUrlsToRevoke = useRef(creativeUrls);
   creativeUrlsToRevoke.current = creativeUrls;
@@ -446,13 +451,15 @@ export default function CampaignDetailPage() {
     setGeneratingCreativeId(v.id);
     try {
       await api.generateVariantCreative(experiment.id, v.id);
-      const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id);
+      const url = await api.getVariantCreativeBlobUrl(experiment.id, v.id, "image");
       setCreativeUrls((prev) => ({ ...prev, [v.id]: url }));
       setExperiment((prev) => {
         if (!prev?.variants) return prev;
         return {
           ...prev,
-          variants: prev.variants!.map((x) => (x.id === v.id ? { ...x, hasCreative: true } : x)),
+          variants: prev.variants!.map((x) =>
+            x.id === v.id ? { ...x, hasCreative: true, creativeMediaKind: "image" as const } : x
+          ),
         };
       });
     } catch {
@@ -471,21 +478,24 @@ export default function CampaignDetailPage() {
       return next;
     });
     try {
-      await api.setVariantCreative(experiment.id, variantId, { creativeId: creativeId.trim() });
+      const { variant: vMeta } = await api.setVariantCreative(experiment.id, variantId, {
+        creativeId: creativeId.trim(),
+      });
+      const kind = vMeta.creativeMediaKind ?? "image";
       setCreativeUrls((prev) => {
         const next = { ...prev };
         if (next[variantId]) URL.revokeObjectURL(next[variantId]);
         delete next[variantId];
         return next;
       });
-      const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId);
+      const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId, kind);
       setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
       setExperiment((prev) => {
         if (!prev?.variants) return prev;
         return {
           ...prev,
           variants: prev.variants.map((x) =>
-            x.id === variantId ? { ...x, hasCreative: true } : x
+            x.id === variantId ? { ...x, hasCreative: true, creativeMediaKind: kind } : x
           ),
         };
       });
@@ -512,10 +522,40 @@ export default function CampaignDetailPage() {
       }));
       return;
     }
+    if (isLikelyVideoFile(file)) {
+      setSettingCreativeVariantId(variantId);
+      try {
+        const videoData = await fileToUploadableVideoDataUrl(file);
+        await api.setVariantCreative(experiment.id, variantId, { videoData });
+        setCreativeUrls((prev) => {
+          const next = { ...prev };
+          if (next[variantId]) URL.revokeObjectURL(next[variantId]);
+          delete next[variantId];
+          return next;
+        });
+        const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId, "video");
+        setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
+        setExperiment((prev) => {
+          if (!prev?.variants) return prev;
+          return {
+            ...prev,
+            variants: prev.variants.map((x) =>
+              x.id === variantId ? { ...x, hasCreative: true, creativeMediaKind: "video" as const } : x
+            ),
+          };
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Upload failed";
+        setAttachCreativeErrors((prev) => ({ ...prev, [variantId]: msg }));
+      } finally {
+        setSettingCreativeVariantId(null);
+      }
+      return;
+    }
     if (!isLikelyImageFile(file)) {
       setAttachCreativeErrors((prev) => ({
         ...prev,
-        [variantId]: "Please choose an image (JPG, PNG, WebP, or GIF).",
+        [variantId]: "Choose an image (JPG, PNG, WebP, GIF) or a short video (MP4/MOV/WebM).",
       }));
       return;
     }
@@ -529,14 +569,14 @@ export default function CampaignDetailPage() {
         delete next[variantId];
         return next;
       });
-      const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId);
+      const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId, "image");
       setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
       setExperiment((prev) => {
         if (!prev?.variants) return prev;
         return {
           ...prev,
           variants: prev.variants.map((x) =>
-            x.id === variantId ? { ...x, hasCreative: true } : x
+            x.id === variantId ? { ...x, hasCreative: true, creativeMediaKind: "image" as const } : x
           ),
         };
       });
@@ -792,11 +832,16 @@ export default function CampaignDetailPage() {
     for (const variantId of variantIds) {
       try {
         await api.generateVariantCreative(experiment.id, variantId);
-        const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId);
+        const url = await api.getVariantCreativeBlobUrl(experiment.id, variantId, "image");
         setCreativeUrls((prev) => ({ ...prev, [variantId]: url }));
         setExperiment((prev) => {
           if (!prev?.variants) return prev;
-          return { ...prev, variants: prev.variants.map((x) => (x.id === variantId ? { ...x, hasCreative: true } : x)) };
+          return {
+            ...prev,
+            variants: prev.variants.map((x) =>
+              x.id === variantId ? { ...x, hasCreative: true, creativeMediaKind: "image" as const } : x
+            ),
+          };
         });
       } catch {
         // continue with next
@@ -815,9 +860,11 @@ export default function CampaignDetailPage() {
     setSwapCreativesLoading(true);
     try {
       const { variants: updated } = await api.swapVariantCreatives(experiment.id, variantIdA, variantIdB);
+      const byId = new Map(updated.map((u) => [u.id, u]));
+      const kindA = byId.get(variantIdA)?.creativeMediaKind ?? "image";
+      const kindB = byId.get(variantIdB)?.creativeMediaKind ?? "image";
       setExperiment((prev) => {
         if (!prev?.variants) return prev;
-        const byId = new Map(updated.map((u) => [u.id, u]));
         return { ...prev, variants: prev.variants.map((v) => byId.get(v.id) ?? v) };
       });
       setCreativeUrls((prev) => {
@@ -829,8 +876,8 @@ export default function CampaignDetailPage() {
         return next;
       });
       const [urlA, urlB] = await Promise.all([
-        api.getVariantCreativeBlobUrl(experiment.id, variantIdA),
-        api.getVariantCreativeBlobUrl(experiment.id, variantIdB),
+        api.getVariantCreativeBlobUrl(experiment.id, variantIdA, kindA),
+        api.getVariantCreativeBlobUrl(experiment.id, variantIdB, kindB),
       ]);
       setCreativeUrls((prev) => ({ ...prev, [variantIdA]: urlA, [variantIdB]: urlB }));
     } finally {
@@ -2111,6 +2158,7 @@ export default function CampaignDetailPage() {
                       copy={variantCopies[v.id] ?? v.copy}
                       platform={experiment.platform}
                       imageUrl={creativeUrls[v.id] ?? null}
+                      creativeMediaKind={v.creativeMediaKind ?? "image"}
                       imageDraggable={false}
                     />
                   </div>
@@ -2130,7 +2178,9 @@ export default function CampaignDetailPage() {
                           className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 disabled:opacity-60"
                         >
                           <option value="">
-                            {libraryCreatives.length === 0 ? "No library images yet" : "Choose from library…"}
+                            {libraryCreatives.length === 0
+                              ? "No library creatives yet"
+                              : "Choose from library…"}
                           </option>
                           {libraryCreatives.map((c) => (
                             <option key={c.id} value={c.id}>
@@ -2157,7 +2207,7 @@ export default function CampaignDetailPage() {
                       <div>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/*,video/mp4,video/quicktime,video/webm"
                           className="hidden"
                           ref={(el) => {
                             variantFileInputsRef.current[v.id] = el;
@@ -2174,7 +2224,7 @@ export default function CampaignDetailPage() {
                           onClick={() => variantFileInputsRef.current[v.id]?.click()}
                           className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
                         >
-                          Upload image file
+                          Upload image or video
                         </button>
                       </div>
                       {attachCreativeErrors[v.id] && (

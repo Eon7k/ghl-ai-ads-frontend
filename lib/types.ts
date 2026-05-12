@@ -12,6 +12,8 @@ export type AdVariant = {
   copy: string;
   status: string;
   hasCreative?: boolean;
+  /** Present when hasCreative — how to fetch / preview the asset. */
+  creativeMediaKind?: "image" | "video";
   /** Which AI generated this variant (admin-only in UI). */
   aiSource?: "openai" | "anthropic";
 };
@@ -65,6 +67,8 @@ export type Creative = {
   id: string;
   name: string;
   createdAt: string;
+  /** From creatives list API; omit on older payloads. */
+  mediaKind?: "image" | "video";
 };
 
 export type CreateExperimentBody = {

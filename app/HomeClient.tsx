@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import type { MetaAdAccount } from "@/lib/api";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment, Creative } from "@/lib/types";
-import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile } from "@/lib/imageUpload";
+import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile, isLikelyVideoFile, fileToUploadableVideoDataUrl } from "@/lib/imageUpload";
 import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 import { PageGuide } from "@/components/PageGuide";
@@ -31,7 +31,15 @@ const PLATFORMS: { id: "meta" | "google" | "tiktok" | "linkedin"; name: string }
   { id: "linkedin", name: "LinkedIn Ads" },
 ];
 
-function CreativeThumbnail({ creativeId, className }: { creativeId: string; className?: string }) {
+function CreativeThumbnail({
+  creativeId,
+  mediaKind = "image",
+  className,
+}: {
+  creativeId: string;
+  mediaKind?: "image" | "video";
+  className?: string;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const ref = useRef<string | null>(null);
   useEffect(() => {
@@ -44,6 +52,9 @@ function CreativeThumbnail({ creativeId, className }: { creativeId: string; clas
     };
   }, [creativeId]);
   if (!src) return <div className={className} style={{ minHeight: 48 }} />;
+  if (mediaKind === "video") {
+    return <video src={src} muted playsInline preload="metadata" className={className} />;
+  }
   return <img src={src} alt="" className={className} />;
 }
 
@@ -250,21 +261,62 @@ export function HomeClient() {
       );
       return;
     }
+    if (isLikelyVideoFile(file)) {
+      setUploadingCreative(true);
+      try {
+        const videoData = await fileToUploadableVideoDataUrl(file);
+        const created = await api.creatives.create(file.name.replace(/\.[^.]+$/, "") || "Video", {
+          videoData,
+        });
+        setCreatives((prev) => [
+          ...prev,
+          {
+            id: created.id,
+            name: created.name,
+            createdAt: created.createdAt,
+            mediaKind: created.mediaKind ?? "video",
+          },
+        ]);
+        setSelectedCreativeIds((prev) => [...prev, created.id]);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Upload failed";
+        setUploadCreativeError(
+          msg.includes("fetch") || msg.includes("Network")
+            ? "Could not reach the server. Check your connection or try a shorter / smaller clip."
+            : msg
+        );
+      } finally {
+        setUploadingCreative(false);
+      }
+      return;
+    }
     if (!isLikelyImageFile(file)) {
-      setUploadCreativeError("Please choose an image file (JPG, PNG, WebP, or GIF).");
+      setUploadCreativeError(
+        "Please choose an image (JPG, PNG, WebP, GIF) or a short Meta-friendly video (MP4, MOV, or WebM)."
+      );
       return;
     }
     setUploadingCreative(true);
     try {
       const base64 = await fileToUploadableDataUrl(file);
-      const created = await api.creatives.create(file.name.replace(/\.[^.]+$/, "") || "Creative", base64);
-      setCreatives((prev) => [...prev, { id: created.id, name: created.name, createdAt: created.createdAt }]);
+      const created = await api.creatives.create(file.name.replace(/\.[^.]+$/, "") || "Creative", {
+        imageData: base64,
+      });
+      setCreatives((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          name: created.name,
+          createdAt: created.createdAt,
+          mediaKind: created.mediaKind ?? "image",
+        },
+      ]);
       setSelectedCreativeIds((prev) => [...prev, created.id]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       setUploadCreativeError(
         msg.includes("fetch") || msg.includes("Network")
-          ? "Could not reach the server. Check your connection or try a smaller image."
+          ? "Could not reach the server. Check your connection or try a smaller file."
           : msg
       );
     } finally {
@@ -563,13 +615,13 @@ export function HomeClient() {
         <section className="mb-8">
           <h2 className="app-section-title">Creative library</h2>
           <p className="form-hint mt-1 max-w-2xl">
-            Store images here and attach them to campaigns when using your own creatives or a mix of AI and own.
+            Store images or short Meta-friendly videos here; attach them when using your own creatives or a mix with AI.
           </p>
           <div className="mt-3 flex flex-wrap items-start gap-3">
             <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50">
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,video/mp4,video/quicktime,video/webm"
                 className="hidden"
                 disabled={uploadingCreative}
                 onChange={(e) => {
@@ -588,12 +640,16 @@ export function HomeClient() {
             {creativesLoading ? (
               <div className="h-20 w-20 animate-pulse rounded-lg bg-zinc-100" />
             ) : creatives.length === 0 ? (
-              <p className="text-sm text-zinc-500">No creatives yet. Upload an image to get started.</p>
+              <p className="text-sm text-zinc-500">No creatives yet. Upload an image or a short clip (Meta video ads) to get started.</p>
             ) : (
               creatives.map((c) => (
                 <div key={c.id} className="flex flex-col items-center gap-1 rounded-xl border border-zinc-200 bg-white p-2 shadow-sm">
                   <div className="h-16 w-16 overflow-hidden rounded-lg bg-zinc-100">
-                    <CreativeThumbnail creativeId={c.id} className="h-full w-full object-cover" />
+                    <CreativeThumbnail
+                      creativeId={c.id}
+                      mediaKind={c.mediaKind ?? "image"}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   <span className="max-w-[100px] truncate text-xs text-zinc-700">{c.name}</span>
                   <button

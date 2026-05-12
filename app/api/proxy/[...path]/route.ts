@@ -98,7 +98,7 @@ export async function GET(
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
     const contentType = res.headers.get("content-type") || "";
-    if (contentType.startsWith("image/")) {
+    if (contentType.startsWith("image/") || contentType.startsWith("video/")) {
       const blob = await res.arrayBuffer();
       return new Response(blob, {
         status: res.status,

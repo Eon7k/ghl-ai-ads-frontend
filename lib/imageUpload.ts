@@ -42,3 +42,27 @@ export function isHeicFile(file: File): boolean {
 export function isLikelyImageFile(file: File): boolean {
   return file.type.startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(file.name);
 }
+
+const MAX_UPLOAD_VIDEO_BYTES = 12 * 1024 * 1024;
+
+export function isLikelyVideoFile(file: File): boolean {
+  return file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
+}
+
+/** Reads video as a data URL (no re-encoding). Keeps payloads under typical JSON/proxy limits. */
+export async function fileToUploadableVideoDataUrl(
+  file: File,
+  maxBytes = MAX_UPLOAD_VIDEO_BYTES
+): Promise<string> {
+  if (file.size > maxBytes) {
+    throw new Error(
+      `Pick a shorter clip or compress — max size here is ${Math.round(maxBytes / (1024 * 1024))}MB before upload.`
+    );
+  }
+  return await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error("Could not read video file"));
+    r.readAsDataURL(file);
+  });
+}

@@ -368,27 +368,36 @@ export const api = {
       { method: "POST", body: {} }
     ),
 
-  /** Generate AI creative (image) for a variant. Returns { hasCreative: true } on success. */
+  /** Generate AI image creative; clears any video on the variant. */
   generateVariantCreative: (experimentId: string, variantId: string) =>
-    request<{ hasCreative: boolean }>(
+    request<{ hasCreative: boolean; creativeMediaKind?: "image" }>(
       `experiments/${experimentId}/variants/${variantId}/generate-creative`,
       { method: "POST", body: {} }
     ),
 
-  /** Set variant image from library (creativeId) or upload (imageData base64 / data URL). */
+  /** Set variant creative from library or upload (exactly one body field). */
   setVariantCreative: (
     experimentId: string,
     variantId: string,
-    body: { creativeId: string } | { imageData: string }
+    body:
+      | { creativeId: string }
+      | { imageData: string }
+      | { videoData: string }
   ) =>
     request<{ variant: import("./types").AdVariant }>(
       `experiments/${experimentId}/variants/${variantId}/set-creative`,
       { method: "POST", body }
     ),
 
-  /** Get blob URL for variant creative image (for use in <img src>. Caller should revoke the URL when done.) */
-  getVariantCreativeBlobUrl: async (experimentId: string, variantId: string): Promise<string> => {
-    const url = `${API_BASE}/experiments/${experimentId}/variants/${variantId}/creative`;
+  /** Blob URL for variant asset; pass creativeMediaKind from the variant when known. */
+  getVariantCreativeBlobUrl: async (
+    experimentId: string,
+    variantId: string,
+    creativeMediaKind: "image" | "video" = "image"
+  ): Promise<string> => {
+    const subpath =
+      creativeMediaKind === "video" ? "creative-video" : "creative";
+    const url = `${API_BASE}/experiments/${experimentId}/variants/${variantId}/${subpath}`;
     const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) throw new Error("Failed to load creative");
     const blob = await res.blob();
@@ -465,10 +474,10 @@ export const api = {
   creatives: {
     list: () =>
       request<{ creatives: import("./types").Creative[] }>("creatives").then((r) => r.creatives),
-    create: (name: string, imageData: string) =>
-      request<{ id: string; name: string; createdAt: string }>("creatives", {
+    create: (name: string, payload: { imageData: string } | { videoData: string }) =>
+      request<{ id: string; name: string; createdAt: string; mediaKind?: "image" | "video" }>("creatives", {
         method: "POST",
-        body: { name, imageData },
+        body: { name, ...payload },
       }),
     delete: (id: string) =>
       request<{ ok: boolean }>(`creatives/${id}`, { method: "DELETE" }),
