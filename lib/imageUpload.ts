@@ -43,7 +43,8 @@ export function isLikelyImageFile(file: File): boolean {
   return file.type.startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(file.name);
 }
 
-const MAX_UPLOAD_VIDEO_BYTES = 12 * 1024 * 1024;
+/** ~40MiB cap; large videos should use api.setVariantCreativeFile / creatives.uploadFile when NEXT_PUBLIC_BACKEND_URL is set. */
+const MAX_UPLOAD_VIDEO_BYTES = 40 * 1024 * 1024;
 
 export function isLikelyVideoFile(file: File): boolean {
   return file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
@@ -55,8 +56,10 @@ export async function fileToUploadableVideoDataUrl(
   maxBytes = MAX_UPLOAD_VIDEO_BYTES
 ): Promise<string> {
   if (file.size > maxBytes) {
+    const mb = (file.size / (1024 * 1024)).toFixed(1);
+    const cap = Math.round(maxBytes / (1024 * 1024));
     throw new Error(
-      `Pick a shorter clip or compress — max size here is ${Math.round(maxBytes / (1024 * 1024))}MB before upload.`
+      `This file is about ${mb}MB. The upload limit is ${cap}MB (file size, not duration)—use a compressed export or 720p, or shorten the clip.`
     );
   }
   return await new Promise<string>((resolve, reject) => {

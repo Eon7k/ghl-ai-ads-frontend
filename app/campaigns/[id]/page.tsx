@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { api, type MetaAdAccount } from "@/lib/api";
+import { api, publicApiOrigin, type MetaAdAccount } from "@/lib/api";
 import AdPreview from "@/components/AdPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Experiment, AdVariant, Creative, AiOptimizationMode } from "@/lib/types";
@@ -525,8 +525,12 @@ export default function CampaignDetailPage() {
     if (isLikelyVideoFile(file)) {
       setSettingCreativeVariantId(variantId);
       try {
-        const videoData = await fileToUploadableVideoDataUrl(file);
-        await api.setVariantCreative(experiment.id, variantId, { videoData });
+        if (publicApiOrigin()) {
+          await api.setVariantCreativeFile(experiment.id, variantId, file);
+        } else {
+          const videoData = await fileToUploadableVideoDataUrl(file);
+          await api.setVariantCreative(experiment.id, variantId, { videoData });
+        }
         setCreativeUrls((prev) => {
           const next = { ...prev };
           if (next[variantId]) URL.revokeObjectURL(next[variantId]);

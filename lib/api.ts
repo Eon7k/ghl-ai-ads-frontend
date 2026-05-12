@@ -18,6 +18,26 @@ function authHeaders(): Record<string, string> {
   return h;
 }
 
+/** No Content-Type — browser sets multipart boundary when using FormData. */
+function authHeadersFormData(): Record<string, string> {
+  const h: Record<string, string> = {};
+  const token = getToken();
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  const viewingAs = getViewingAs();
+  if (viewingAs) h["X-Viewing-As"] = viewingAs;
+  return h;
+}
+
+/** Public API base URL from env (multipart uploads bypass same-origin proxy size limits when set). */
+export function publicApiOrigin(): string {
+  const raw = (
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || ""
+      : ""
+  ).trim();
+  return raw.replace(/\/$/, "");
+}
+
 async function request<T>(
   path: string,
   options: { method?: string; body?: unknown; skipAuth?: boolean } = {}
@@ -389,6 +409,44 @@ export const api = {
       { method: "POST", body }
     ),
 
+  /**
+   * Multipart upload of raw image/video (field name `file`). Uses NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL
+   * so large files don’t transit the Next proxy as huge JSON/base64 payloads.
+   */
+  setVariantCreativeFile: async (
+    experimentId: string,
+    variantId: string,
+    file: File
+  ): Promise<{ variant: import("./types").AdVariant }> => {
+    const origin = publicApiOrigin();
+    if (!origin) {
+      throw new Error(
+        "NEXT_PUBLIC_BACKEND_URL (or NEXT_PUBLIC_API_URL) is not set — add your API URL to `.env.local` / Vercel so large video uploads can reach the backend directly."
+      );
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(
+      `${origin}/experiments/${encodeURIComponent(experimentId)}/variants/${encodeURIComponent(variantId)}/set-creative-file`,
+      { method: "POST", headers: authHeadersFormData(), body: fd }
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: unknown;
+      variant?: import("./types").AdVariant;
+    };
+    if (!res.ok) {
+      const msg =
+        typeof data.error === "string"
+          ? data.error
+          : typeof data.error === "object" && data.error !== null && "message" in data.error
+            ? String((data.error as { message?: unknown }).message)
+            : `Upload failed (${res.status})`;
+      throw new Error(msg);
+    }
+    if (!data.variant) throw new Error("Upload failed: malformed response.");
+    return { variant: data.variant };
+  },
+
   /** Blob URL for variant asset; pass creativeMediaKind from the variant when known. */
   getVariantCreativeBlobUrl: async (
     experimentId: string,
@@ -479,6 +537,43 @@ export const api = {
         method: "POST",
         body: { name, ...payload },
       }),
+    /** Multipart: fields `name` + `file` — uses public API URL when NEXT_PUBLIC_BACKEND_URL is set (large videos). */
+    uploadFile: async (
+      name: string,
+      file: File
+    ): Promise<{ id: string; name: string; createdAt: string; mediaKind?: "image" | "video" }> => {
+      const origin = publicApiOrigin();
+      if (!origin) {
+        throw new Error(
+          "NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_API_URL must be set for large multipart creative uploads."
+        );
+      }
+      const fd = new FormData();
+      fd.append("name", name.slice(0, 200));
+      fd.append("file", file);
+      const res = await fetch(`${origin}/creatives/upload`, {
+        method: "POST",
+        headers: authHeadersFormData(),
+        body: fd,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        id?: string;
+        name?: string;
+        createdAt?: string;
+        mediaKind?: "image" | "video";
+      };
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : `Upload failed (${res.status})`);
+      }
+      if (!data.id || !data.name || !data.createdAt) throw new Error("Upload failed: malformed response.");
+      return {
+        id: data.id,
+        name: data.name,
+        createdAt: data.createdAt,
+        ...(data.mediaKind && { mediaKind: data.mediaKind }),
+      };
+    },
     delete: (id: string) =>
       request<{ ok: boolean }>(`creatives/${id}`, { method: "DELETE" }),
     /** Returns a URL that loads the creative image (via proxy). Call revokeObjectURL when done if you created one. */

@@ -6,17 +6,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getToken } from "@/lib/auth";
 import { getViewingAs } from "@/lib/viewingAs";
-import { api } from "@/lib/api";
-import type { MetaAdAccount } from "@/lib/api";
+import {
+  api,
+  expansion,
+  publicApiOrigin,
+  type ConnectedIntegration,
+  type MetaAdAccount,
+} from "@/lib/api";
 import { IntegrationLogo } from "@/components/IntegrationLogo";
 import type { Experiment, Creative } from "@/lib/types";
 import { fileToUploadableDataUrl, isHeicFile, isLikelyImageFile, isLikelyVideoFile, fileToUploadableVideoDataUrl } from "@/lib/imageUpload";
-import type { ConnectedIntegration } from "@/lib/api";
 import AppNav from "@/components/AppNav";
 import { PageGuide } from "@/components/PageGuide";
 import { SetupChecklist } from "@/components/SetupChecklist";
 import { hasExpansionProduct } from "@/lib/products";
-import { expansion } from "@/lib/api";
 import { PublicLanding } from "@/components/PublicLanding";
 
 const BACKEND_URL =
@@ -264,10 +267,12 @@ export function HomeClient() {
     if (isLikelyVideoFile(file)) {
       setUploadingCreative(true);
       try {
-        const videoData = await fileToUploadableVideoDataUrl(file);
-        const created = await api.creatives.create(file.name.replace(/\.[^.]+$/, "") || "Video", {
-          videoData,
-        });
+        const title = file.name.replace(/\.[^.]+$/, "") || "Video";
+        const created = publicApiOrigin()
+          ? await api.creatives.uploadFile(title, file)
+          : await api.creatives.create(title, {
+              videoData: await fileToUploadableVideoDataUrl(file),
+            });
         setCreatives((prev) => [
           ...prev,
           {
