@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppNav from "@/components/AppNav";
+import LandingPageDesignCanvas from "@/components/LandingPageDesignCanvas";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, expansion, type LandingFunnelStep, type LandingPageData, type LandingPageRecord } from "@/lib/api";
@@ -105,6 +106,7 @@ function LandingPageEditorPageInner() {
   /** Until false, avoid treating page===null as “not found” (fetch still in flight). */
   const [detailLoading, setDetailLoading] = useState(true);
   const loadGenRef = useRef(0);
+  const [editorTab, setEditorTab] = useState<"design" | "settings">("design");
 
   const load = useCallback(async () => {
     if (!id || !user) return;
@@ -230,6 +232,7 @@ function LandingPageEditorPageInner() {
       setPage(row);
       setPageData(normalizePageData(row.pageData));
       setSaveOk(true);
+      setEditorTab("design");
       setTimeout(() => setSaveOk(false), 2500);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "AI regenerate failed");
@@ -315,6 +318,10 @@ function LandingPageEditorPageInner() {
     setPageData((prev) => ({ ...prev, [key]: value }));
   }
 
+  function setTrustSignalsFromLines(lines: string[]) {
+    setPageData((prev) => ({ ...prev, trustSignals: lines }));
+  }
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50">
@@ -362,7 +369,7 @@ function LandingPageEditorPageInner() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <AppNav />
-      <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-8">
         <Link href="/landing-pages" className="text-sm text-violet-700 hover:underline">
           ← All landing pages
         </Link>
@@ -390,348 +397,173 @@ function LandingPageEditorPageInner() {
         {saveOk && <p className="mt-2 text-sm text-green-700">Saved.</p>}
         {saveError && <p className="mt-2 text-sm text-red-600">{saveError}</p>}
 
-        <div className="mt-8 space-y-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Title</label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">URL slug</label>
-              <input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                placeholder="spring-promo"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-              >
-                <option value="draft">draft</option>
-                <option value="published">published</option>
-                <option value="archived">archived</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">Linked campaign (optional)</label>
-              <select
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-              >
-                <option value="">— None —</option>
-                {experiments.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name} ({ex.platform})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="mt-6 flex flex-wrap gap-2 border-b border-zinc-200 pb-3">
+          <button
+            type="button"
+            onClick={() => setEditorTab("design")}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              editorTab === "design"
+                ? "bg-violet-600 text-white shadow-sm"
+                : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            Design & preview
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditorTab("settings")}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              editorTab === "settings"
+                ? "bg-violet-600 text-white shadow-sm"
+                : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            Page settings & AI
+          </button>
+        </div>
 
-          <div className="border-t border-zinc-100 pt-6">
-            <h2 className="text-sm font-semibold text-zinc-900">Page content</h2>
-            <p className="mt-1 text-xs text-zinc-500">Stored as structured data for a future visual editor and AI generation.</p>
-            <div className="mt-4 grid gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Headline</label>
-                <input
-                  value={pageData.headline ?? ""}
-                  onChange={(e) => updateField("headline", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Subheadline</label>
-                <input
-                  value={pageData.subheadline ?? ""}
-                  onChange={(e) => updateField("subheadline", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Body</label>
-                <textarea
-                  value={pageData.body ?? ""}
-                  onChange={(e) => updateField("body", e.target.value)}
-                  rows={6}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700">CTA button text</label>
-                  <input
-                    value={pageData.ctaText ?? ""}
-                    onChange={(e) => updateField("ctaText", e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700">CTA URL</label>
-                  <input
-                    value={pageData.ctaUrl ?? ""}
-                    onChange={(e) => updateField("ctaUrl", e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                    placeholder="https://"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-100 pt-6">
-            <h2 className="text-sm font-semibold text-zinc-900">Lead capture embed (HTML)</h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              Paste GoHighLevel (or other) iframe/embed code. AI positions copy relative to this when you generate — only paste snippets you trust.
-            </p>
-            <textarea
-              value={pageData.formEmbedHtml ?? ""}
-              onChange={(e) => updateField("formEmbedHtml", e.target.value)}
-              rows={5}
-              placeholder='<iframe src="https://link.example.com/widget/form/..." ...></iframe>'
-              className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs text-zinc-900"
+        {editorTab === "design" ? (
+          <div className="mt-8">
+            <LandingPageDesignCanvas
+              pageData={pageData}
+              updateField={updateField}
+              patchFunnelStep={patchFunnelStep}
+              removeFunnelStep={removeFunnelStep}
+              addFunnelStep={addFunnelStep}
+              setStepBullets={setStepBullets}
+              patchFaq={patchFaq}
+              removeFaq={removeFaq}
+              addFaq={addFaq}
+              setTrustSignalsFromLines={setTrustSignalsFromLines}
             />
           </div>
+        ) : (
+          <div className="mt-8 space-y-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Title</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">URL slug</label>
+                <input
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  placeholder="spring-promo"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                >
+                  <option value="draft">draft</option>
+                  <option value="published">published</option>
+                  <option value="archived">archived</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Linked campaign (optional)</label>
+                <select
+                  value={campaignId}
+                  onChange={(e) => setCampaignId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                >
+                  <option value="">— None —</option>
+                  {experiments.map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.name} ({ex.platform})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-          <div className="border-t border-zinc-100 pt-6">
-            <h2 className="text-sm font-semibold text-zinc-900">AI funnel sections</h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              Ordered sections for a full conversion path (hero → problem → proof → form bridge). Generated by AI; edit freely.
-            </p>
-            <div className="mt-4 space-y-4">
-              {(pageData.funnelSteps ?? []).map((step, i) => (
-                <div key={`${step.key ?? "step"}-${i}`} className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{step.key || `step-${i + 1}`}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeFunnelStep(i)}
-                      className="text-xs text-red-700 hover:underline"
-                    >
-                      Remove section
-                    </button>
-                  </div>
-                  <input
-                    value={step.title ?? ""}
-                    onChange={(e) => patchFunnelStep(i, { title: e.target.value })}
-                    placeholder="Section title"
-                    className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
-                  />
+            <div className="border-t border-zinc-100 pt-6">
+              <h2 className="text-sm font-semibold text-zinc-900">AI & tracking</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Edit headlines, funnel sections, FAQs, and embed in the <strong className="font-medium text-zinc-700">Design & preview</strong> tab.
+              </p>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">Competitor URLs to analyze</label>
                   <textarea
-                    value={step.body ?? ""}
-                    onChange={(e) => patchFunnelStep(i, { body: e.target.value })}
-                    placeholder="Body copy"
-                    rows={4}
-                    className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
-                  />
-                  <label className="mt-2 block text-xs text-zinc-600">Bullets (one per line)</label>
-                  <textarea
-                    value={(step.bullets ?? []).join("\n")}
-                    onChange={(e) => setStepBullets(i, e.target.value)}
+                    value={competitorUrlsScan}
+                    onChange={(e) => setCompetitorUrlsScan(e.target.value)}
                     rows={3}
-                    className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-1.5 font-mono text-xs"
+                    placeholder="One URL per line (optional — fills research notes below)"
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
                   />
+                  <button
+                    type="button"
+                    disabled={scanBusy || !competitorUrlsScan.trim()}
+                    onClick={() => void runUrlAnalysis()}
+                    className="mt-2 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    {scanBusy ? "Analyzing…" : "Run URL analysis"}
+                  </button>
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={addFunnelStep}
-                className="rounded-lg border border-dashed border-zinc-400 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-              >
-                + Add funnel section
-              </button>
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-100 pt-6">
-            <h2 className="text-sm font-semibold text-zinc-900">Trust & FAQ</h2>
-            <div className="mt-4 grid gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Trust signals (one per line)</label>
-                <textarea
-                  value={(pageData.trustSignals ?? []).join("\n")}
-                  onChange={(e) =>
-                    setPageData((prev) => ({
-                      ...prev,
-                      trustSignals: e.target.value
-                        .split("\n")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    }))
-                  }
-                  rows={4}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="space-y-3">
-                {(pageData.faq ?? []).map((item, i) => (
-                  <div key={`faq-${i}`} className="rounded-lg border border-zinc-200 p-3">
-                    <div className="flex justify-end">
-                      <button type="button" onClick={() => removeFaq(i)} className="text-xs text-red-700 hover:underline">
-                        Remove
-                      </button>
-                    </div>
-                    <input
-                      value={item.q ?? ""}
-                      onChange={(e) => patchFaq(i, { q: e.target.value })}
-                      placeholder="Question"
-                      className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
-                    />
-                    <textarea
-                      value={item.a ?? ""}
-                      onChange={(e) => patchFaq(i, { a: e.target.value })}
-                      placeholder="Answer"
-                      rows={2}
-                      className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
-                    />
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addFaq}
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
-                >
-                  + Add FAQ pair
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-100 pt-6">
-            <h2 className="text-sm font-semibold text-zinc-900">Thank-you & SEO</h2>
-            <div className="mt-4 grid gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Thank-you / next-step copy</label>
-                <textarea
-                  value={pageData.thankYouCopy ?? ""}
-                  onChange={(e) => updateField("thankYouCopy", e.target.value)}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">SEO title</label>
-                  <input
-                    value={pageData.seoTitle ?? ""}
-                    onChange={(e) => updateField("seoTitle", e.target.value)}
+                  <label className="block text-sm font-medium text-zinc-700">Competitor research notes</label>
+                  <textarea
+                    value={competitorBrief}
+                    onChange={(e) => setCompetitorBrief(e.target.value)}
+                    rows={6}
+                    placeholder="Paste insights here, or run URL analysis above. Used when you regenerate with AI."
                     className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700">SEO description</label>
-                  <input
-                    value={pageData.seoDescription ?? ""}
-                    onChange={(e) => updateField("seoDescription", e.target.value)}
+                  <label className="block text-sm font-medium text-zinc-700">AI generation prompt</label>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    rows={3}
+                    placeholder="Describe the offer, audience, and tone…"
                     className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={aiDraftBusy || !aiPrompt.trim()}
+                    onClick={() => void regenerateFromAi()}
+                    className="mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {aiDraftBusy ? "Regenerating…" : "Regenerate full funnel with AI"}
+                  </button>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Rebuilds funnel content in Design & preview. Your HTML embed is kept unless you change it there before regenerating.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">Conversion goal</label>
+                  <input
+                    value={conversionGoal}
+                    onChange={(e) => setConversionGoal(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                    placeholder="e.g. Lead form submit"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">Tracking pixel / snippet</label>
+                  <textarea
+                    value={pixel}
+                    onChange={(e) => setPixel(e.target.value)}
+                    rows={2}
+                    placeholder="Paste Meta/Google snippet or image URL"
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Form placement note (AI hint)</label>
-                <input
-                  value={pageData.formPlacementNote ?? ""}
-                  onChange={(e) => updateField("formPlacementNote", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                  placeholder='e.g. "Embedded form sits below proof section"'
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Ad goal echo (AI summary)</label>
-                <input
-                  value={pageData.adGoalEcho ?? ""}
-                  onChange={(e) => updateField("adGoalEcho", e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                  placeholder="Filled when AI generates"
-                />
-              </div>
             </div>
           </div>
-
-          <div className="border-t border-zinc-100 pt-6">
-            <h2 className="text-sm font-semibold text-zinc-900">AI & tracking (optional)</h2>
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Competitor URLs to analyze</label>
-                <textarea
-                  value={competitorUrlsScan}
-                  onChange={(e) => setCompetitorUrlsScan(e.target.value)}
-                  rows={3}
-                  placeholder="One URL per line (optional — fills research notes below)"
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
-                />
-                <button
-                  type="button"
-                  disabled={scanBusy || !competitorUrlsScan.trim()}
-                  onClick={() => void runUrlAnalysis()}
-                  className="mt-2 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
-                >
-                  {scanBusy ? "Analyzing…" : "Run URL analysis"}
-                </button>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Competitor research notes</label>
-                <textarea
-                  value={competitorBrief}
-                  onChange={(e) => setCompetitorBrief(e.target.value)}
-                  rows={6}
-                  placeholder="Paste insights here, or run URL analysis above. Used when you regenerate headline/body with AI."
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">AI generation prompt</label>
-                <textarea
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  rows={3}
-                  placeholder="Describe the offer, audience, and tone…"
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={aiDraftBusy || !aiPrompt.trim()}
-                  onClick={() => void regenerateFromAi()}
-                  className="mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {aiDraftBusy ? "Regenerating…" : "Regenerate full funnel with AI"}
-                </button>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Rebuilds the whole funnel JSON (sections, hero, CTAs, FAQ, trust, SEO, thank-you). Existing HTML embed is preserved unless you replace it here and save before regenerating.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Conversion goal</label>
-                <input
-                  value={conversionGoal}
-                  onChange={(e) => setConversionGoal(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                  placeholder="e.g. Lead form submit"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700">Tracking pixel / snippet</label>
-                <textarea
-                  value={pixel}
-                  onChange={(e) => setPixel(e.target.value)}
-                  rows={2}
-                  placeholder="Paste Meta/Google snippet or image URL"
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm font-mono text-xs"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </main>
     </div>
   );
