@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
@@ -102,15 +102,21 @@ function LandingPageEditorPageInner() {
   const [competitorUrlsScan, setCompetitorUrlsScan] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [aiDraftBusy, setAiDraftBusy] = useState(false);
+  /** Until false, avoid treating page===null as “not found” (fetch still in flight). */
+  const [detailLoading, setDetailLoading] = useState(true);
+  const loadGenRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!id || !user) return;
+    const gen = ++loadGenRef.current;
+    setDetailLoading(true);
     setLoadError(null);
     try {
       const [{ page: row }, exList] = await Promise.all([
         expansion.landingPages.get(id),
         api.listExperiments().catch(() => [] as Experiment[]),
       ]);
+      if (gen !== loadGenRef.current) return;
       setPage(row);
       setTitle(row.title);
       setSlug(row.slug);
@@ -122,8 +128,11 @@ function LandingPageEditorPageInner() {
       setPixel(row.conversionTrackingPixel ?? "");
       setExperiments(exList);
     } catch (e) {
+      if (gen !== loadGenRef.current) return;
       setLoadError(e instanceof Error ? e.message : "Could not load page");
       setPage(null);
+    } finally {
+      if (gen === loadGenRef.current) setDetailLoading(false);
     }
   }, [id, user]);
 
@@ -132,8 +141,15 @@ function LandingPageEditorPageInner() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (user && id) void load();
-  }, [user, id, load]);
+    if (loading || !user) return;
+    if (!id.trim()) {
+      setDetailLoading(false);
+      setLoadError("Invalid landing page link.");
+      setPage(null);
+      return;
+    }
+    void load();
+  }, [loading, user, id, load]);
 
   async function save() {
     if (!id) return;
@@ -307,12 +323,34 @@ function LandingPageEditorPageInner() {
     );
   }
 
+  if (!id.trim()) {
+    return (
+      <div className="min-h-screen bg-zinc-50">
+        <AppNav />
+        <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
+          <p className="text-red-600">{loadError || "Invalid landing page link."}</p>
+          <Link href="/landing-pages" className="mt-4 inline-block text-violet-700 hover:underline">
+            ← Back to landing pages
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (detailLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-violet-600" />
+      </div>
+    );
+  }
+
   if (loadError || !page) {
     return (
       <div className="min-h-screen bg-zinc-50">
         <AppNav />
         <main id="main-content" className="mx-auto max-w-3xl px-4 py-8">
-          <p className="text-red-600">{loadError || "Not found"}</p>
+          <p className="text-red-600">{loadError || "Landing page not found."}</p>
           <Link href="/landing-pages" className="mt-4 inline-block text-violet-700 hover:underline">
             ← Back to landing pages
           </Link>
