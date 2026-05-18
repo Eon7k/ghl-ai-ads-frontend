@@ -1,7 +1,15 @@
 "use client";
 
+import type { Dispatch, SetStateAction } from "react";
 import { useMemo } from "react";
-import type { LandingFunnelStep, LandingPageData } from "@/lib/api";
+import type { LandingFunnelStep, LandingPageData, LandingGalleryImage, LandingNavLinkRow, LandingPageTheme } from "@/lib/api";
+import {
+  cornerRoundingClass,
+  landingDesignRootVars,
+  normalizeHex,
+  resolveBodyFont,
+  resolveHeadingFont,
+} from "@/lib/landingPageTheme";
 
 type FieldKey =
   | "headline"
@@ -27,6 +35,7 @@ export type LandingPageDesignCanvasProps = {
   removeFaq: (index: number) => void;
   addFaq: () => void;
   setTrustSignalsFromLines: (lines: string[]) => void;
+  patchPageData: Dispatch<SetStateAction<LandingPageData>>;
 };
 
 /** Visitor-style landing layout with inline editable fields (no separate “code view”). */
@@ -41,6 +50,7 @@ export default function LandingPageDesignCanvas({
   removeFaq,
   addFaq,
   setTrustSignalsFromLines,
+  patchPageData,
 }: LandingPageDesignCanvasProps) {
   const funnelIndexes = useMemo(() => {
     const rawSteps = pageData.funnelSteps ?? [];
@@ -56,9 +66,90 @@ export default function LandingPageDesignCanvas({
   const headline = pageData.headline ?? "";
   const subheadline = pageData.subheadline ?? "";
   const body = pageData.body ?? "";
+  const theme = pageData.theme ?? {};
+  const navLinks = pageData.navLinks ?? [];
+  const footerLinks = pageData.footerLinks ?? [];
+  const galleryImages = pageData.galleryImages ?? [];
+  const heroBgRaw = theme.heroBgImageUrl?.trim() ?? "";
+  const ctaCorners = cornerRoundingClass(theme.cornerRadius);
+
+  const patchTheme = (patch: Partial<LandingPageTheme>) =>
+    patchPageData((prev) => ({
+      ...prev,
+      theme: { ...(prev.theme ?? {}), ...patch },
+    }));
+
+  function patchNavAt(index: number, patch: Partial<LandingNavLinkRow>) {
+    patchPageData((prev) => {
+      const nl = [...(prev.navLinks ?? [])];
+      nl[index] = { ...(nl[index] ?? { label: "", href: "" }), ...patch };
+      return { ...prev, navLinks: nl };
+    });
+  }
+
+  function addNav() {
+    patchPageData((prev) => ({
+      ...prev,
+      navLinks: [...(prev.navLinks ?? []), { label: "", href: "/" }],
+    }));
+  }
+
+  function removeNav(i: number) {
+    patchPageData((prev) => ({
+      ...prev,
+      navLinks: (prev.navLinks ?? []).filter((_, j) => j !== i),
+    }));
+  }
+
+  function patchGalleryAt(index: number, patch: Partial<LandingGalleryImage>) {
+    patchPageData((prev) => {
+      const g = [...(prev.galleryImages ?? [])];
+      g[index] = { ...(g[index] ?? { url: "" }), ...patch };
+      return { ...prev, galleryImages: g };
+    });
+  }
+
+  function addGallery() {
+    patchPageData((prev) => ({
+      ...prev,
+      galleryImages: [...(prev.galleryImages ?? []), { url: "", alt: "" }],
+    }));
+  }
+
+  function removeGallery(i: number) {
+    patchPageData((prev) => ({
+      ...prev,
+      galleryImages: (prev.galleryImages ?? []).filter((_, j) => j !== i),
+    }));
+  }
+
+  function patchFooterAt(index: number, patch: Partial<LandingNavLinkRow>) {
+    patchPageData((prev) => {
+      const fl = [...(prev.footerLinks ?? [])];
+      fl[index] = { ...(fl[index] ?? { label: "", href: "" }), ...patch };
+      return { ...prev, footerLinks: fl };
+    });
+  }
+
+  function addFooter() {
+    patchPageData((prev) => ({
+      ...prev,
+      footerLinks: [...(prev.footerLinks ?? []), { label: "", href: "/" }],
+    }));
+  }
+
+  function removeFooter(i: number) {
+    patchPageData((prev) => ({
+      ...prev,
+      footerLinks: (prev.footerLinks ?? []).filter((_, j) => j !== i),
+    }));
+  }
 
   return (
-    <div className="landing-design-root rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/60 ring-1 ring-black/5">
+    <div
+      className="landing-design-root rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/60 ring-1 ring-black/5"
+      style={{ ...landingDesignRootVars(theme), fontFamily: resolveBodyFont(theme) }}
+    >
       <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-center">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Design preview — click Save to persist changes</p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
@@ -67,17 +158,211 @@ export default function LandingPageDesignCanvas({
         </p>
       </div>
 
+      <details className="group border-b border-zinc-200 bg-white px-4 py-2 open:bg-zinc-50/80">
+        <summary className="cursor-pointer text-sm font-medium text-zinc-800">Look &amp; feel (colours, fonts, hero image)</summary>
+        <div className="mt-4 grid gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block text-xs font-medium text-zinc-600">
+            Primary colour
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="color"
+                value={normalizeHex(theme.primaryHex, "#6d28d9")}
+                onChange={(e) => patchTheme({ primaryHex: e.target.value })}
+                className="h-9 w-12 cursor-pointer rounded border border-zinc-300 bg-white p-0.5"
+              />
+              <input
+                value={theme.primaryHex ?? ""}
+                onChange={(e) => patchTheme({ primaryHex: e.target.value })}
+                placeholder="#6d28d9"
+                className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 font-mono text-xs"
+              />
+            </div>
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Accent colour
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="color"
+                value={normalizeHex(theme.accentHex, "#c4b5fd")}
+                onChange={(e) => patchTheme({ accentHex: e.target.value })}
+                className="h-9 w-12 cursor-pointer rounded border border-zinc-300 bg-white p-0.5"
+              />
+              <input
+                value={theme.accentHex ?? ""}
+                onChange={(e) => patchTheme({ accentHex: e.target.value })}
+                placeholder="#c4b5fd"
+                className="flex-1 rounded-md border border-zinc-300 px-2 py-1.5 font-mono text-xs"
+              />
+            </div>
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Corner style
+            <select
+              value={theme.cornerRadius ?? "rounded"}
+              onChange={(e) => patchTheme({ cornerRadius: e.target.value as LandingPageTheme["cornerRadius"] })}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
+            >
+              <option value="rounded">Rounded</option>
+              <option value="square">Square</option>
+              <option value="pill">Pill</option>
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-zinc-600 sm:col-span-2 lg:col-span-3">
+            Hero background image URL (https or /path)
+            <input
+              value={theme.heroBgImageUrl ?? ""}
+              onChange={(e) => patchTheme({ heroBgImageUrl: e.target.value })}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
+              placeholder="https://…/hero.jpg"
+            />
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Heading font
+            <select
+              value={theme.headingFontPreset ?? "modern"}
+              onChange={(e) => patchTheme({ headingFontPreset: e.target.value, headingFontCss: undefined })}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
+            >
+              <option value="modern">Modern sans</option>
+              <option value="system">System UI</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Mono</option>
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Body font
+            <select
+              value={theme.bodyFontPreset ?? "system"}
+              onChange={(e) => patchTheme({ bodyFontPreset: e.target.value, bodyFontCss: undefined })}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
+            >
+              <option value="system">System UI</option>
+              <option value="modern">Modern sans</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Mono</option>
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-zinc-600 sm:col-span-2">
+            Custom heading stack (optional)
+            <input
+              value={theme.headingFontCss ?? ""}
+              onChange={(e) => patchTheme({ headingFontCss: e.target.value })}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 font-mono text-xs"
+              placeholder={'e.g. "Playfair Display", Georgia, serif'}
+            />
+          </label>
+          <label className="block text-xs font-medium text-zinc-600 sm:col-span-2">
+            Custom body stack (optional)
+            <input
+              value={theme.bodyFontCss ?? ""}
+              onChange={(e) => patchTheme({ bodyFontCss: e.target.value })}
+              className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 font-mono text-xs"
+            />
+          </label>
+        </div>
+      </details>
+
+      <div className="border-b border-zinc-200 bg-white px-4 py-3">
+        <div className="mx-auto flex max-w-4xl flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Top navigation links</span>
+            <button
+              type="button"
+              onClick={addNav}
+              className="text-xs font-medium text-violet-700 hover:underline"
+            >
+              + Add link
+            </button>
+          </div>
+          {navLinks.length === 0 ? (
+            <p className="text-xs text-zinc-400">Optional — pricing, FAQs, booking, privacy, etc.</p>
+          ) : (
+            <div className="space-y-2">
+              {navLinks.map((link, i) => (
+                <div key={`nav-${i}`} className="flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200 bg-zinc-50/70 p-2">
+                  <label className="min-w-[8rem] flex-1 text-[11px] text-zinc-600">
+                    Label
+                    <input
+                      value={link.label}
+                      onChange={(e) => patchNavAt(i, { label: e.target.value })}
+                      className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="min-w-[10rem] flex-[2] text-[11px] text-zinc-600">
+                    URL
+                    <input
+                      value={link.href}
+                      onChange={(e) => patchNavAt(i, { href: e.target.value })}
+                      className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+                      placeholder="/pricing"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1 text-[11px] text-zinc-600">
+                    <input
+                      type="checkbox"
+                      checked={!!link.newTab}
+                      onChange={(e) => patchNavAt(i, { newTab: e.target.checked })}
+                    />{" "}
+                    New tab
+                  </label>
+                  <button type="button" onClick={() => removeNav(i)} className="text-xs text-red-600 hover:underline">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-violet-950 via-zinc-900 to-zinc-950 px-6 py-14 md:px-12 md:py-20">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.35),transparent_55%)]" />
-        <div className="relative mx-auto max-w-3xl">
+      <section className="relative overflow-hidden px-6 py-14 text-white md:px-12 md:py-20">
+        <div className="absolute inset-0 bg-zinc-950" />
+        {heroBgRaw ? (
+          <>
+            <div
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: `url(${heroBgRaw})` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/75 to-black/88" />
+          </>
+        ) : (
+          <>
+            <div
+              className="absolute inset-0 opacity-[0.98]"
+              style={{
+                background: `linear-gradient(135deg, ${normalizeHex(theme.primaryHex, "#5b21b6")} 0%, #27272a 46%, #0c0a12 100%)`,
+              }}
+            />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.16),transparent_58%)]" />
+          </>
+        )}
+        <div className="relative mx-auto max-w-3xl" style={{ fontFamily: resolveBodyFont(theme) }}>
+          {(navLinks.length > 0 && navLinks.some((n) => n.label.trim())) ? (
+            <nav className="mb-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-white/10 pb-4 text-sm">
+              {navLinks
+                .filter((n) => n.label.trim() && n.href.trim())
+                .map((n, i) => (
+                  <a
+                    key={`nav-vis-${n.href}-${i}`}
+                    href={n.href}
+                    target={n.newTab ? "_blank" : undefined}
+                    rel={n.newTab ? "noopener noreferrer" : undefined}
+                    className="font-medium text-white/90 underline-offset-4 hover:text-white hover:underline"
+                  >
+                    {n.label}
+                  </a>
+                ))}
+            </nav>
+          ) : null}
           <label className="mb-6 flex flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-300">Goal line</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Goal line</span>
             <input
               value={pageData.adGoalEcho ?? ""}
               onChange={(e) => updateField("adGoalEcho", e.target.value)}
-              className="min-w-[10rem] flex-1 border-b border-transparent bg-transparent text-sm font-medium text-white outline-none placeholder:text-violet-300/60 focus:border-violet-400"
+              className="min-w-[10rem] flex-1 border-b border-transparent bg-transparent text-sm font-medium text-white outline-none placeholder:text-white/35 focus:border-violet-300"
               placeholder="e.g. Book a strategy call"
+              style={{ fontFamily: resolveBodyFont(theme) }}
             />
           </label>
           <label className="block">
@@ -88,6 +373,7 @@ export default function LandingPageDesignCanvas({
               rows={Math.min(6, Math.max(2, headline.split("\n").length || 2))}
               placeholder="Headline — big promise visitors see first"
               className="w-full resize-none bg-transparent text-3xl font-bold leading-tight tracking-tight text-white placeholder:text-zinc-500 focus:outline-none focus:ring-0 md:text-4xl lg:text-5xl"
+              style={{ fontFamily: resolveHeadingFont(theme) }}
             />
           </label>
           <label className="mt-5 block">
@@ -97,7 +383,8 @@ export default function LandingPageDesignCanvas({
               onChange={(e) => updateField("subheadline", e.target.value)}
               rows={Math.min(5, Math.max(2, subheadline.split("\n").length || 2))}
               placeholder="Supporting line — clarify who it’s for and what they get"
-              className="w-full resize-none bg-transparent text-lg leading-relaxed text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:ring-0 md:text-xl"
+              className="w-full resize-none bg-transparent text-lg leading-relaxed text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-0 md:text-xl"
+              style={{ fontFamily: resolveHeadingFont(theme) }}
             />
           </label>
           <label className="mt-8 block">
@@ -107,37 +394,39 @@ export default function LandingPageDesignCanvas({
               onChange={(e) => updateField("body", e.target.value)}
               rows={Math.min(12, Math.max(4, body.split("\n").length || 4))}
               placeholder="Hero body — expand on the offer (paragraphs)."
-              className="w-full resize-none bg-transparent text-base leading-relaxed text-zinc-400 placeholder:text-zinc-600 focus:outline-none focus:ring-0"
+              className="w-full resize-none bg-transparent text-base leading-relaxed text-zinc-300 placeholder:text-zinc-500 focus:outline-none focus:ring-0"
+              style={{ fontFamily: resolveBodyFont(theme) }}
             />
           </label>
 
           <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <label className="flex flex-1 flex-col gap-1 sm:max-w-xs">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-300">Button label</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Button label</span>
               <input
                 value={pageData.ctaText ?? ""}
                 onChange={(e) => updateField("ctaText", e.target.value)}
-                className="rounded-xl border border-white/25 bg-white px-5 py-3 text-center text-base font-semibold text-violet-950 shadow-lg placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/40"
+                className={`border border-white/30 bg-white px-5 py-3 text-center text-base font-semibold shadow-lg placeholder:text-zinc-400 focus:border-white focus:outline-none focus:ring-2 focus:ring-white/30 ${ctaCorners}`}
+                style={{ color: normalizeHex(theme.primaryHex, "#5b21b6") }}
                 placeholder="Get started"
               />
             </label>
             <label className="flex flex-1 flex-col gap-1 sm:min-w-[200px]">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-300">Button link</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Button link</span>
               <input
                 value={pageData.ctaUrl ?? ""}
                 onChange={(e) => updateField("ctaUrl", e.target.value)}
-                className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                className={`border border-white/20 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-400/30 ${ctaCorners}`}
                 placeholder="https://… or /thank-you"
               />
             </label>
           </div>
 
           <label className="mt-8 block rounded-lg border border-white/10 bg-white/5 p-3">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Form placement note</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Form placement note</span>
             <input
               value={pageData.formPlacementNote ?? ""}
               onChange={(e) => updateField("formPlacementNote", e.target.value)}
-              className="mt-1 w-full bg-transparent text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none"
+              className="mt-1 w-full bg-transparent text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none"
               placeholder="e.g. Form sits below proof section"
             />
           </label>
@@ -173,6 +462,7 @@ export default function LandingPageDesignCanvas({
                   rows={Math.min(3, Math.max(1, (step.title ?? "").split("\n").length))}
                   placeholder="Section headline"
                   className="w-full resize-none bg-transparent text-2xl font-semibold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none md:text-3xl"
+                  style={{ fontFamily: resolveHeadingFont(theme) }}
                 />
               </label>
               <label className="mt-5 block">
@@ -183,13 +473,14 @@ export default function LandingPageDesignCanvas({
                   rows={Math.min(14, Math.max(4, (step.body ?? "").split("\n").length || 4))}
                   placeholder="Paragraphs for this section."
                   className="w-full resize-none bg-transparent text-base leading-relaxed text-zinc-600 placeholder:text-zinc-400 focus:outline-none"
+                  style={{ fontFamily: resolveBodyFont(theme) }}
                 />
               </label>
               <div className="mt-6 rounded-xl border border-dashed border-zinc-200 bg-white/80 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Bullet points</p>
                 <p className="mt-1 text-xs text-zinc-400">One line per bullet — shown as a list below.</p>
                 {(step.bullets?.length ?? 0) > 0 ? (
-                  <ul className="mt-4 list-disc space-y-2 pl-5 text-zinc-700 marker:text-violet-500">
+                  <ul className="mt-4 list-disc space-y-2 pl-5 text-zinc-700 marker:text-[color:var(--lp-accent)]">
                     {(step.bullets ?? []).map((b, bi) => (
                       <li key={`${bi}-${b.slice(0, 16)}`}>{b}</li>
                     ))}
@@ -218,6 +509,58 @@ export default function LandingPageDesignCanvas({
         </button>
       </div>
 
+      {/* Image gallery */}
+      <section className="border-t border-zinc-200 bg-white px-6 py-12 md:px-12">
+        <div className="mx-auto max-w-4xl">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Image gallery</h3>
+            <button type="button" onClick={addGallery} className="text-xs font-medium text-violet-700 hover:underline">
+              + Add image
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">Use https image URLs (or /site paths). Shown in a responsive grid above trust signals.</p>
+          {galleryImages.length === 0 ? (
+            <p className="mt-6 text-sm text-zinc-400">No images yet — add photos, logo walls, or product shots.</p>
+          ) : (
+            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {galleryImages.map((img, i) => (
+                <div key={`gal-${i}`} className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 shadow-sm">
+                  {img.url.trim() ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img.url} alt={img.alt || ""} className="h-40 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-40 items-center justify-center text-xs text-zinc-400">Paste image URL</div>
+                  )}
+                  <div className="space-y-2 p-3">
+                    <input
+                      value={img.url}
+                      onChange={(e) => patchGalleryAt(i, { url: e.target.value })}
+                      className="w-full rounded border border-zinc-200 px-2 py-1 font-mono text-xs"
+                      placeholder="https://..."
+                    />
+                    <input
+                      value={img.alt ?? ""}
+                      onChange={(e) => patchGalleryAt(i, { alt: e.target.value })}
+                      className="w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                      placeholder="Alt text"
+                    />
+                    <input
+                      value={img.caption ?? ""}
+                      onChange={(e) => patchGalleryAt(i, { caption: e.target.value })}
+                      className="w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                      placeholder="Caption (optional)"
+                    />
+                    <button type="button" onClick={() => removeGallery(i)} className="text-xs text-red-600 hover:underline">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Trust */}
       <section className="border-t border-zinc-200 bg-white px-6 py-12 md:px-12">
         <div className="mx-auto max-w-3xl">
@@ -229,7 +572,11 @@ export default function LandingPageDesignCanvas({
               (pageData.trustSignals ?? []).map((t, i) => (
                 <span
                   key={`${i}-${t.slice(0, 24)}`}
-                  className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm"
+                  className="rounded-full border bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm"
+                  style={{
+                    borderColor: normalizeHex(theme.accentHex, "#a78bfa"),
+                    backgroundColor: `${normalizeHex(theme.primaryHex, "#6d28d9")}10`,
+                  }}
                 >
                   {t}
                 </span>
@@ -289,6 +636,72 @@ export default function LandingPageDesignCanvas({
               placeholder='<iframe src="https://..." ...></iframe>'
             />
           </details>
+        </div>
+      </section>
+
+      {/* Footer links */}
+      <section className="border-t border-zinc-200 bg-zinc-50 px-6 py-8 md:px-12">
+        <div className="mx-auto max-w-3xl">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Footer / legal links</span>
+            <button type="button" onClick={addFooter} className="text-xs font-medium text-violet-700 hover:underline">
+              + Add link
+            </button>
+          </div>
+          {footerLinks.length === 0 ? (
+            <p className="mt-2 text-xs text-zinc-400">Optional — privacy, terms, contact.</p>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {footerLinks.map((link, i) => (
+                <div key={`ft-${i}`} className="flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200 bg-white p-2">
+                  <label className="min-w-[8rem] flex-1 text-[11px] text-zinc-600">
+                    Label
+                    <input
+                      value={link.label}
+                      onChange={(e) => patchFooterAt(i, { label: e.target.value })}
+                      className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="min-w-[10rem] flex-[2] text-[11px] text-zinc-600">
+                    URL
+                    <input
+                      value={link.href}
+                      onChange={(e) => patchFooterAt(i, { href: e.target.value })}
+                      className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1 text-[11px] text-zinc-600">
+                    <input
+                      type="checkbox"
+                      checked={!!link.newTab}
+                      onChange={(e) => patchFooterAt(i, { newTab: e.target.checked })}
+                    />{" "}
+                    New tab
+                  </label>
+                  <button type="button" onClick={() => removeFooter(i)} className="text-xs text-red-600 hover:underline">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {footerLinks.some((f) => f.label.trim() && f.href.trim()) ? (
+            <div className="mt-6 flex flex-wrap justify-center gap-4 border-t border-zinc-200 pt-6 text-sm text-zinc-600">
+              {footerLinks
+                .filter((f) => f.label.trim() && f.href.trim())
+                .map((f, i) => (
+                  <a
+                    key={`ft-a-${i}`}
+                    href={f.href}
+                    target={f.newTab ? "_blank" : undefined}
+                    rel={f.newTab ? "noopener noreferrer" : undefined}
+                    className="hover:text-zinc-900 hover:underline"
+                  >
+                    {f.label}
+                  </a>
+                ))}
+            </div>
+          ) : null}
         </div>
       </section>
 

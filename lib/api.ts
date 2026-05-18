@@ -746,6 +746,32 @@ export type LandingFunnelStep = {
   bullets?: string[];
 };
 
+export type LandingNavLinkRow = {
+  label: string;
+  href: string;
+  /** open in new tab */
+  newTab?: boolean;
+};
+
+export type LandingGalleryImage = {
+  url: string;
+  alt?: string;
+  caption?: string;
+};
+
+/** Look & feel (stored inside `pageData.theme`). */
+export type LandingPageTheme = {
+  preset?: string;
+  primaryHex?: string;
+  accentHex?: string;
+  heroBgImageUrl?: string;
+  cornerRadius?: "rounded" | "square" | "pill";
+  headingFontPreset?: string;
+  bodyFontPreset?: string;
+  headingFontCss?: string;
+  bodyFontCss?: string;
+};
+
 /** Stored JSON for landing page content (hero, funnel steps, optional form embed). */
 export type LandingPageData = {
   headline?: string;
@@ -763,6 +789,10 @@ export type LandingPageData = {
   seoDescription?: string;
   formPlacementNote?: string;
   adGoalEcho?: string;
+  theme?: LandingPageTheme;
+  navLinks?: LandingNavLinkRow[];
+  footerLinks?: LandingNavLinkRow[];
+  galleryImages?: LandingGalleryImage[];
 };
 
 export type LandingPageRecord = {
@@ -1104,6 +1134,11 @@ export const expansion = {
       request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}/ai-draft`, {
         method: "POST",
         body: body ?? {},
+      }),
+    aiRefine: (id: string, body: { refinementsPrompt: string }) =>
+      request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}/ai-refine`, {
+        method: "POST",
+        body,
       }),
   },
 

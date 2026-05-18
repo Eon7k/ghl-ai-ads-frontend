@@ -7,8 +7,67 @@ import AppNav from "@/components/AppNav";
 import LandingPageDesignCanvas from "@/components/LandingPageDesignCanvas";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, expansion, type LandingFunnelStep, type LandingPageData, type LandingPageRecord } from "@/lib/api";
+import {
+  api,
+  expansion,
+  type LandingFunnelStep,
+  type LandingGalleryImage,
+  type LandingNavLinkRow,
+  type LandingPageData,
+  type LandingPageRecord,
+  type LandingPageTheme,
+} from "@/lib/api";
 import type { Experiment } from "@/lib/types";
+
+function parseNavLinks(raw: unknown): LandingNavLinkRow[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: LandingNavLinkRow[] = [];
+  for (const x of raw) {
+    if (!x || typeof x !== "object") continue;
+    const r = x as Record<string, unknown>;
+    const label = typeof r.label === "string" ? r.label : "";
+    const href = typeof r.href === "string" ? r.href : "";
+    if (!label.trim() && !href.trim()) continue;
+    const row: LandingNavLinkRow = { label, href };
+    if (r.newTab === true) row.newTab = true;
+    rows.push(row);
+  }
+  return rows.length ? rows : undefined;
+}
+
+function parseGalleryImages(raw: unknown): LandingGalleryImage[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: LandingGalleryImage[] = [];
+  for (const x of raw) {
+    if (!x || typeof x !== "object") continue;
+    const g = x as Record<string, unknown>;
+    const url = typeof g.url === "string" ? g.url : "";
+    if (!url.trim()) continue;
+    const row: LandingGalleryImage = { url };
+    if (typeof g.alt === "string" && g.alt.trim()) row.alt = g.alt;
+    if (typeof g.caption === "string" && g.caption.trim()) row.caption = g.caption;
+    rows.push(row);
+  }
+  return rows.length ? rows : undefined;
+}
+
+function normalizeTheme(raw: unknown): LandingPageTheme | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const t = raw as Record<string, unknown>;
+  const corner =
+    t.cornerRadius === "rounded" || t.cornerRadius === "square" || t.cornerRadius === "pill" ? t.cornerRadius : undefined;
+  const out: LandingPageTheme = {};
+  if (typeof t.preset === "string") out.preset = t.preset;
+  if (typeof t.primaryHex === "string") out.primaryHex = t.primaryHex;
+  if (typeof t.accentHex === "string") out.accentHex = t.accentHex;
+  if (typeof t.heroBgImageUrl === "string") out.heroBgImageUrl = t.heroBgImageUrl;
+  if (corner) out.cornerRadius = corner;
+  if (typeof t.headingFontPreset === "string") out.headingFontPreset = t.headingFontPreset;
+  if (typeof t.bodyFontPreset === "string") out.bodyFontPreset = t.bodyFontPreset;
+  if (typeof t.headingFontCss === "string") out.headingFontCss = t.headingFontCss;
+  if (typeof t.bodyFontCss === "string") out.bodyFontCss = t.bodyFontCss;
+  return Object.keys(out).length ? out : undefined;
+}
 
 function normalizePageData(raw: unknown): LandingPageData {
   if (!raw || typeof raw !== "object") return {};
@@ -74,6 +133,10 @@ function normalizePageData(raw: unknown): LandingPageData {
     seoDescription: typeof o.seoDescription === "string" ? o.seoDescription : "",
     formPlacementNote: typeof o.formPlacementNote === "string" ? o.formPlacementNote : "",
     adGoalEcho: typeof o.adGoalEcho === "string" ? o.adGoalEcho : "",
+    theme: normalizeTheme(o.theme),
+    navLinks: parseNavLinks(o.navLinks),
+    footerLinks: parseNavLinks(o.footerLinks),
+    galleryImages: parseGalleryImages(o.galleryImages),
   };
 }
 
@@ -103,6 +166,9 @@ function LandingPageEditorPageInner() {
   const [competitorUrlsScan, setCompetitorUrlsScan] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
   const [aiDraftBusy, setAiDraftBusy] = useState(false);
+  const [aiRefineBusy, setAiRefineBusy] = useState(false);
+  const [aiRefinementPrompt, setAiRefinementPrompt] = useState("");
+  const [aiRefineOk, setAiRefineOk] = useState(false);
   /** Until false, avoid treating page===null as “not found” (fetch still in flight). */
   const [detailLoading, setDetailLoading] = useState(true);
   const loadGenRef = useRef(0);
@@ -238,6 +304,32 @@ function LandingPageEditorPageInner() {
       setSaveError(e instanceof Error ? e.message : "AI regenerate failed");
     } finally {
       setAiDraftBusy(false);
+    }
+  }
+
+  async function applyAiRefinement() {
+    if (!id) return;
+    if (!aiRefinementPrompt.trim()) {
+      setSaveError("Describe the changes you want (colours, copy, sections, links, gallery, etc.).");
+      return;
+    }
+    setAiRefineBusy(true);
+    setSaveError(null);
+    setSaveOk(false);
+    setAiRefineOk(false);
+    try {
+      const { page: row } = await expansion.landingPages.aiRefine(id, {
+        refinementsPrompt: aiRefinementPrompt.trim(),
+      });
+      setPage(row);
+      setPageData(normalizePageData(row.pageData));
+      setAiRefinementPrompt("");
+      setAiRefineOk(true);
+      setTimeout(() => setAiRefineOk(false), 3500);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "AI refinement failed");
+    } finally {
+      setAiRefineBusy(false);
     }
   }
 
@@ -423,7 +515,39 @@ function LandingPageEditorPageInner() {
         </div>
 
         {editorTab === "design" ? (
-          <div className="mt-8">
+          <div className="mt-8 space-y-6">
+            <section className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/80 to-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-zinc-900">Targeted AI changes</h2>
+              <p className="mt-1 text-xs text-zinc-600">
+                Ask for specific edits only—fonts, palette, hero copy, funnel sections, nav/footer links, or gallery images. Your form embed stays as-is unless you change it manually.
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                Saves, targeted AI tweaks, and full AI regenerates accumulate a funnel-style summary tied to{' '}
+                <strong className="font-medium text-zinc-600">this client record</strong> you&apos;re editing (kept apart from other clients your agency manages). Future drafts steer toward patterns you&apos;ve established—nothing is shared outside your tenancy.
+              </p>
+              <textarea
+                value={aiRefinementPrompt}
+                onChange={(e) => setAiRefinementPrompt(e.target.value)}
+                rows={3}
+                placeholder="e.g. Make the primary colour navy, shorten the hero subhead, add a Pricing section bullet list, add footer link “Privacy” to /privacy"
+                className="mt-3 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
+              />
+              <button
+                type="button"
+                disabled={aiRefineBusy || !aiRefinementPrompt.trim()}
+                onClick={() => void applyAiRefinement()}
+                className="mt-3 rounded-lg bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800 disabled:opacity-50"
+              >
+                {aiRefineBusy ? "Applying…" : "Apply AI changes"}
+              </button>
+              {aiRefineOk && (
+                <p className="mt-2 text-xs text-green-700">
+                  Updates applied on the server. If you tweak copy or styling below—or change title, slug, or settings—use{" "}
+                  <strong className="font-medium">Save</strong> to persist those.
+                </p>
+              )}
+            </section>
+
             <LandingPageDesignCanvas
               pageData={pageData}
               updateField={updateField}
@@ -435,6 +559,7 @@ function LandingPageEditorPageInner() {
               removeFaq={removeFaq}
               addFaq={addFaq}
               setTrustSignalsFromLines={setTrustSignalsFromLines}
+              patchPageData={setPageData}
             />
           </div>
         ) : (
@@ -489,7 +614,9 @@ function LandingPageEditorPageInner() {
             <div className="border-t border-zinc-100 pt-6">
               <h2 className="text-sm font-semibold text-zinc-900">AI & tracking</h2>
               <p className="mt-1 text-xs text-zinc-500">
-                Edit headlines, funnel sections, FAQs, and embed in the <strong className="font-medium text-zinc-700">Design & preview</strong> tab.
+                Edit headlines, funnel sections, FAQs, branding and embed in <strong className="font-medium text-zinc-700">Design &amp; preview</strong>. Use{" "}
+                <strong className="font-medium text-zinc-700">Targeted AI changes</strong> there for incremental edits; use{" "}
+                <strong className="font-medium text-zinc-700">Regenerate full funnel</strong> here to rebuild from scratch.
               </p>
               <div className="mt-4 space-y-4">
                 <div>
