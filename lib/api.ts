@@ -739,13 +739,30 @@ export type LandingCompetitorSiteScanRow = {
   textPreview?: string;
 };
 
-/** Stored JSON for landing page content (headline, CTAs, etc.). */
+export type LandingFunnelStep = {
+  key?: string;
+  title?: string;
+  body?: string;
+  bullets?: string[];
+};
+
+/** Stored JSON for landing page content (hero, funnel steps, optional form embed). */
 export type LandingPageData = {
   headline?: string;
   subheadline?: string;
   body?: string;
   ctaText?: string;
   ctaUrl?: string;
+  /** Pasted iframe/script snippet (e.g. GHL form embed). Render only on trusted domains with sandbox when publishing. */
+  formEmbedHtml?: string;
+  funnelSteps?: LandingFunnelStep[];
+  trustSignals?: string[];
+  faq?: { q?: string; a?: string }[];
+  thankYouCopy?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  formPlacementNote?: string;
+  adGoalEcho?: string;
 };
 
 export type LandingPageRecord = {
@@ -1063,6 +1080,8 @@ export const expansion = {
       title: string;
       prompt: string;
       conversionGoal?: string | null;
+      /** Optional embed snippet — AI shapes funnel copy around it (never echoed back into JSON). */
+      formEmbedHtml?: string | null;
       competitorUrlsText?: string;
       competitorUrls?: string[];
     }) =>
@@ -1078,6 +1097,8 @@ export const expansion = {
         competitorBrief?: string | null;
         competitorUrlsText?: string;
         competitorUrls?: string[];
+        /** Optional — omit to keep existing embed on the page. */
+        formEmbedHtml?: string | null;
       }
     ) =>
       request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}/ai-draft`, {

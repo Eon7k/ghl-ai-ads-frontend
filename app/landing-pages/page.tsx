@@ -26,6 +26,7 @@ function LandingPagesListPageInner() {
   const [aiGenBusy, setAiGenBusy] = useState(false);
   const [builderInfo, setBuilderInfo] = useState<string | null>(null);
   const [builderError, setBuilderError] = useState<string | null>(null);
+  const [aiFormEmbed, setAiFormEmbed] = useState("");
   const [lastScanSummary, setLastScanSummary] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -111,10 +112,12 @@ function LandingPagesListPageInner() {
         prompt: p,
         conversionGoal: aiGoal.trim() || undefined,
         competitorUrlsText: competitorUrlsText.trim() || undefined,
+        ...(aiFormEmbed.trim() ? { formEmbedHtml: aiFormEmbed.trim() } : {}),
       });
       setAiTitle("");
       setAiPrompt("");
       setAiGoal("");
+      setAiFormEmbed("");
       setCompetitorUrlsText("");
       setLastScanSummary(null);
       void load();
@@ -182,10 +185,11 @@ function LandingPagesListPageInner() {
         </p>
 
         <section className="mt-8 rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-zinc-900">AI website builder</h2>
+          <h2 className="text-base font-semibold text-zinc-900">AI funnel builder</h2>
           <p className="mt-2 text-sm text-zinc-700">
-            <strong>Prompt only</strong> — describe your offer, audience, and tone. <strong>With URLs</strong> — paste competitor or inspiration sites (one per line,
-            or CSV with URLs in the first column); we fetch public HTML only and summarize what works or falls flat, then generate differentiated copy.
+            Generates an end-to-end conversion funnel (hero → story → proof → objections → bridge to capture → thank-you hints,
+            FAQ, trust signals, SEO fields). Describe your offer and <strong>ad goal</strong>; optionally paste competitor URLs and your{" "}
+            <strong>GHL / embed HTML</strong> so copy leads visitors into that form — the model never echoes raw iframe code back into JSON.
           </p>
           <form onSubmit={generateWithAi} className="mt-5 space-y-4">
             <div>
@@ -215,14 +219,27 @@ function LandingPagesListPageInner() {
             </div>
             <div>
               <label htmlFor="ai-lp-goal" className="block text-sm font-medium text-zinc-700">
-                Conversion goal (optional)
+                Ad / funnel goal (recommended)
               </label>
               <input
                 id="ai-lp-goal"
                 value={aiGoal}
                 onChange={(e) => setAiGoal(e.target.value)}
-                placeholder="Book consult, lead form, phone call…"
+                placeholder="e.g. Book a demo call · Capture cold-traffic leads at $50 CPA · Waitlist signups"
                 className="mt-1 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-zinc-900"
+              />
+            </div>
+            <div>
+              <label htmlFor="ai-lp-embed" className="block text-sm font-medium text-zinc-700">
+                Form embed HTML (optional)
+              </label>
+              <textarea
+                id="ai-lp-embed"
+                value={aiFormEmbed}
+                onChange={(e) => setAiFormEmbed(e.target.value)}
+                rows={4}
+                placeholder={'Paste iframe/script embed from GoHighLevel or your CRM — AI writes copy around it.'}
+                className="mt-1 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 font-mono text-xs text-zinc-900"
               />
             </div>
             <div>
@@ -245,7 +262,7 @@ function LandingPagesListPageInner() {
                 disabled={aiGenBusy}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
               >
-                {aiGenBusy ? "Generating…" : "Generate landing page"}
+                {aiGenBusy ? "Generating…" : "Generate AI funnel"}
               </button>
               <button
                 type="button"

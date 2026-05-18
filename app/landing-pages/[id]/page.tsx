@@ -6,18 +6,73 @@ import { useCallback, useEffect, useState } from "react";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, expansion, type LandingPageData, type LandingPageRecord } from "@/lib/api";
+import { api, expansion, type LandingFunnelStep, type LandingPageData, type LandingPageRecord } from "@/lib/api";
 import type { Experiment } from "@/lib/types";
 
 function normalizePageData(raw: unknown): LandingPageData {
   if (!raw || typeof raw !== "object") return {};
   const o = raw as Record<string, unknown>;
+
+  let funnelSteps: LandingFunnelStep[] | undefined;
+  if (Array.isArray(o.funnelSteps)) {
+    funnelSteps = o.funnelSteps
+      .filter((x) => x && typeof x === "object")
+      .map((x) => {
+        const s = x as Record<string, unknown>;
+        let bullets: string[] | undefined;
+        if (Array.isArray(s.bullets)) {
+          bullets = s.bullets.filter((b) => typeof b === "string").map((b) => String(b));
+          if (bullets.length === 0) bullets = undefined;
+        }
+        return {
+          key: typeof s.key === "string" ? s.key : "",
+          title: typeof s.title === "string" ? s.title : "",
+          body: typeof s.body === "string" ? s.body : "",
+          bullets,
+        };
+      });
+    if (funnelSteps.length === 0) funnelSteps = undefined;
+  }
+
+  let faq: { q: string; a: string }[] | undefined;
+  if (Array.isArray(o.faq)) {
+    faq = o.faq
+      .filter((x) => x && typeof x === "object")
+      .map((x) => {
+        const f = x as Record<string, unknown>;
+        return {
+          q: typeof f.q === "string" ? f.q : "",
+          a: typeof f.a === "string" ? f.a : "",
+        };
+      })
+      .filter((x) => x.q || x.a);
+    if (faq.length === 0) faq = undefined;
+  }
+
+  let trustSignals: string[] | undefined;
+  if (Array.isArray(o.trustSignals)) {
+    trustSignals = o.trustSignals
+      .filter((x) => typeof x === "string")
+      .map((x) => String(x))
+      .filter(Boolean);
+    if (trustSignals.length === 0) trustSignals = undefined;
+  }
+
   return {
     headline: typeof o.headline === "string" ? o.headline : "",
     subheadline: typeof o.subheadline === "string" ? o.subheadline : "",
     body: typeof o.body === "string" ? o.body : "",
     ctaText: typeof o.ctaText === "string" ? o.ctaText : "",
     ctaUrl: typeof o.ctaUrl === "string" ? o.ctaUrl : "",
+    formEmbedHtml: typeof o.formEmbedHtml === "string" ? o.formEmbedHtml : "",
+    funnelSteps,
+    faq,
+    trustSignals,
+    thankYouCopy: typeof o.thankYouCopy === "string" ? o.thankYouCopy : "",
+    seoTitle: typeof o.seoTitle === "string" ? o.seoTitle : "",
+    seoDescription: typeof o.seoDescription === "string" ? o.seoDescription : "",
+    formPlacementNote: typeof o.formPlacementNote === "string" ? o.formPlacementNote : "",
+    adGoalEcho: typeof o.adGoalEcho === "string" ? o.adGoalEcho : "",
   };
 }
 
@@ -167,7 +222,80 @@ function LandingPageEditorPageInner() {
     }
   }
 
-  function updateField<K extends keyof LandingPageData>(key: K, value: string) {
+  function patchFunnelStep(index: number, patch: Partial<LandingFunnelStep>) {
+    setPageData((prev) => {
+      const steps = [...(prev.funnelSteps ?? [])];
+      steps[index] = { ...steps[index], ...patch };
+      return { ...prev, funnelSteps: steps };
+    });
+  }
+
+  function removeFunnelStep(index: number) {
+    setPageData((prev) => ({
+      ...prev,
+      funnelSteps: (prev.funnelSteps ?? []).filter((_, i) => i !== index),
+    }));
+  }
+
+  function addFunnelStep() {
+    setPageData((prev) => ({
+      ...prev,
+      funnelSteps: [
+        ...(prev.funnelSteps ?? []),
+        {
+          key: `section-${(prev.funnelSteps?.length ?? 0) + 1}`,
+          title: "",
+          body: "",
+        },
+      ],
+    }));
+  }
+
+  function setStepBullets(index: number, raw: string) {
+    const bullets = raw
+      .split(/\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    patchFunnelStep(index, { bullets: bullets.length ? bullets : undefined });
+  }
+
+  function addFaq() {
+    setPageData((prev) => ({
+      ...prev,
+      faq: [...(prev.faq ?? []), { q: "", a: "" }],
+    }));
+  }
+
+  function patchFaq(index: number, patch: Partial<{ q: string; a: string }>) {
+    setPageData((prev) => {
+      const faq = [...(prev.faq ?? [])];
+      faq[index] = { ...faq[index], ...patch };
+      return { ...prev, faq };
+    });
+  }
+
+  function removeFaq(index: number) {
+    setPageData((prev) => ({
+      ...prev,
+      faq: (prev.faq ?? []).filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateField(
+    key:
+      | "headline"
+      | "subheadline"
+      | "body"
+      | "ctaText"
+      | "ctaUrl"
+      | "formEmbedHtml"
+      | "thankYouCopy"
+      | "seoTitle"
+      | "seoDescription"
+      | "formPlacementNote"
+      | "adGoalEcho",
+    value: string
+  ) {
     setPageData((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -324,6 +452,175 @@ function LandingPageEditorPageInner() {
           </div>
 
           <div className="border-t border-zinc-100 pt-6">
+            <h2 className="text-sm font-semibold text-zinc-900">Lead capture embed (HTML)</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Paste GoHighLevel (or other) iframe/embed code. AI positions copy relative to this when you generate — only paste snippets you trust.
+            </p>
+            <textarea
+              value={pageData.formEmbedHtml ?? ""}
+              onChange={(e) => updateField("formEmbedHtml", e.target.value)}
+              rows={5}
+              placeholder='<iframe src="https://link.example.com/widget/form/..." ...></iframe>'
+              className="mt-2 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs text-zinc-900"
+            />
+          </div>
+
+          <div className="border-t border-zinc-100 pt-6">
+            <h2 className="text-sm font-semibold text-zinc-900">AI funnel sections</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Ordered sections for a full conversion path (hero → problem → proof → form bridge). Generated by AI; edit freely.
+            </p>
+            <div className="mt-4 space-y-4">
+              {(pageData.funnelSteps ?? []).map((step, i) => (
+                <div key={`${step.key ?? "step"}-${i}`} className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{step.key || `step-${i + 1}`}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFunnelStep(i)}
+                      className="text-xs text-red-700 hover:underline"
+                    >
+                      Remove section
+                    </button>
+                  </div>
+                  <input
+                    value={step.title ?? ""}
+                    onChange={(e) => patchFunnelStep(i, { title: e.target.value })}
+                    placeholder="Section title"
+                    className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
+                  />
+                  <textarea
+                    value={step.body ?? ""}
+                    onChange={(e) => patchFunnelStep(i, { body: e.target.value })}
+                    placeholder="Body copy"
+                    rows={4}
+                    className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
+                  />
+                  <label className="mt-2 block text-xs text-zinc-600">Bullets (one per line)</label>
+                  <textarea
+                    value={(step.bullets ?? []).join("\n")}
+                    onChange={(e) => setStepBullets(i, e.target.value)}
+                    rows={3}
+                    className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-1.5 font-mono text-xs"
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addFunnelStep}
+                className="rounded-lg border border-dashed border-zinc-400 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+              >
+                + Add funnel section
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-zinc-100 pt-6">
+            <h2 className="text-sm font-semibold text-zinc-900">Trust & FAQ</h2>
+            <div className="mt-4 grid gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Trust signals (one per line)</label>
+                <textarea
+                  value={(pageData.trustSignals ?? []).join("\n")}
+                  onChange={(e) =>
+                    setPageData((prev) => ({
+                      ...prev,
+                      trustSignals: e.target.value
+                        .split("\n")
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    }))
+                  }
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-3">
+                {(pageData.faq ?? []).map((item, i) => (
+                  <div key={`faq-${i}`} className="rounded-lg border border-zinc-200 p-3">
+                    <div className="flex justify-end">
+                      <button type="button" onClick={() => removeFaq(i)} className="text-xs text-red-700 hover:underline">
+                        Remove
+                      </button>
+                    </div>
+                    <input
+                      value={item.q ?? ""}
+                      onChange={(e) => patchFaq(i, { q: e.target.value })}
+                      placeholder="Question"
+                      className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
+                    />
+                    <textarea
+                      value={item.a ?? ""}
+                      onChange={(e) => patchFaq(i, { a: e.target.value })}
+                      placeholder="Answer"
+                      rows={2}
+                      className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addFaq}
+                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
+                >
+                  + Add FAQ pair
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-zinc-100 pt-6">
+            <h2 className="text-sm font-semibold text-zinc-900">Thank-you & SEO</h2>
+            <div className="mt-4 grid gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Thank-you / next-step copy</label>
+                <textarea
+                  value={pageData.thankYouCopy ?? ""}
+                  onChange={(e) => updateField("thankYouCopy", e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">SEO title</label>
+                  <input
+                    value={pageData.seoTitle ?? ""}
+                    onChange={(e) => updateField("seoTitle", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700">SEO description</label>
+                  <input
+                    value={pageData.seoDescription ?? ""}
+                    onChange={(e) => updateField("seoDescription", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Form placement note (AI hint)</label>
+                <input
+                  value={pageData.formPlacementNote ?? ""}
+                  onChange={(e) => updateField("formPlacementNote", e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  placeholder='e.g. "Embedded form sits below proof section"'
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700">Ad goal echo (AI summary)</label>
+                <input
+                  value={pageData.adGoalEcho ?? ""}
+                  onChange={(e) => updateField("adGoalEcho", e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  placeholder="Filled when AI generates"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-zinc-100 pt-6">
             <h2 className="text-sm font-semibold text-zinc-900">AI & tracking (optional)</h2>
             <div className="mt-4 space-y-4">
               <div>
@@ -369,10 +666,10 @@ function LandingPageEditorPageInner() {
                   onClick={() => void regenerateFromAi()}
                   className="mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {aiDraftBusy ? "Regenerating…" : "Regenerate headline & body from AI"}
+                  {aiDraftBusy ? "Regenerating…" : "Regenerate full funnel with AI"}
                 </button>
                 <p className="mt-1 text-xs text-zinc-500">
-                  Overwrites headline, subheadline, body, and CTA fields using your prompt plus optional research notes (and URLs if you did not analyze yet).
+                  Rebuilds the whole funnel JSON (sections, hero, CTAs, FAQ, trust, SEO, thank-you). Existing HTML embed is preserved unless you replace it here and save before regenerating.
                 </p>
               </div>
               <div>
