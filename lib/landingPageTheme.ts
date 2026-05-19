@@ -38,6 +38,12 @@ export function resolveBodyFont(theme?: LandingPageTheme | null): string {
   return resolvePresetStack(theme?.bodyFontPreset, theme?.bodyFontCss, "system");
 }
 
+/** Full-bleed: funnel bands + footer areas reuse hero backdrop layers when enabled in theme. */
+export function landingBandsMatchHeroBackdrop(theme?: LandingPageTheme | null): boolean {
+  if (!theme || theme.belowHeroBackdrop === "isolateHero") return false;
+  return theme.belowHeroBackdrop === "matchHero";
+}
+
 /** CSS variables consumed by Tailwind-rich preview (editor only). */
 export function landingDesignRootVars(theme?: LandingPageTheme | null): CSSProperties {
   const primary = normalizeHex(theme?.primaryHex, FALLBACK_PRIMARY);

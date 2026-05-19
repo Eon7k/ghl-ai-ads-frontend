@@ -767,6 +767,12 @@ export type LandingPageTheme = {
   heroBgImageUrl?: string;
   /** When the hero shows a photo, darkening overlay intensity (0–1). Gradient hero ignores this. */
   heroOverlayOpacity?: number;
+  /**
+   * Hero backdrop repetition below the hero row:
+   * - `matchHero` — funnel, gallery, trust, footer bands, FAQ, etc. reuse the same image/gradient + darker stack as the hero.
+   * Omit or use `isolateHero` for zebra light sections under the hero.
+   */
+  belowHeroBackdrop?: "matchHero" | "isolateHero";
   cornerRadius?: "rounded" | "square" | "pill";
   headingFontPreset?: string;
   bodyFontPreset?: string;
@@ -830,6 +836,8 @@ export type LandingPageRecord = {
   status: string;
   hostingType: string;
   subdomain: string | null;
+  customDomain: string | null;
+  deploymentNotes: string | null;
   pageData: LandingPageData;
   aiGenerationPrompt: string | null;
   conversionGoal: string | null;
@@ -855,6 +863,7 @@ export type LandingPageListItem = Pick<
   | "status"
   | "hostingType"
   | "subdomain"
+  | "customDomain"
   | "conversionGoal"
   | "publishedAt"
   | "createdAt"
@@ -1141,6 +1150,8 @@ export const expansion = {
         status: string;
         hostingType: string;
         subdomain: string | null;
+        customDomain: string | null;
+        deploymentNotes: string | null;
         campaignId: string | null;
         pageData: LandingPageData | null;
         aiGenerationPrompt: string | null;

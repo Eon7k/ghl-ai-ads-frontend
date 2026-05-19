@@ -332,6 +332,7 @@ function LandingPagesListPageInner() {
                     <p className="truncate text-xs text-zinc-500">
                       /{p.slug} · {p.status}
                       {p.experiment ? ` · ${p.experiment.name}` : ""}
+                      {p.customDomain?.trim() ? ` · Domain: ${p.customDomain.trim()}` : ""}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm text-violet-700">Edit →</span>

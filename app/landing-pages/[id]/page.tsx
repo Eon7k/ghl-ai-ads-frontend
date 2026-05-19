@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "@/components/AppNav";
 import LandingPageDesignCanvas from "@/components/LandingPageDesignCanvas";
 import LandingPageEditorInspector, {
@@ -21,6 +21,23 @@ import {
   type LandingPageTheme,
 } from "@/lib/api";
 import type { Experiment } from "@/lib/types";
+
+const LANDING_DNS_CNAME_TARGET = (
+  typeof process.env.NEXT_PUBLIC_LANDING_DNS_CNAME_TARGET === "string" ? process.env.NEXT_PUBLIC_LANDING_DNS_CNAME_TARGET : ""
+).trim();
+
+const LANDING_PUBLIC_URL_TEMPLATE = (
+  typeof process.env.NEXT_PUBLIC_LANDING_PUBLIC_URL_TEMPLATE === "string"
+    ? process.env.NEXT_PUBLIC_LANDING_PUBLIC_URL_TEMPLATE
+    : ""
+).trim();
+
+function interpolateLandingUrlTemplate(
+  template: string,
+  ctx: { id: string; slug: string; subdomain: string },
+): string {
+  return template.replace(/\{id\}/g, ctx.id).replace(/\{slug\}/g, ctx.slug).replace(/\{subdomain\}/g, ctx.subdomain || "");
+}
 
 function parseNavLinks(raw: unknown): LandingNavLinkRow[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -85,6 +102,10 @@ function normalizeTheme(raw: unknown): LandingPageTheme | undefined {
   if (typeof t.heroOverlayOpacity === "number" && Number.isFinite(t.heroOverlayOpacity)) {
     out.heroOverlayOpacity = Math.min(0.95, Math.max(0, t.heroOverlayOpacity));
   }
+
+  const belowBackdrop =
+    t.belowHeroBackdrop === "matchHero" || t.belowHeroBackdrop === "isolateHero" ? t.belowHeroBackdrop : undefined;
+  if (belowBackdrop) out.belowHeroBackdrop = belowBackdrop;
 
   const ew = safeThemeEmbedMaxWidth(t.formEmbedMaxWidth);
   if (ew) out.formEmbedMaxWidth = ew;
@@ -217,6 +238,10 @@ function LandingPageEditorPageInner() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [conversionGoal, setConversionGoal] = useState("");
   const [pixel, setPixel] = useState("");
+  const [hostingType, setHostingType] = useState("platform");
+  const [subdomain, setSubdomain] = useState("");
+  const [customDomain, setCustomDomain] = useState("");
+  const [deploymentNotes, setDeploymentNotes] = useState("");
   const [competitorBrief, setCompetitorBrief] = useState("");
   const [competitorUrlsScan, setCompetitorUrlsScan] = useState("");
   const [scanBusy, setScanBusy] = useState(false);
@@ -229,6 +254,11 @@ function LandingPageEditorPageInner() {
   const loadGenRef = useRef(0);
   const [editorTab, setEditorTab] = useState<"design" | "settings">("design");
   const [editorZone, setEditorZone] = useState<LandingEditorZone>(null);
+
+  const [browserOrigin, setBrowserOrigin] = useState("");
+  useEffect(() => {
+    setBrowserOrigin(typeof window !== "undefined" ? window.location.origin : "");
+  }, []);
 
   const scrollToZoneId = useCallback((id: string) => {
     const el = typeof document !== "undefined" ? document.getElementById(id) : null;
@@ -261,6 +291,10 @@ function LandingPageEditorPageInner() {
       setSlug(row.slug);
       setStatus(row.status);
       setCampaignId(row.campaignId ?? "");
+      setHostingType(row.hostingType || "platform");
+      setSubdomain(row.subdomain ?? "");
+      setCustomDomain(row.customDomain ?? "");
+      setDeploymentNotes(row.deploymentNotes ?? "");
       setPageData(normalizePageData(row.pageData));
       setAiPrompt(row.aiGenerationPrompt ?? "");
       setConversionGoal(row.conversionGoal ?? "");
@@ -300,6 +334,10 @@ function LandingPageEditorPageInner() {
         title: title.trim(),
         slug: slug.trim() || undefined,
         status,
+        hostingType,
+        subdomain: subdomain.trim() || null,
+        customDomain: customDomain.trim() || null,
+        deploymentNotes: deploymentNotes.trim() || null,
         campaignId: campaignId || null,
         pageData,
         aiGenerationPrompt: aiPrompt.trim() || null,
@@ -309,6 +347,10 @@ function LandingPageEditorPageInner() {
       setPage(row);
       setTitle(row.title);
       setSlug(row.slug);
+      setHostingType(row.hostingType || "platform");
+      setSubdomain(row.subdomain ?? "");
+      setCustomDomain(row.customDomain ?? "");
+      setDeploymentNotes(row.deploymentNotes ?? "");
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 2000);
     } catch (e) {
@@ -367,6 +409,10 @@ function LandingPageEditorPageInner() {
         competitorUrlsText: competitorUrlsScan.trim() || undefined,
       });
       setPage(row);
+      setHostingType(row.hostingType || "platform");
+      setSubdomain(row.subdomain ?? "");
+      setCustomDomain(row.customDomain ?? "");
+      setDeploymentNotes(row.deploymentNotes ?? "");
       setPageData(normalizePageData(row.pageData));
       setSaveOk(true);
       setEditorTab("design");
@@ -393,6 +439,10 @@ function LandingPageEditorPageInner() {
         refinementsPrompt: aiRefinementPrompt.trim(),
       });
       setPage(row);
+      setHostingType(row.hostingType || "platform");
+      setSubdomain(row.subdomain ?? "");
+      setCustomDomain(row.customDomain ?? "");
+      setDeploymentNotes(row.deploymentNotes ?? "");
       setPageData(normalizePageData(row.pageData));
       setAiRefinementPrompt("");
       setAiRefineOk(true);
@@ -484,6 +534,15 @@ function LandingPageEditorPageInner() {
   function setTrustSignalsFromLines(lines: string[]) {
     setPageData((prev) => ({ ...prev, trustSignals: lines }));
   }
+
+  const interpolatedPublicUrl = useMemo(() => {
+    if (!LANDING_PUBLIC_URL_TEMPLATE || !page?.id) return "";
+    return interpolateLandingUrlTemplate(LANDING_PUBLIC_URL_TEMPLATE, {
+      id: page.id,
+      slug: (slug.trim() || page.slug || "page").trim(),
+      subdomain: subdomain.trim(),
+    });
+  }, [page, slug, subdomain]);
 
   if (loading || !user) {
     return (
@@ -692,6 +751,96 @@ function LandingPageEditorPageInner() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="border-t border-zinc-100 pt-6">
+              <h2 className="text-sm font-semibold text-zinc-900">Publish on your website &amp; DNS</h2>
+              <p className="mt-1 text-xs text-zinc-600">
+                Capture the hostname and DNS steps here so going live stays organized. Actual DNS records are created at your registrar or Cloudflare — this workspace only saves your notes and hostname
+                for the team unless your administrator automates provisioning elsewhere.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-zinc-700">Where visitors will consume this funnel</label>
+                  <select
+                    value={hostingType}
+                    onChange={(e) => setHostingType(e.target.value)}
+                    className="mt-1 w-full max-w-xl rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                  >
+                    <option value="platform">Platform-hosted funnel URL (use DNS checklist below)</option>
+                    <option value="export">Rebuilt on another site (CMS, GHL funnel, WordPress hosted page…)</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-zinc-700">Planned public hostname (optional)</label>
+                  <input
+                    value={customDomain}
+                    onChange={(e) => setCustomDomain(e.target.value)}
+                    className="mt-1 w-full max-w-xl rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm"
+                    placeholder="promo.customerdomain.com"
+                    autoComplete="off"
+                  />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Hostname only — omit https:// paths and query strings. Save validates the shape server-side.
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-zinc-700">Reserved platform subdomain slug (optional)</label>
+                  <input
+                    value={subdomain}
+                    onChange={(e) => setSubdomain(e.target.value)}
+                    className="mt-1 w-full max-w-md rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm"
+                    placeholder="lower-case identifier if multi-tenant hosting maps URLs"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-950">
+                <p className="font-medium text-emerald-900">Typical DNS (ask your infra owner for the real target hostname)</p>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-xs leading-relaxed text-emerald-900">
+                  <li>
+                    <strong>CNAME:</strong> point your subdomain to{" "}
+                    <code className="rounded bg-white px-1.5 py-0.5 font-mono">
+                      {LANDING_DNS_CNAME_TARGET || "(set NEXT_PUBLIC_LANDING_DNS_CNAME_TARGET)"}
+                    </code>
+                  </li>
+                  <li>
+                    <strong>APEX / naked domain:</strong> often requires ALIAS / CNAME flattening at Cloudflare, DNSimple, or an A record pair your host provides — follow their docs.
+                  </li>
+                  <li>
+                    <strong>HTTPS:</strong> issue a certificate once DNS resolves (Lets Encrypt ACM, Cloudflare proxy, etc.).
+                  </li>
+                </ul>
+                {LANDING_PUBLIC_URL_TEMPLATE ? (
+                  <p className="mt-3 border-t border-emerald-200/70 pt-3 text-[11px] leading-relaxed text-emerald-900/90">
+                    Public URL template in env:&nbsp;
+                    <code className="break-all rounded bg-white px-2 py-0.5 font-mono">{LANDING_PUBLIC_URL_TEMPLATE}</code>
+                    {interpolatedPublicUrl ? (
+                      <>
+                        <br />
+                        Resolved example:&nbsp;<strong className="break-all">{interpolatedPublicUrl}</strong>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+                {browserOrigin && id ? (
+                  <p className="mt-2 text-[11px] text-emerald-900/85">
+                    Staff editor URL:&nbsp;
+                    <code className="break-all rounded bg-white px-1.5 py-0.5 font-mono">{`${browserOrigin}/landing-pages/${id}`}</code>
+                  </p>
+                ) : null}
+              </div>
+
+              <label className="mt-6 block">
+                <span className="text-sm font-medium text-zinc-700">DNS / registrar / verification notes</span>
+                <textarea
+                  value={deploymentNotes}
+                  onChange={(e) => setDeploymentNotes(e.target.value)}
+                  rows={5}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs"
+                  placeholder="Paste TXT proofs, CDN steps, registrar screenshots links, stakeholder sign-off…"
+                />
+              </label>
             </div>
 
             <div className="border-t border-zinc-100 pt-6">

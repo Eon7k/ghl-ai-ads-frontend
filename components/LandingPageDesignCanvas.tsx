@@ -4,11 +4,13 @@ import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import { useMemo } from "react";
 import type { LandingEditorZone } from "@/components/LandingPageEditorInspector";
 import LandingEmbedResizeHandle from "@/components/LandingEmbedResizeHandle";
+import LandingHeroBackdropStack from "@/components/LandingHeroBackdropStack";
 import LandingResizeBar from "@/components/LandingResizeBar";
 import type { LandingFunnelStep, LandingPageData, LandingGalleryImage, LandingNavLinkRow, LandingPageTheme } from "@/lib/api";
 import {
   cornerRoundingClass,
   embedColumnWidthPx,
+  landingBandsMatchHeroBackdrop,
   landingContentColumnStyle,
   landingDesignRootVars,
   landingEmbedIframeVars,
@@ -98,7 +100,6 @@ export default function LandingPageDesignCanvas({
   const navLinks = pageData.navLinks ?? [];
   const footerLinks = pageData.footerLinks ?? [];
   const galleryImages = pageData.galleryImages ?? [];
-  const heroBgRaw = theme.heroBgImageUrl?.trim() ?? "";
   const ctaCorners = cornerRoundingClass(theme.cornerRadius);
   const embedCorners = cornerRoundingClass(theme.formEmbedCardRadius ?? theme.cornerRadius);
   const embedMaxW = theme.formEmbedMaxWidth?.trim() || "36rem";
@@ -108,6 +109,7 @@ export default function LandingPageDesignCanvas({
   const heroSp = landingHeroSpacing(theme);
   const funnelSp = landingFunnelSectionSpacing(theme);
   const faqSp = landingFaqSpacing(theme);
+  const bleed = landingBandsMatchHeroBackdrop(theme);
   /** Default hero column matches prior max-w-3xl (~768px) when untouched. */
   const proseWrap = `${colMaxCustom ? "" : "max-w-3xl"}`;
   const galleryWrap = `${colMaxCustom ? "" : "max-w-4xl"}`;
@@ -262,6 +264,23 @@ export default function LandingPageDesignCanvas({
               placeholder="https://…/hero.jpg"
             />
           </label>
+          <label className="flex cursor-pointer items-start gap-3 text-xs font-medium text-zinc-600 sm:col-span-2 lg:col-span-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-400"
+              checked={bleed}
+              onChange={(e) =>
+                patchTheme({ belowHeroBackdrop: e.target.checked ? "matchHero" : "isolateHero" })
+              }
+            />
+            <span className="leading-snug">
+              Extend hero backdrop down through funnel, gallery, trust, FAQs &amp; footer (matches the cinematic
+              hero strip).
+              <span className="block font-normal text-zinc-400">
+                Leave off for zebra light-grey sections below the hero only.
+              </span>
+            </span>
+          </label>
           <label className="block text-xs font-medium text-zinc-600">
             Heading font
             <select
@@ -387,33 +406,9 @@ export default function LandingPageDesignCanvas({
         onFocusCapture={() => setEditorZone("hero")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "hero", setEditorZone)}
       >
-        <div className="absolute inset-0 bg-zinc-950" />
-        {heroBgRaw ? (
-          <>
-            <div
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{ backgroundImage: `url(${heroBgRaw})` }}
-            />
-            <div
-              className="absolute inset-0 bg-black"
-              style={{
-                opacity: Math.min(0.95, Math.max(0, theme.heroOverlayOpacity ?? 0.55)),
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <div
-              className="absolute inset-0 opacity-[0.98]"
-              style={{
-                background: `linear-gradient(135deg, ${normalizeHex(theme.primaryHex, "#5b21b6")} 0%, #27272a 46%, #0c0a12 100%)`,
-              }}
-            />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.16),transparent_58%)]" />
-          </>
-        )}
+        <LandingHeroBackdropStack theme={theme} />
         <div
-          className={`relative mx-auto w-full ${proseWrap} pr-10`}
+          className={`relative z-10 mx-auto w-full ${proseWrap} pr-10`}
           style={{ ...colSx, fontFamily: resolveBodyFont(theme) }}
         >
           {(navLinks.length > 0 && navLinks.some((n) => n.label.trim())) ? (
@@ -535,24 +530,40 @@ export default function LandingPageDesignCanvas({
       {/* Funnel sections */}
       {funnelIndexes.map(({ step, index }, visualRank) => {
         const zebra = visualRank % 2 === 0;
+        const bandSurface = bleed
+          ? "relative z-0 overflow-hidden border-white/10 text-white"
+          : `border-zinc-100 ${zebra ? "bg-white" : "bg-zinc-50/90"}`;
         return (
           <section
             key={`${step.key ?? "step"}-${index}`}
             id={`lp-zone-section-${index}`}
-            className={`border-t border-zinc-100 px-6 md:px-12 ${funnelSp.className} ${zebra ? "bg-white" : "bg-zinc-50/90"} ${zoneRing(editorZone === `section-${index}`)}`}
+            className={`border-t px-6 md:px-12 ${funnelSp.className} ${bandSurface} ${zoneRing(editorZone === `section-${index}`)}`}
             style={funnelSp.padStyle}
             onFocusCapture={() => setEditorZone(`section-${index}`)}
-            onPointerDownCapture={(e) => editableSurfaceClick(e, `section-${index}` as LandingEditorZone, setEditorZone)}
+            onPointerDownCapture={(e) =>
+              editableSurfaceClick(e, `section-${index}` as LandingEditorZone, setEditorZone)
+            }
           >
-            <div className={`relative mx-auto w-full ${proseWrap}`} style={colSx}>
+            {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+            <div className={`relative z-10 mx-auto w-full ${proseWrap}`} style={colSx}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <span className="rounded-md bg-violet-100 px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide text-violet-800">
+                <span
+                  className={
+                    bleed
+                      ? "rounded-md border border-white/15 bg-white/10 px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide text-zinc-100"
+                      : "rounded-md bg-violet-100 px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide text-violet-800"
+                  }
+                >
                   {(step.key ?? "").trim() || `section-${visualRank + 1}`}
                 </span>
                 <button
                   type="button"
                   onClick={() => removeFunnelStep(index)}
-                  className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline"
+                  className={
+                    bleed
+                      ? "text-xs font-medium text-red-400 hover:text-red-300 hover:underline"
+                      : "text-xs font-medium text-red-600 hover:text-red-800 hover:underline"
+                  }
                 >
                   Remove section
                 </button>
@@ -564,8 +575,12 @@ export default function LandingPageDesignCanvas({
                   onChange={(e) => patchFunnelStep(index, { title: e.target.value })}
                   rows={Math.min(3, Math.max(1, (step.title ?? "").split("\n").length))}
                   placeholder="Section headline"
-                  className="w-full resize-none bg-transparent text-2xl font-semibold tracking-tight placeholder:text-zinc-400 focus:outline-none md:text-3xl"
-                  style={{ fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
+                  className={
+                    bleed
+                      ? "w-full resize-none bg-transparent text-2xl font-semibold tracking-tight text-white placeholder:text-zinc-500 focus:outline-none md:text-3xl"
+                      : "w-full resize-none bg-transparent text-2xl font-semibold tracking-tight placeholder:text-zinc-400 focus:outline-none md:text-3xl"
+                  }
+                  style={bleed ? { fontFamily: resolveHeadingFont(theme) } : { fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
                 />
               </label>
               <label className="mt-5 block">
@@ -575,15 +590,39 @@ export default function LandingPageDesignCanvas({
                   onChange={(e) => patchFunnelStep(index, { body: e.target.value })}
                   rows={Math.min(14, Math.max(4, (step.body ?? "").split("\n").length || 4))}
                   placeholder="Paragraphs for this section."
-                  className="w-full resize-none bg-transparent text-base leading-relaxed text-zinc-600 placeholder:text-zinc-400 focus:outline-none"
+                  className={
+                    bleed
+                      ? "w-full resize-none bg-transparent text-base leading-relaxed text-zinc-200 placeholder:text-zinc-400 focus:outline-none"
+                      : "w-full resize-none bg-transparent text-base leading-relaxed text-zinc-600 placeholder:text-zinc-400 focus:outline-none"
+                  }
                   style={{ fontFamily: resolveBodyFont(theme) }}
                 />
               </label>
-              <div className="mt-6 rounded-xl border border-dashed border-zinc-200 bg-white/80 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Bullet points</p>
-                <p className="mt-1 text-xs text-zinc-400">One line per bullet — shown as a list below.</p>
+              <div
+                className={
+                  bleed
+                    ? "mt-6 rounded-xl border border-dashed border-white/25 bg-black/25 p-4"
+                    : "mt-6 rounded-xl border border-dashed border-zinc-200 bg-white/80 p-4"
+                }
+              >
+                <p
+                  className={
+                    bleed ? "text-[11px] font-semibold uppercase tracking-wide text-zinc-400" : "text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
+                  }
+                >
+                  Bullet points
+                </p>
+                <p className={`mt-1 text-xs ${bleed ? "text-zinc-500" : "text-zinc-400"}`}>
+                  One line per bullet — shown as a list below.
+                </p>
                 {(step.bullets?.length ?? 0) > 0 ? (
-                  <ul className="mt-4 list-disc space-y-2 pl-5 text-zinc-800 marker:text-[color:var(--lp-accent)]">
+                  <ul
+                    className={
+                      bleed
+                        ? "mt-4 list-disc space-y-2 pl-5 text-zinc-100 marker:text-[color:var(--lp-accent)]"
+                        : "mt-4 list-disc space-y-2 pl-5 text-zinc-800 marker:text-[color:var(--lp-accent)]"
+                    }
+                  >
                     {(step.bullets ?? []).map((b, bi) => (
                       <li key={`${bi}-${b.slice(0, 16)}`}>{b}</li>
                     ))}
@@ -593,7 +632,11 @@ export default function LandingPageDesignCanvas({
                   value={(step.bullets ?? []).join("\n")}
                   onChange={(e) => setStepBullets(index, e.target.value)}
                   rows={4}
-                  className="mt-4 w-full rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                  className={
+                    bleed
+                      ? "mt-4 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                      : "mt-4 w-full rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                  }
                   placeholder={"Outcome one\nOutcome two"}
                 />
               </div>
@@ -607,43 +650,79 @@ export default function LandingPageDesignCanvas({
               clamp={[16, 160]}
               apply={(n) => patchTheme({ funnelSectionPaddingYPx: n })}
               onBegin={() => setEditorZone(`section-${index}` as LandingEditorZone)}
+              className="relative z-20"
             />
           </section>
         );
       })}
 
-      <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-6 md:px-12">
-        <button
-          type="button"
-          onClick={addFunnelStep}
-          style={colSx}
-          className={`mx-auto flex w-full ${proseWrap} rounded-xl border-2 border-dashed border-zinc-300 px-6 py-4 text-sm font-medium text-zinc-600 hover:border-violet-400 hover:bg-white hover:text-violet-900`}
-        >
-          + Add funnel section
-        </button>
+      <div
+        className={
+          bleed
+            ? "relative z-0 overflow-hidden border-t border-white/10 px-6 py-6 md:px-12"
+            : "border-t border-zinc-100 bg-zinc-50 px-6 py-6 md:px-12"
+        }
+      >
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+        <div className={bleed ? "relative z-10" : undefined}>
+          <button
+            type="button"
+            onClick={addFunnelStep}
+            style={colSx}
+            className={
+              bleed
+                ? `mx-auto flex w-full ${proseWrap} rounded-xl border-2 border-dashed border-white/25 bg-white/5 px-6 py-4 text-sm font-medium text-zinc-200 hover:border-violet-400/80 hover:bg-white/10 hover:text-white`
+                : `mx-auto flex w-full ${proseWrap} rounded-xl border-2 border-dashed border-zinc-300 px-6 py-4 text-sm font-medium text-zinc-600 hover:border-violet-400 hover:bg-white hover:text-violet-900`
+            }
+          >
+            + Add funnel section
+          </button>
+        </div>
       </div>
 
       {/* Image gallery */}
       <section
         id="lp-zone-gallery"
-        className={`border-t border-zinc-200 bg-white px-6 py-12 md:px-12 ${zoneRing(editorZone === "gallery")}`}
+        className={
+          bleed
+            ? `relative z-0 overflow-hidden border-t border-white/10 px-6 py-12 text-white md:px-12 ${zoneRing(editorZone === "gallery")}`
+            : `border-t border-zinc-200 bg-white px-6 py-12 md:px-12 ${zoneRing(editorZone === "gallery")}`
+        }
         onFocusCapture={() => setEditorZone("gallery")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "gallery", setEditorZone)}
       >
-        <div className={`mx-auto w-full ${galleryWrap}`} style={colSx}>
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+        <div className={`relative z-10 mx-auto w-full ${galleryWrap}`} style={colSx}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Image gallery</h3>
-            <button type="button" onClick={addGallery} className="text-xs font-medium text-violet-700 hover:underline">
+            <h3 className={`text-sm font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+              Image gallery
+            </h3>
+            <button
+              type="button"
+              onClick={addGallery}
+              className={bleed ? "text-xs font-medium text-violet-400 hover:underline" : "text-xs font-medium text-violet-700 hover:underline"}
+            >
               + Add image
             </button>
           </div>
-          <p className="mt-1 text-xs text-zinc-400">Use https image URLs (or /site paths). Shown in a responsive grid above trust signals.</p>
+          <p className={`mt-1 text-xs ${bleed ? "text-zinc-500" : "text-zinc-400"}`}>
+            Use https image URLs (or /site paths). Shown in a responsive grid above trust signals.
+          </p>
           {galleryImages.length === 0 ? (
-            <p className="mt-6 text-sm text-zinc-400">No images yet — add photos, logo walls, or product shots.</p>
+            <p className={`mt-6 text-sm ${bleed ? "text-zinc-400" : "text-zinc-400"}`}>
+              No images yet — add photos, logo walls, or product shots.
+            </p>
           ) : (
             <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {galleryImages.map((img, i) => (
-                <div key={`gal-${i}`} className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 shadow-sm">
+                <div
+                  key={`gal-${i}`}
+                  className={
+                    bleed
+                      ? "overflow-hidden rounded-xl border border-white/20 bg-black/35 shadow-sm shadow-black/30"
+                      : "overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 shadow-sm"
+                  }
+                >
                   {img.url.trim() ? (
                     <div className="w-full shrink-0 overflow-hidden" style={landingGalleryThumbStyle(theme)}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -651,7 +730,7 @@ export default function LandingPageDesignCanvas({
                     </div>
                   ) : (
                     <div
-                      className="flex w-full shrink-0 items-center justify-center text-xs text-zinc-400"
+                      className={`flex w-full shrink-0 items-center justify-center text-xs ${bleed ? "text-zinc-400" : "text-zinc-400"}`}
                       style={landingGalleryThumbStyle(theme)}
                     >
                       Paste image URL
@@ -661,22 +740,34 @@ export default function LandingPageDesignCanvas({
                     <input
                       value={img.url}
                       onChange={(e) => patchGalleryAt(i, { url: e.target.value })}
-                      className="w-full rounded border border-zinc-200 px-2 py-1 font-mono text-xs"
+                      className={
+                        bleed
+                          ? "w-full rounded border border-white/25 bg-black/35 px-2 py-1 font-mono text-xs text-white placeholder:text-zinc-500"
+                          : "w-full rounded border border-zinc-200 px-2 py-1 font-mono text-xs"
+                      }
                       placeholder="https://..."
                     />
                     <input
                       value={img.alt ?? ""}
                       onChange={(e) => patchGalleryAt(i, { alt: e.target.value })}
-                      className="w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                      className={
+                        bleed
+                          ? "w-full rounded border border-white/25 bg-black/35 px-2 py-1 text-xs text-white placeholder:text-zinc-500"
+                          : "w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                      }
                       placeholder="Alt text"
                     />
                     <input
                       value={img.caption ?? ""}
                       onChange={(e) => patchGalleryAt(i, { caption: e.target.value })}
-                      className="w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                      className={
+                        bleed
+                          ? "w-full rounded border border-white/25 bg-black/35 px-2 py-1 text-xs text-white placeholder:text-zinc-500"
+                          : "w-full rounded border border-zinc-200 px-2 py-1 text-xs"
+                      }
                       placeholder="Caption (optional)"
                     />
-                    <button type="button" onClick={() => removeGallery(i)} className="text-xs text-red-600 hover:underline">
+                    <button type="button" onClick={() => removeGallery(i)} className={`text-xs ${bleed ? "text-red-400 hover:underline" : "text-red-600 hover:underline"}`}>
                       Remove
                     </button>
                   </div>
@@ -692,7 +783,7 @@ export default function LandingPageDesignCanvas({
             getValue={() => theme.galleryCardImageHeightPx ?? 160}
             clamp={[88, 420]}
             apply={(n) => patchTheme({ galleryCardImageHeightPx: n })}
-            className={galleryImages.length > 0 ? "mt-6" : "mt-4"}
+            className={`relative z-20 ${galleryImages.length > 0 ? "mt-6" : "mt-4"}`}
             onBegin={() => setEditorZone("gallery")}
           />
         </div>
@@ -701,12 +792,19 @@ export default function LandingPageDesignCanvas({
       {/* Trust */}
       <section
         id="lp-zone-trust"
-        className={`border-t border-zinc-200 bg-white px-6 py-12 md:px-12 ${zoneRing(editorZone === "trust")}`}
+        className={
+          bleed
+            ? `relative z-0 overflow-hidden border-t border-white/10 px-6 py-12 text-white md:px-12 ${zoneRing(editorZone === "trust")}`
+            : `border-t border-zinc-200 bg-white px-6 py-12 md:px-12 ${zoneRing(editorZone === "trust")}`
+        }
         onFocusCapture={() => setEditorZone("trust")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "trust", setEditorZone)}
       >
-        <div className={`mx-auto w-full ${proseWrap}`} style={colSx}>
-          <h3 className="text-center text-sm font-semibold uppercase tracking-wide text-zinc-500">Trust & credibility</h3>
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+        <div className={`relative z-10 mx-auto w-full ${proseWrap}`} style={colSx}>
+          <h3 className={`text-center text-sm font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+            Trust & credibility
+          </h3>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {(pageData.trustSignals ?? []).length === 0 ? (
               <p className="text-sm text-zinc-400">Add signals below — they appear as chips.</p>
@@ -714,10 +812,16 @@ export default function LandingPageDesignCanvas({
               (pageData.trustSignals ?? []).map((t, i) => (
                 <span
                   key={`${i}-${t.slice(0, 24)}`}
-                  className="rounded-full border bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm"
+                  className={
+                    bleed
+                      ? "rounded-full border px-4 py-2 text-sm font-medium text-white shadow-sm shadow-black/30"
+                      : "rounded-full border bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm"
+                  }
                   style={{
                     borderColor: normalizeHex(theme.accentHex, "#a78bfa"),
-                    backgroundColor: `${normalizeHex(theme.primaryHex, "#6d28d9")}10`,
+                    backgroundColor: bleed
+                      ? `${normalizeHex(theme.primaryHex, "#6d28d9")}35`
+                      : `${normalizeHex(theme.primaryHex, "#6d28d9")}10`,
                   }}
                 >
                   {t}
@@ -726,7 +830,7 @@ export default function LandingPageDesignCanvas({
             )}
           </div>
           <label className="mt-8 block">
-            <span className="text-xs font-medium text-zinc-600">Edit signals (one per line)</span>
+            <span className={`text-xs font-medium ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>Edit signals (one per line)</span>
             <textarea
               value={(pageData.trustSignals ?? []).join("\n")}
               onChange={(e) =>
@@ -738,7 +842,11 @@ export default function LandingPageDesignCanvas({
                 )
               }
               rows={5}
-              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+              className={
+                bleed
+                  ? "mt-2 w-full rounded-xl border border-white/25 bg-black/35 px-4 py-3 text-sm text-white placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                  : "mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-3 text-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+              }
               placeholder={"ISO certified\n500+ happy clients"}
             />
           </label>
@@ -746,21 +854,28 @@ export default function LandingPageDesignCanvas({
       </section>
 
       {/* Lead form */}
-      <section className="border-t border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-14 md:px-12">
+      <section
+        className={
+          bleed
+            ? "relative z-0 overflow-hidden border-t border-white/10 px-6 py-14 text-white md:px-12"
+            : "border-t border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-14 md:px-12"
+        }
+      >
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
         <div
           id="lp-zone-lead-form"
-          className={`relative mx-auto w-full pr-12 ${editorZone === "embed" ? "rounded-3xl ring-2 ring-violet-400/75 ring-offset-4 ring-offset-transparent" : ""}`}
+          className={`relative z-10 mx-auto w-full pr-12 ${editorZone === "embed" ? "rounded-3xl ring-2 ring-violet-400/75 ring-offset-4 ring-offset-transparent" : ""}`}
           style={{ maxWidth: embedMaxW }}
           onFocusCapture={() => setEditorZone("embed")}
           onPointerDownCapture={(e) => editableSurfaceClick(e, "embed", setEditorZone)}
         >
           <h3
-            className="text-center text-2xl font-bold"
-            style={{ fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
+            className={`text-center text-2xl font-bold ${bleed ? "text-white" : ""}`}
+            style={bleed ? { fontFamily: resolveHeadingFont(theme) } : { fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
           >
             Lead capture
           </h3>
-          <p className="mt-2 text-center text-sm text-zinc-500">
+          <p className={`mt-2 text-center text-sm ${bleed ? "text-zinc-300" : "text-zinc-500"}`}>
             Paste your GoHighLevel or other embed — preview updates here (same as visitors will see when published).
           </p>
           {(pageData.formEmbedHtml ?? "").trim() ? (
@@ -795,19 +910,44 @@ export default function LandingPageDesignCanvas({
               </p>
             </div>
           ) : (
-            <div className="mt-8 rounded-2xl border-2 border-dashed border-zinc-200 bg-white px-8 py-16 text-center">
-              <p className="text-sm text-zinc-500">No embed yet — paste HTML below.</p>
+            <div
+              className={
+                bleed
+                  ? "mt-8 rounded-2xl border-2 border-dashed border-white/25 bg-black/35 px-8 py-16 text-center"
+                  : "mt-8 rounded-2xl border-2 border-dashed border-zinc-200 bg-white px-8 py-16 text-center"
+              }
+            >
+              <p className={bleed ? "text-sm text-zinc-300" : "text-sm text-zinc-500"}>
+                No embed yet — paste HTML below.
+              </p>
             </div>
           )}
-          <details id="lp-zone-embed-html" className="group mt-6 rounded-xl border border-zinc-200 bg-white open:shadow-md">
-            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+          <details
+            id="lp-zone-embed-html"
+            className={
+              bleed
+                ? "group mt-6 rounded-xl border border-white/20 bg-black/35 open:border-violet-500/40 open:shadow-lg open:shadow-black/40"
+                : "group mt-6 rounded-xl border border-zinc-200 bg-white open:shadow-md"
+            }
+          >
+            <summary
+              className={
+                bleed
+                  ? "cursor-pointer select-none px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5"
+                  : "cursor-pointer select-none px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              }
+            >
               Embed HTML
             </summary>
             <textarea
               value={pageData.formEmbedHtml ?? ""}
               onChange={(e) => updateField("formEmbedHtml", e.target.value)}
               rows={8}
-              className="w-full border-t border-zinc-100 bg-zinc-50 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+              className={
+                bleed
+                  ? "w-full border-t border-white/10 bg-black/45 px-4 py-3 font-mono text-xs leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none"
+                  : "w-full border-t border-zinc-100 bg-zinc-50 px-4 py-3 font-mono text-xs leading-relaxed text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+              }
               spellCheck={false}
               placeholder='<iframe src="https://..." ...></iframe>'
             />
@@ -830,40 +970,66 @@ export default function LandingPageDesignCanvas({
       {/* Footer links */}
       <section
         id="lp-zone-footer"
-        className={`border-t border-zinc-200 bg-zinc-50 px-6 py-8 md:px-12 ${zoneRing(editorZone === "footer")}`}
+        className={
+          bleed
+            ? `relative z-0 overflow-hidden border-t border-white/10 px-6 py-8 text-white md:px-12 ${zoneRing(editorZone === "footer")}`
+            : `border-t border-zinc-200 bg-zinc-50 px-6 py-8 md:px-12 ${zoneRing(editorZone === "footer")}`
+        }
         onFocusCapture={() => setEditorZone("footer")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "footer", setEditorZone)}
       >
-        <div className={`mx-auto w-full ${proseWrap}`} style={colSx}>
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+        <div className={`relative z-10 mx-auto w-full ${proseWrap}`} style={colSx}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Footer / legal links</span>
-            <button type="button" onClick={addFooter} className="text-xs font-medium text-violet-700 hover:underline">
+            <span className={`text-xs font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+              Footer / legal links
+            </span>
+            <button
+              type="button"
+              onClick={addFooter}
+              className={bleed ? "text-xs font-medium text-violet-400 hover:underline" : "text-xs font-medium text-violet-700 hover:underline"}
+            >
               + Add link
             </button>
           </div>
           {footerLinks.length === 0 ? (
-            <p className="mt-2 text-xs text-zinc-400">Optional — privacy, terms, contact.</p>
+            <p className={`mt-2 text-xs ${bleed ? "text-zinc-400" : "text-zinc-400"}`}>Optional — privacy, terms, contact.</p>
           ) : (
             <div className="mt-4 space-y-2">
               {footerLinks.map((link, i) => (
-                <div key={`ft-${i}`} className="flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200 bg-white p-2">
-                  <label className="min-w-[8rem] flex-1 text-[11px] text-zinc-600">
+                <div
+                  key={`ft-${i}`}
+                  className={
+                    bleed
+                      ? "flex flex-wrap items-end gap-2 rounded-lg border border-white/20 bg-black/35 p-2"
+                      : "flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200 bg-white p-2"
+                  }
+                >
+                  <label className={`min-w-[8rem] flex-1 text-[11px] ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
                     Label
                     <input
                       value={link.label}
                       onChange={(e) => patchFooterAt(i, { label: e.target.value })}
-                      className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                      className={
+                        bleed
+                          ? "mt-0.5 w-full rounded border border-white/25 bg-black/40 px-2 py-1 text-sm text-white"
+                          : "mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+                      }
                     />
                   </label>
-                  <label className="min-w-[10rem] flex-[2] text-[11px] text-zinc-600">
+                  <label className={`min-w-[10rem] flex-[2] text-[11px] ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
                     URL
                     <input
                       value={link.href}
                       onChange={(e) => patchFooterAt(i, { href: e.target.value })}
-                      className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+                      className={
+                        bleed
+                          ? "mt-0.5 w-full rounded border border-white/25 bg-black/40 px-2 py-1 font-mono text-xs text-white"
+                          : "mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+                      }
                     />
                   </label>
-                  <label className="flex items-center gap-1 text-[11px] text-zinc-600">
+                  <label className={`flex items-center gap-1 text-[11px] ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
                     <input
                       type="checkbox"
                       checked={!!link.newTab}
@@ -871,7 +1037,11 @@ export default function LandingPageDesignCanvas({
                     />{" "}
                     New tab
                   </label>
-                  <button type="button" onClick={() => removeFooter(i)} className="text-xs text-red-600 hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => removeFooter(i)}
+                    className={`text-xs ${bleed ? "text-red-400 hover:underline" : "text-red-600 hover:underline"}`}
+                  >
                     Remove
                   </button>
                 </div>
@@ -879,7 +1049,11 @@ export default function LandingPageDesignCanvas({
             </div>
           )}
           {footerLinks.some((f) => f.label.trim() && f.href.trim()) ? (
-            <div className="mt-6 flex flex-wrap justify-center gap-4 border-t border-zinc-200 pt-6 text-sm text-zinc-600">
+            <div
+              className={`mt-6 flex flex-wrap justify-center gap-4 pt-6 text-sm ${
+                bleed ? "border-t border-white/15 text-zinc-200" : "border-t border-zinc-200 text-zinc-600"
+              }`}
+            >
               {footerLinks
                 .filter((f) => f.label.trim() && f.href.trim())
                 .map((f, i) => (
@@ -888,7 +1062,11 @@ export default function LandingPageDesignCanvas({
                     href={f.href}
                     target={f.newTab ? "_blank" : undefined}
                     rel={f.newTab ? "noopener noreferrer" : undefined}
-                    className="hover:text-zinc-900 hover:underline"
+                    className={
+                      bleed
+                        ? "text-zinc-200 underline-offset-4 hover:text-white hover:underline"
+                        : "hover:text-zinc-900 hover:underline"
+                    }
                   >
                     {f.label}
                   </a>
@@ -901,24 +1079,42 @@ export default function LandingPageDesignCanvas({
       {/* FAQ */}
       <section
         id="lp-zone-faq"
-        className={`border-t border-zinc-200 bg-white px-6 md:px-12 ${faqSp.className} ${zoneRing(editorZone === "faq")}`}
+        className={
+          bleed
+            ? `relative z-0 overflow-hidden border-t border-white/10 px-6 md:px-12 ${faqSp.className} text-white ${zoneRing(editorZone === "faq")}`
+            : `border-t border-zinc-200 bg-white px-6 md:px-12 ${faqSp.className} ${zoneRing(editorZone === "faq")}`
+        }
         style={faqSp.padStyle}
         onFocusCapture={() => setEditorZone("faq")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "faq", setEditorZone)}
       >
-        <div className={`mx-auto w-full ${proseWrap}`} style={colSx}>
-          <h3 className="text-center text-sm font-semibold uppercase tracking-wide text-zinc-500">Questions</h3>
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+        <div className={`relative z-10 mx-auto w-full ${proseWrap}`} style={colSx}>
+          <h3 className={`text-center text-sm font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+            Questions
+          </h3>
           <div className="mt-10 space-y-4">
             {(pageData.faq ?? []).length === 0 ? (
               <p className="text-center text-sm text-zinc-400">No FAQs yet — add pairs below.</p>
             ) : (
               (pageData.faq ?? []).map((item, i) => (
-                <div key={`faq-${i}`} className="rounded-xl border border-zinc-200 bg-zinc-50/40 p-5 shadow-sm">
+                <div
+                  key={`faq-${i}`}
+                  className={
+                    bleed
+                      ? "rounded-xl border border-white/15 bg-black/35 p-5 shadow-sm shadow-black/30"
+                      : "rounded-xl border border-zinc-200 bg-zinc-50/40 p-5 shadow-sm"
+                  }
+                >
                   <div className="flex justify-end">
                     <button
                       type="button"
                       onClick={() => removeFaq(i)}
-                      className="text-xs font-medium text-red-600 hover:underline"
+                      className={
+                        bleed
+                          ? "text-xs font-medium text-red-400 hover:underline"
+                          : "text-xs font-medium text-red-600 hover:underline"
+                      }
                     >
                       Remove
                     </button>
@@ -927,15 +1123,27 @@ export default function LandingPageDesignCanvas({
                     value={item.q ?? ""}
                     onChange={(e) => patchFaq(i, { q: e.target.value })}
                     placeholder="Question"
-                    className="mt-1 w-full bg-transparent text-lg font-semibold placeholder:text-zinc-400 focus:outline-none"
-                    style={{ fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
+                    className={
+                      bleed
+                        ? "mt-1 w-full bg-transparent text-lg font-semibold text-white placeholder:text-zinc-500 focus:outline-none"
+                        : "mt-1 w-full bg-transparent text-lg font-semibold placeholder:text-zinc-400 focus:outline-none"
+                    }
+                    style={
+                      bleed
+                        ? { fontFamily: resolveHeadingFont(theme) }
+                        : { fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }
+                    }
                   />
                   <textarea
                     value={item.a ?? ""}
                     onChange={(e) => patchFaq(i, { a: e.target.value })}
                     placeholder="Answer"
                     rows={3}
-                    className="mt-3 w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-600 placeholder:text-zinc-400 focus:outline-none"
+                    className={
+                      bleed
+                        ? "mt-3 w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-200 placeholder:text-zinc-500 focus:outline-none"
+                        : "mt-3 w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-600 placeholder:text-zinc-400 focus:outline-none"
+                    }
                   />
                 </div>
               ))
@@ -943,7 +1151,11 @@ export default function LandingPageDesignCanvas({
             <button
               type="button"
               onClick={addFaq}
-              className="w-full rounded-xl border border-dashed border-zinc-300 py-3 text-sm font-medium text-zinc-600 hover:border-violet-400 hover:bg-violet-50 hover:text-violet-900"
+              className={
+                bleed
+                  ? "w-full rounded-xl border border-dashed border-white/35 py-3 text-sm font-medium text-zinc-200 hover:border-violet-400/80 hover:bg-white/10 hover:text-white"
+                  : "w-full rounded-xl border border-dashed border-zinc-300 py-3 text-sm font-medium text-zinc-600 hover:border-violet-400 hover:bg-violet-50 hover:text-violet-900"
+              }
             >
               + Add FAQ
             </button>
@@ -956,7 +1168,7 @@ export default function LandingPageDesignCanvas({
             getValue={() => theme.faqSectionPaddingYPx ?? 56}
             clamp={[24, 200]}
             apply={(n) => patchTheme({ faqSectionPaddingYPx: n })}
-            className="mt-4"
+            className="relative z-20 mt-4"
             onBegin={() => setEditorZone("faq")}
           />
         </div>
@@ -965,38 +1177,61 @@ export default function LandingPageDesignCanvas({
       {/* Thank you + SEO */}
       <section
         id="lp-zone-seo"
-        className={`border-t border-zinc-200 bg-zinc-900 px-6 py-14 text-zinc-100 md:px-12 ${zoneRing(editorZone === "seo")}`}
+        className={
+          bleed
+            ? `relative z-0 overflow-hidden border-t border-white/10 px-6 py-14 text-white md:px-12 ${zoneRing(editorZone === "seo")}`
+            : `border-t border-zinc-200 bg-zinc-900 px-6 py-14 text-zinc-100 md:px-12 ${zoneRing(editorZone === "seo")}`
+        }
         onFocusCapture={() => setEditorZone("seo")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "seo", setEditorZone)}
       >
-        <div className={`mx-auto w-full ${proseWrap} space-y-10`} style={colSx}>
+        {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
+        <div className={`relative z-10 mx-auto w-full ${proseWrap} space-y-10`} style={colSx}>
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">After submit</h3>
+            <h3 className={`text-xs font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+              After submit
+            </h3>
             <textarea
               value={pageData.thankYouCopy ?? ""}
               onChange={(e) => updateField("thankYouCopy", e.target.value)}
               rows={4}
               placeholder="Thank-you message or next step after someone converts."
-              className="mt-3 w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3 text-base leading-relaxed text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              className={
+                bleed
+                  ? "mt-3 w-full resize-none rounded-xl border border-white/20 bg-black/45 px-4 py-3 text-base leading-relaxed text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+                  : "mt-3 w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3 text-base leading-relaxed text-zinc-200 placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              }
             />
           </div>
-          <div className="grid gap-6 border-t border-zinc-800 pt-10 md:grid-cols-2">
+          <div className={`grid gap-6 pt-10 md:grid-cols-2 ${bleed ? "border-t border-white/15" : "border-t border-zinc-800"}`}>
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">SEO title</span>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+                SEO title
+              </span>
               <input
                 value={pageData.seoTitle ?? ""}
                 onChange={(e) => updateField("seoTitle", e.target.value)}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
+                className={
+                  bleed
+                    ? "mt-2 w-full rounded-lg border border-white/20 bg-black/45 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none"
+                    : "mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
+                }
                 placeholder="≤70 characters"
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">SEO description</span>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+                SEO description
+              </span>
               <textarea
                 value={pageData.seoDescription ?? ""}
                 onChange={(e) => updateField("seoDescription", e.target.value)}
                 rows={2}
-                className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
+                className={
+                  bleed
+                    ? "mt-2 w-full rounded-lg border border-white/20 bg-black/45 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none"
+                    : "mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-violet-500 focus:outline-none"
+                }
                 placeholder="≤160 characters"
               />
             </label>
