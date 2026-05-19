@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
-import { expansion, type LandingPageRecord } from "@/lib/api";
+import { expansion, type LandingPageListItem } from "@/lib/api";
 function LandingPagesListPageInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [pages, setPages] = useState<LandingPageRecord[]>([]);
+  const [pages, setPages] = useState<LandingPageListItem[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [title, setTitle] = useState("");

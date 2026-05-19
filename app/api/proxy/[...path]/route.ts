@@ -245,7 +245,7 @@ export async function PATCH(
       cache: "no-store",
       signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
-    const data = await res.json().catch(() => ({ error: "Invalid JSON from backend" }));
+    const data = await readBackendProxyBody(res);
     return Response.json(data, { status: res.status });
   } catch (err: unknown) {
     const message =

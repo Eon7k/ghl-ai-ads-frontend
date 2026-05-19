@@ -815,6 +815,29 @@ export type LandingPageRecord = {
   experiment?: { id: string; name: string; platform: string; status: string } | null;
 };
 
+/**
+ * GET `/agency/landing-pages` — omits `pageData`, `aiGenerationPrompt`, and `pixel` so many large funnels do not blow RAM on small hosts.
+ * Use `landingPages.get(id)` for full editor payload.
+ */
+export type LandingPageListItem = Pick<
+  LandingPageRecord,
+  | "id"
+  | "agencyId"
+  | "clientId"
+  | "campaignId"
+  | "title"
+  | "slug"
+  | "status"
+  | "hostingType"
+  | "subdomain"
+  | "conversionGoal"
+  | "publishedAt"
+  | "createdAt"
+  | "updatedAt"
+> & {
+  experiment?: LandingPageRecord["experiment"];
+};
+
 export type ReportConfigInput = {
   reportName: string;
   frequency?: string;
@@ -1070,7 +1093,7 @@ export const expansion = {
     ),
 
   landingPages: {
-    list: () => request<{ pages: LandingPageRecord[] }>("api/agency/landing-pages"),
+    list: () => request<{ pages: LandingPageListItem[] }>("api/agency/landing-pages"),
     get: (id: string) => request<{ page: LandingPageRecord }>(`api/agency/landing-pages/${id}`),
     create: (body: {
       title: string;
