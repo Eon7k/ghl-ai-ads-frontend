@@ -19,6 +19,7 @@ import {
   type LandingPageData,
   type LandingPageRecord,
   type LandingPageTheme,
+  type LandingStepButton,
 } from "@/lib/api";
 import type { Experiment } from "@/lib/types";
 
@@ -66,6 +67,38 @@ function parseGalleryImages(raw: unknown): LandingGalleryImage[] | undefined {
     const row: LandingGalleryImage = { url };
     if (typeof g.alt === "string" && g.alt.trim()) row.alt = g.alt;
     if (typeof g.caption === "string" && g.caption.trim()) row.caption = g.caption;
+    rows.push(row);
+  }
+  return rows.length ? rows : undefined;
+}
+
+function parseLandingStepButtons(raw: unknown): LandingStepButton[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: LandingStepButton[] = [];
+  for (const x of raw.slice(0, 8)) {
+    if (!x || typeof x !== "object") continue;
+    const r = x as Record<string, unknown>;
+    const labelRaw =
+      typeof r.label === "string" ? r.label : typeof r.text === "string" ? String(r.text) : "";
+    const hrefRaw =
+      typeof r.href === "string"
+        ? r.href
+        : typeof r.url === "string"
+          ? r.url
+          : typeof r.link === "string"
+            ? String(r.link)
+            : "";
+    const label = labelRaw.trim().slice(0, 140);
+    const href = hrefRaw.trim().slice(0, 2048);
+    if (!href && !label) continue;
+    const row: LandingStepButton = { label: label || "Button", href: href || "/" };
+    if (r.newTab === true || r.openNewTab === true) row.newTab = true;
+    const vr = typeof r.variant === "string" ? r.variant.trim().toLowerCase() : "";
+    const sr = typeof r.style === "string" ? r.style.trim().toLowerCase() : "";
+    const cand = vr || sr;
+    if (cand.includes("outline")) row.variant = "outline";
+    else if (cand.includes("ghost") || cand.includes("link") || cand.includes("text"))
+      row.variant = "ghost";
     rows.push(row);
   }
   return rows.length ? rows : undefined;
@@ -160,12 +193,16 @@ function normalizePageData(raw: unknown): LandingPageData {
           bullets = s.bullets.filter((b) => typeof b === "string").map((b) => String(b));
           if (bullets.length === 0) bullets = undefined;
         }
-        return {
+        const stepOut: LandingFunnelStep = {
           key: typeof s.key === "string" ? s.key : "",
           title: typeof s.title === "string" ? s.title : "",
           body: typeof s.body === "string" ? s.body : "",
           bullets,
         };
+        const blockBtns =
+          parseLandingStepButtons(s.buttons) ?? parseLandingStepButtons(s.ctas);
+        if (blockBtns?.length) stepOut.buttons = blockBtns;
+        return stepOut;
       });
     if (funnelSteps.length === 0) funnelSteps = undefined;
   }
@@ -659,7 +696,7 @@ function LandingPageEditorPageInner() {
                 value={aiRefinementPrompt}
                 onChange={(e) => setAiRefinementPrompt(e.target.value)}
                 rows={3}
-                placeholder="e.g. Make the primary colour navy, shorten the hero subhead, add a Pricing section bullet list, add footer link “Privacy” to /privacy"
+                placeholder={`e.g. Make the primary colour navy, shorten the hero subhead, add a Pricing section bullet list; on the Proof panel add two buttons labeled "Book a call" and "View pricing" with https calendar / page URLs`}
                 className="mt-3 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
               />
               <button

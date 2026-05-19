@@ -739,11 +739,21 @@ export type LandingCompetitorSiteScanRow = {
   textPreview?: string;
 };
 
+/** Up to six per funnel section — e.g. “Book calendar” → Calendly/Schedule URL */
+export type LandingStepButton = {
+  label: string;
+  href: string;
+  newTab?: boolean;
+  variant?: "primary" | "outline" | "ghost";
+};
+
 export type LandingFunnelStep = {
   key?: string;
   title?: string;
   body?: string;
   bullets?: string[];
+  /** Section CTAs rendered under body copy (below bullets). Alias in AI JSON: `ctas`. */
+  buttons?: LandingStepButton[];
 };
 
 export type LandingNavLinkRow = {

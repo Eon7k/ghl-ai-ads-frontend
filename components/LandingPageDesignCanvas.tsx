@@ -6,7 +6,14 @@ import type { LandingEditorZone } from "@/components/LandingPageEditorInspector"
 import LandingEmbedResizeHandle from "@/components/LandingEmbedResizeHandle";
 import LandingHeroBackdropStack from "@/components/LandingHeroBackdropStack";
 import LandingResizeBar from "@/components/LandingResizeBar";
-import type { LandingFunnelStep, LandingPageData, LandingGalleryImage, LandingNavLinkRow, LandingPageTheme } from "@/lib/api";
+import type {
+  LandingFunnelStep,
+  LandingGalleryImage,
+  LandingNavLinkRow,
+  LandingPageData,
+  LandingPageTheme,
+  LandingStepButton,
+} from "@/lib/api";
 import {
   cornerRoundingClass,
   embedColumnWidthPx,
@@ -23,6 +30,33 @@ import {
   resolveBodyFont,
   resolveHeadingFont,
 } from "@/lib/landingPageTheme";
+
+/** Visitor-style anchor for section CTAs in the design preview. */
+function landingSectionBtnPreviewClass(
+  variant: LandingStepButton["variant"] | undefined,
+  bleed: boolean,
+  cornerRounding: string
+): string {
+  const ring = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+  const base = `${cornerRounding} ${ring} inline-flex min-h-[42px] items-center justify-center px-5 py-2.5 text-sm font-semibold transition`;
+  const v = variant ?? "primary";
+  if (bleed) {
+    if (v === "outline") {
+      return `${base} border border-white/60 bg-transparent text-white hover:bg-white/10 focus-visible:ring-white/50 focus-visible:ring-offset-black/40`;
+    }
+    if (v === "ghost") {
+      return `${base} bg-transparent px-3 text-white/95 underline underline-offset-4 hover:text-white focus-visible:ring-white/50 focus-visible:ring-offset-black/40`;
+    }
+    return `${base} border border-white/25 bg-white text-zinc-900 shadow-md hover:bg-zinc-50 focus-visible:ring-white/60 focus-visible:ring-offset-black/40`;
+  }
+  if (v === "outline") {
+    return `${base} border-2 border-[color:var(--lp-primary)] bg-transparent text-[color:var(--lp-primary)] hover:bg-violet-50 focus-visible:ring-violet-300`;
+  }
+  if (v === "ghost") {
+    return `${base} bg-transparent px-3 text-[color:var(--lp-primary)] underline underline-offset-4 hover:opacity-90 focus-visible:ring-violet-200`;
+  }
+  return `${base} border border-transparent bg-[color:var(--lp-primary)] text-white shadow-sm hover:brightness-105 focus-visible:ring-violet-400`;
+}
 
 type FieldKey =
   | "headline"
@@ -186,6 +220,41 @@ export default function LandingPageDesignCanvas({
     }));
   }
 
+  function patchSectionButton(stepIndex: number, buttonIdx: number, patch: Partial<LandingStepButton>) {
+    patchPageData((prev) => {
+      const fs = [...(prev.funnelSteps ?? [])];
+      const step = fs[stepIndex];
+      if (!step) return prev;
+      const btns = [...(step.buttons ?? [])];
+      const cur = btns[buttonIdx] ?? { label: "", href: "" };
+      btns[buttonIdx] = { ...cur, ...patch };
+      fs[stepIndex] = { ...step, buttons: btns.length ? btns : undefined };
+      return { ...prev, funnelSteps: fs };
+    });
+  }
+
+  function addSectionButton(stepIndex: number) {
+    patchPageData((prev) => {
+      const fs = [...(prev.funnelSteps ?? [])];
+      const step = fs[stepIndex];
+      if (!step) return prev;
+      const btns = [...(step.buttons ?? []), { label: "Book calendar", href: "https://" }];
+      fs[stepIndex] = { ...step, buttons: btns };
+      return { ...prev, funnelSteps: fs };
+    });
+  }
+
+  function removeSectionButton(stepIndex: number, buttonIdx: number) {
+    patchPageData((prev) => {
+      const fs = [...(prev.funnelSteps ?? [])];
+      const step = fs[stepIndex];
+      if (!step?.buttons?.length) return prev;
+      const btns = step.buttons.filter((_, j) => j !== buttonIdx);
+      fs[stepIndex] = { ...step, buttons: btns.length ? btns : undefined };
+      return { ...prev, funnelSteps: fs };
+    });
+  }
+
   return (
     <div
       className="landing-design-root rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/60 ring-1 ring-black/5"
@@ -194,8 +263,10 @@ export default function LandingPageDesignCanvas({
       <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-center">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Design preview — click Save to persist changes</p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
-          A funnel step with key <code className="rounded bg-zinc-200/80 px-1 py-0.5 font-mono text-[10px] text-zinc-700">hero</code> matches
-          the headline area above and is not repeated in the sections list. Drag violet bars on blocks to resize width, heights, spacing, and typography.
+          Each funnel panel can include its own Buttons block (below bullets) for calendar/demo links — no HTML. The step whose key is{" "}
+          <code className="rounded bg-zinc-200/80 px-1 py-0.5 font-mono text-[10px] text-zinc-700">hero</code> mirrors
+          the headline area above and is not duplicated in the sections list. Drag violet bars on blocks to resize width,
+          heights, spacing, and typography.
         </p>
       </div>
 
@@ -639,6 +710,168 @@ export default function LandingPageDesignCanvas({
                   }
                   placeholder={"Outcome one\nOutcome two"}
                 />
+              </div>
+
+              <div
+                className={
+                  bleed
+                    ? "mt-6 rounded-xl border border-dashed border-violet-300/35 bg-black/22 p-4"
+                    : "mt-6 rounded-xl border border-dashed border-violet-300/70 bg-violet-50/50 p-4"
+                }
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p
+                      className={
+                        bleed ? "text-[11px] font-semibold uppercase tracking-wide text-zinc-200" : "text-[11px] font-semibold uppercase tracking-wide text-violet-800"
+                      }
+                    >
+                      Section buttons
+                    </p>
+                    <p className={`mt-1 text-xs leading-snug ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+                      Add labelled links for this panel (book calendar, WhatsApp, jump to embed). Matches hero look — tweak style per button.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addSectionButton(index)}
+                    className={
+                      bleed
+                        ? "shrink-0 text-xs font-medium text-violet-300 hover:underline"
+                        : "shrink-0 text-xs font-medium text-violet-700 hover:underline"
+                    }
+                  >
+                    + Add button
+                  </button>
+                </div>
+
+                {!step.buttons?.length ? (
+                  <p className={`mt-4 text-xs ${bleed ? "text-zinc-400" : "text-zinc-400"}`}>
+                    Optional — e.g. <span className="font-mono">Book a demo</span> → your scheduling URL (https).
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    {(step.buttons ?? []).map((btn, bi) => (
+                      <div
+                        key={`sb-${index}-${bi}`}
+                        className={
+                          bleed
+                            ? "grid gap-2 rounded-lg border border-white/18 bg-black/30 p-3 sm:grid-cols-2 lg:grid-cols-12 lg:gap-3 lg:items-end"
+                            : "grid gap-2 rounded-lg border border-zinc-200 bg-white p-3 sm:grid-cols-2 lg:grid-cols-12 lg:gap-3 lg:items-end"
+                        }
+                      >
+                        <label className={`text-[10px] font-medium uppercase lg:col-span-3 ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
+                          Label
+                          <input
+                            value={btn.label}
+                            onChange={(e) => patchSectionButton(index, bi, { label: e.target.value })}
+                            className={
+                              bleed
+                                ? "mt-1 w-full rounded border border-white/25 bg-black/35 px-2 py-2 text-sm text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                                : "mt-1 w-full rounded border border-zinc-300 px-2 py-2 text-sm placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                            }
+                            placeholder="Book calendar"
+                          />
+                        </label>
+                        <label className={`text-[10px] font-medium uppercase lg:col-span-4 ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
+                          Link URL
+                          <input
+                            value={btn.href}
+                            onChange={(e) => patchSectionButton(index, bi, { href: e.target.value })}
+                            className={
+                              bleed
+                                ? "mt-1 w-full rounded border border-white/25 bg-black/35 px-2 py-2 font-mono text-xs text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                                : "mt-1 w-full rounded border border-zinc-300 px-2 py-2 font-mono text-xs placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                            }
+                            placeholder="https://calendly.com/… or #book"
+                          />
+                        </label>
+                        <label className={`text-[10px] font-medium uppercase lg:col-span-2 ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
+                          Style
+                          <select
+                            value={btn.variant ?? "primary"}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              patchSectionButton(index, bi, {
+                                variant:
+                                  v === "primary"
+                                    ? undefined
+                                    : (v as NonNullable<LandingStepButton["variant"]>),
+                              });
+                            }}
+                            className={
+                              bleed
+                                ? "mt-1 w-full rounded border border-white/25 bg-black/35 px-2 py-2 text-sm text-white focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                                : "mt-1 w-full rounded border border-zinc-300 bg-white px-2 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                            }
+                          >
+                            <option value="primary">Primary</option>
+                            <option value="outline">Outline</option>
+                            <option value="ghost">Text</option>
+                          </select>
+                        </label>
+                        <label
+                          className={`flex cursor-pointer items-center gap-2 lg:col-span-2 ${bleed ? "text-xs text-zinc-300" : "text-xs text-zinc-600"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className={`h-4 w-4 rounded border-zinc-500 ${bleed ? "border-white/40 bg-transparent" : ""}`}
+                            checked={!!btn.newTab}
+                            onChange={(e) => patchSectionButton(index, bi, { newTab: e.target.checked })}
+                          />
+                          New tab
+                        </label>
+                        <div className="flex lg:col-span-1 lg:justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeSectionButton(index, bi)}
+                            className={
+                              bleed
+                                ? "text-xs font-medium text-red-400 hover:text-red-300 hover:underline"
+                                : "text-xs font-medium text-red-600 hover:text-red-800 hover:underline"
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(step.buttons ?? []).some((b) => b.label.trim() && (b.href || "").trim()) ? (
+                  <div className="mt-6">
+                    <p
+                      className={
+                        bleed ? "text-[11px] font-semibold uppercase tracking-wide text-zinc-400" : "text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
+                      }
+                    >
+                      Preview on page
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {(step.buttons ?? [])
+                        .filter((b) => b.label.trim() && (b.href || "").trim())
+                        .map((btn, pi) => {
+                          const hr = btn.href.trim() || "#";
+                          return (
+                            <a
+                              key={`preview-btn-${pi}-${btn.label.slice(0, 8)}`}
+                              href={hr}
+                              onClick={(e) => {
+                                // Keep editing flow in-page (avoid leaving the funnel editor accidental navigation).
+                                e.preventDefault();
+                              }}
+                              target={btn.newTab ? "_blank" : undefined}
+                              rel={btn.newTab ? "noopener noreferrer" : undefined}
+                              className={landingSectionBtnPreviewClass(btn.variant, bleed, ctaCorners)}
+                            >
+                              {btn.label.trim()}
+                            </a>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
             <LandingResizeBar
