@@ -564,8 +564,8 @@ export default function LandingPageDesignCanvas({
                   onChange={(e) => patchFunnelStep(index, { title: e.target.value })}
                   rows={Math.min(3, Math.max(1, (step.title ?? "").split("\n").length))}
                   placeholder="Section headline"
-                  className="w-full resize-none bg-transparent text-2xl font-semibold tracking-tight text-zinc-900 placeholder:text-zinc-400 focus:outline-none md:text-3xl"
-                  style={{ fontFamily: resolveHeadingFont(theme) }}
+                  className="w-full resize-none bg-transparent text-2xl font-semibold tracking-tight placeholder:text-zinc-400 focus:outline-none md:text-3xl"
+                  style={{ fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
                 />
               </label>
               <label className="mt-5 block">
@@ -583,7 +583,7 @@ export default function LandingPageDesignCanvas({
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Bullet points</p>
                 <p className="mt-1 text-xs text-zinc-400">One line per bullet — shown as a list below.</p>
                 {(step.bullets?.length ?? 0) > 0 ? (
-                  <ul className="mt-4 list-disc space-y-2 pl-5 text-zinc-700 marker:text-[color:var(--lp-accent)]">
+                  <ul className="mt-4 list-disc space-y-2 pl-5 text-zinc-800 marker:text-[color:var(--lp-accent)]">
                     {(step.bullets ?? []).map((b, bi) => (
                       <li key={`${bi}-${b.slice(0, 16)}`}>{b}</li>
                     ))}
@@ -754,7 +754,12 @@ export default function LandingPageDesignCanvas({
           onFocusCapture={() => setEditorZone("embed")}
           onPointerDownCapture={(e) => editableSurfaceClick(e, "embed", setEditorZone)}
         >
-          <h3 className="text-center text-2xl font-bold text-zinc-900">Lead capture</h3>
+          <h3
+            className="text-center text-2xl font-bold"
+            style={{ fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
+          >
+            Lead capture
+          </h3>
           <p className="mt-2 text-center text-sm text-zinc-500">
             Paste your GoHighLevel or other embed — preview updates here (same as visitors will see when published).
           </p>
@@ -922,7 +927,8 @@ export default function LandingPageDesignCanvas({
                     value={item.q ?? ""}
                     onChange={(e) => patchFaq(i, { q: e.target.value })}
                     placeholder="Question"
-                    className="mt-1 w-full bg-transparent text-lg font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+                    className="mt-1 w-full bg-transparent text-lg font-semibold placeholder:text-zinc-400 focus:outline-none"
+                    style={{ fontFamily: resolveHeadingFont(theme), color: "var(--lp-primary)" }}
                   />
                   <textarea
                     value={item.a ?? ""}
