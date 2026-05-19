@@ -59,6 +59,20 @@ export function landingDesignRootVars(theme?: LandingPageTheme | null): CSSPrope
   return vars;
 }
 
+/** CSS variables for iframe dimensions inside `.landing-embed-preview` (see globals.css). */
+export function landingEmbedIframeVars(theme?: LandingPageTheme | null): CSSProperties {
+  const minPx = Number(theme?.formEmbedIframeMinHeightPx);
+  const maxPx = Number(theme?.formEmbedIframeMaxHeightPx);
+  const minV = Number.isFinite(minPx) ? Math.min(960, Math.max(120, minPx)) : 260;
+  const maxV = Number.isFinite(maxPx) ? Math.min(1200, Math.max(200, maxPx)) : 720;
+  const lo = Math.min(minV, maxV);
+  const hi = Math.max(minV, maxV);
+  return {
+    "--lp-embed-iframe-min": `${lo}px`,
+    "--lp-embed-iframe-max": `${hi}px`,
+  } as CSSProperties;
+}
+
 /** Primary CTA / chip rounding class for preview chrome. */
 export function cornerRoundingClass(corner?: string): string {
   if (corner === "square") return "rounded-md";

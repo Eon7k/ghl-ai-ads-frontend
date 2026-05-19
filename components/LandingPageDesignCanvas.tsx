@@ -1,11 +1,13 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import { useMemo } from "react";
+import type { LandingEditorZone } from "@/components/LandingPageEditorInspector";
 import type { LandingFunnelStep, LandingPageData, LandingGalleryImage, LandingNavLinkRow, LandingPageTheme } from "@/lib/api";
 import {
   cornerRoundingClass,
   landingDesignRootVars,
+  landingEmbedIframeVars,
   normalizeHex,
   resolveBodyFont,
   resolveHeadingFont,
@@ -36,7 +38,21 @@ export type LandingPageDesignCanvasProps = {
   addFaq: () => void;
   setTrustSignalsFromLines: (lines: string[]) => void;
   patchPageData: Dispatch<SetStateAction<LandingPageData>>;
+  editorZone?: LandingEditorZone | null;
+  setEditorZone?: Dispatch<SetStateAction<LandingEditorZone>>;
 };
+
+function editableSurfaceClick(ev: SyntheticEvent, zone: LandingEditorZone, setZone: Dispatch<SetStateAction<LandingEditorZone>>) {
+  const t = ev.target;
+  if (!(t instanceof HTMLElement)) return;
+  if (t.closest('input:not([type="checkbox"]):not([type="radio"]), textarea, select, button, a, summary'))
+    return;
+  setZone(zone);
+}
+
+function zoneRing(active: boolean) {
+  return active ? "ring-2 ring-violet-400/75 ring-offset-2 ring-offset-white" : "";
+}
 
 /** Visitor-style landing layout with inline editable fields (no separate “code view”). */
 export default function LandingPageDesignCanvas({
@@ -51,6 +67,8 @@ export default function LandingPageDesignCanvas({
   addFaq,
   setTrustSignalsFromLines,
   patchPageData,
+  editorZone = null,
+  setEditorZone = () => {},
 }: LandingPageDesignCanvasProps) {
   const funnelIndexes = useMemo(() => {
     const rawSteps = pageData.funnelSteps ?? [];
@@ -72,6 +90,9 @@ export default function LandingPageDesignCanvas({
   const galleryImages = pageData.galleryImages ?? [];
   const heroBgRaw = theme.heroBgImageUrl?.trim() ?? "";
   const ctaCorners = cornerRoundingClass(theme.cornerRadius);
+  const embedCorners = cornerRoundingClass(theme.formEmbedCardRadius ?? theme.cornerRadius);
+  const embedMaxW = theme.formEmbedMaxWidth?.trim() || "36rem";
+  const embedOuterPadPx = theme.formEmbedOuterPaddingPx ?? 24;
 
   const patchTheme = (patch: Partial<LandingPageTheme>) =>
     patchPageData((prev) => ({
@@ -158,9 +179,16 @@ export default function LandingPageDesignCanvas({
         </p>
       </div>
 
-      <details className="group border-b border-zinc-200 bg-white px-4 py-2 open:bg-zinc-50/80">
+      <details
+        id="lp-zone-look-feel"
+        className={`group border-b border-zinc-200 bg-white px-4 py-2 open:bg-zinc-50/80 ${zoneRing(editorZone === "look")}`}
+      >
         <summary className="cursor-pointer text-sm font-medium text-zinc-800">Look &amp; feel (colours, fonts, hero image)</summary>
-        <div className="mt-4 grid gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          className="mt-4 grid gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-3"
+          onFocusCapture={() => setEditorZone("look")}
+          onPointerDownCapture={(e) => editableSurfaceClick(e, "look", setEditorZone)}
+        >
           <label className="block text-xs font-medium text-zinc-600">
             Primary colour
             <div className="mt-1 flex items-center gap-2">
@@ -262,7 +290,12 @@ export default function LandingPageDesignCanvas({
         </div>
       </details>
 
-      <div className="border-b border-zinc-200 bg-white px-4 py-3">
+      <div
+        id="lp-zone-nav-editor"
+        className={`border-b border-zinc-200 bg-white px-4 py-3 ${zoneRing(editorZone === "nav")}`}
+        onFocusCapture={() => setEditorZone("nav")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "nav", setEditorZone)}
+      >
         <div className="mx-auto flex max-w-4xl flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Top navigation links</span>
@@ -316,7 +349,12 @@ export default function LandingPageDesignCanvas({
       </div>
 
       {/* Hero */}
-      <section className="relative overflow-hidden px-6 py-14 text-white md:px-12 md:py-20">
+      <section
+        id="lp-zone-hero"
+        className={`relative overflow-hidden px-6 py-14 text-white md:px-12 md:py-20 ${zoneRing(editorZone === "hero")}`}
+        onFocusCapture={() => setEditorZone("hero")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "hero", setEditorZone)}
+      >
         <div className="absolute inset-0 bg-zinc-950" />
         {heroBgRaw ? (
           <>
@@ -324,7 +362,12 @@ export default function LandingPageDesignCanvas({
               className="absolute inset-0 bg-cover bg-center bg-no-repeat"
               style={{ backgroundImage: `url(${heroBgRaw})` }}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/75 to-black/88" />
+            <div
+              className="absolute inset-0 bg-black"
+              style={{
+                opacity: Math.min(0.95, Math.max(0, theme.heroOverlayOpacity ?? 0.55)),
+              }}
+            />
           </>
         ) : (
           <>
@@ -439,7 +482,10 @@ export default function LandingPageDesignCanvas({
         return (
           <section
             key={`${step.key ?? "step"}-${index}`}
-            className={`border-t border-zinc-100 px-6 py-12 md:px-12 ${zebra ? "bg-white" : "bg-zinc-50/90"}`}
+            id={`lp-zone-section-${index}`}
+            className={`border-t border-zinc-100 px-6 py-12 md:px-12 ${zebra ? "bg-white" : "bg-zinc-50/90"} ${zoneRing(editorZone === `section-${index}`)}`}
+            onFocusCapture={() => setEditorZone(`section-${index}`)}
+            onPointerDownCapture={(e) => editableSurfaceClick(e, `section-${index}` as LandingEditorZone, setEditorZone)}
           >
             <div className="mx-auto max-w-3xl">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -510,7 +556,12 @@ export default function LandingPageDesignCanvas({
       </div>
 
       {/* Image gallery */}
-      <section className="border-t border-zinc-200 bg-white px-6 py-12 md:px-12">
+      <section
+        id="lp-zone-gallery"
+        className={`border-t border-zinc-200 bg-white px-6 py-12 md:px-12 ${zoneRing(editorZone === "gallery")}`}
+        onFocusCapture={() => setEditorZone("gallery")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "gallery", setEditorZone)}
+      >
         <div className="mx-auto max-w-4xl">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Image gallery</h3>
@@ -562,7 +613,12 @@ export default function LandingPageDesignCanvas({
       </section>
 
       {/* Trust */}
-      <section className="border-t border-zinc-200 bg-white px-6 py-12 md:px-12">
+      <section
+        id="lp-zone-trust"
+        className={`border-t border-zinc-200 bg-white px-6 py-12 md:px-12 ${zoneRing(editorZone === "trust")}`}
+        onFocusCapture={() => setEditorZone("trust")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "trust", setEditorZone)}
+      >
         <div className="mx-auto max-w-3xl">
           <h3 className="text-center text-sm font-semibold uppercase tracking-wide text-zinc-500">Trust & credibility</h3>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -605,15 +661,36 @@ export default function LandingPageDesignCanvas({
 
       {/* Lead form */}
       <section className="border-t border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-14 md:px-12">
-        <div className="mx-auto max-w-xl">
+        <div
+          id="lp-zone-lead-form"
+          className={`mx-auto w-full ${editorZone === "embed" ? "rounded-3xl ring-2 ring-violet-400/75 ring-offset-4 ring-offset-transparent" : ""}`}
+          style={{ maxWidth: embedMaxW }}
+          onFocusCapture={() => setEditorZone("embed")}
+          onPointerDownCapture={(e) => editableSurfaceClick(e, "embed", setEditorZone)}
+        >
           <h3 className="text-center text-2xl font-bold text-zinc-900">Lead capture</h3>
           <p className="mt-2 text-center text-sm text-zinc-500">
             Paste your GoHighLevel or other embed — preview updates here (same as visitors will see when published).
           </p>
           {(pageData.formEmbedHtml ?? "").trim() ? (
-            <div className="mt-8 rounded-2xl border border-zinc-200 bg-white p-6 shadow-inner">
+            <div
+              className={`mt-8 shadow-inner ${embedCorners}`}
+              style={{
+                padding: embedOuterPadPx,
+                boxSizing: "border-box",
+                backgroundColor: normalizeHex(theme.formEmbedCardBgHex, "#ffffff"),
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor: normalizeHex(theme.formEmbedCardBorderHex, "#e4e4e7"),
+              }}
+            >
               {/* Trusted agency-only editor context — mirrors published embed */}
-              <div className="landing-embed-preview overflow-hidden rounded-lg border border-zinc-100 bg-zinc-50/50 [&_iframe]:max-h-[520px] [&_iframe]:min-h-[240px] [&_iframe]:w-full">
+              <div
+                className={`landing-embed-preview overflow-hidden border border-zinc-100 bg-zinc-50/50 ${embedCorners}`}
+                style={{
+                  ...landingEmbedIframeVars(theme),
+                }}
+              >
                 {/* eslint-disable-next-line react/no-danger */}
                 <div dangerouslySetInnerHTML={{ __html: pageData.formEmbedHtml ?? "" }} />
               </div>
@@ -623,7 +700,7 @@ export default function LandingPageDesignCanvas({
               <p className="text-sm text-zinc-500">No embed yet — paste HTML below.</p>
             </div>
           )}
-          <details className="group mt-6 rounded-xl border border-zinc-200 bg-white open:shadow-md">
+          <details id="lp-zone-embed-html" className="group mt-6 rounded-xl border border-zinc-200 bg-white open:shadow-md">
             <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
               Embed HTML
             </summary>
@@ -640,7 +717,12 @@ export default function LandingPageDesignCanvas({
       </section>
 
       {/* Footer links */}
-      <section className="border-t border-zinc-200 bg-zinc-50 px-6 py-8 md:px-12">
+      <section
+        id="lp-zone-footer"
+        className={`border-t border-zinc-200 bg-zinc-50 px-6 py-8 md:px-12 ${zoneRing(editorZone === "footer")}`}
+        onFocusCapture={() => setEditorZone("footer")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "footer", setEditorZone)}
+      >
         <div className="mx-auto max-w-3xl">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Footer / legal links</span>
@@ -706,7 +788,12 @@ export default function LandingPageDesignCanvas({
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-zinc-200 bg-white px-6 py-14 md:px-12">
+      <section
+        id="lp-zone-faq"
+        className={`border-t border-zinc-200 bg-white px-6 py-14 md:px-12 ${zoneRing(editorZone === "faq")}`}
+        onFocusCapture={() => setEditorZone("faq")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "faq", setEditorZone)}
+      >
         <div className="mx-auto max-w-3xl">
           <h3 className="text-center text-sm font-semibold uppercase tracking-wide text-zinc-500">Questions</h3>
           <div className="mt-10 space-y-4">
@@ -752,7 +839,12 @@ export default function LandingPageDesignCanvas({
       </section>
 
       {/* Thank you + SEO */}
-      <section className="border-t border-zinc-200 bg-zinc-900 px-6 py-14 text-zinc-100 md:px-12">
+      <section
+        id="lp-zone-seo"
+        className={`border-t border-zinc-200 bg-zinc-900 px-6 py-14 text-zinc-100 md:px-12 ${zoneRing(editorZone === "seo")}`}
+        onFocusCapture={() => setEditorZone("seo")}
+        onPointerDownCapture={(e) => editableSurfaceClick(e, "seo", setEditorZone)}
+      >
         <div className="mx-auto max-w-3xl space-y-10">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">After submit</h3>

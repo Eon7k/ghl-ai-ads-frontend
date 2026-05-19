@@ -765,11 +765,24 @@ export type LandingPageTheme = {
   primaryHex?: string;
   accentHex?: string;
   heroBgImageUrl?: string;
+  /** When the hero shows a photo, darkening overlay intensity (0–1). Gradient hero ignores this. */
+  heroOverlayOpacity?: number;
   cornerRadius?: "rounded" | "square" | "pill";
   headingFontPreset?: string;
   bodyFontPreset?: string;
   headingFontCss?: string;
   bodyFontCss?: string;
+  /** Max width of the lead-form column (CSS length, e.g. 36rem, 520px, 100%). */
+  formEmbedMaxWidth?: string;
+  /** Iframe sizing in editor / published funnel (pixels). */
+  formEmbedIframeMinHeightPx?: number;
+  formEmbedIframeMaxHeightPx?: number;
+  /** Padding inside the outer card around the preview (pixels). */
+  formEmbedOuterPaddingPx?: number;
+  formEmbedCardBgHex?: string;
+  formEmbedCardBorderHex?: string;
+  /** When set, overrides `cornerRadius` for the embed card only. */
+  formEmbedCardRadius?: "rounded" | "square" | "pill";
 };
 
 /** Stored JSON for landing page content (hero, funnel steps, optional form embed). */

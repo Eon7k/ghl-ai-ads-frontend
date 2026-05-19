@@ -100,6 +100,13 @@ body {
     @apply focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;
     color-scheme: light;
   }
+
+  /** Landing funnel design canvas — iframe min/max height from theme (CSS vars on wrapper). */
+  .landing-design-root .landing-embed-preview iframe {
+    width: 100%;
+    min-height: var(--lp-embed-iframe-min, 240px);
+    max-height: var(--lp-embed-iframe-max, 520px);
+  }
 }
 
 /* Loading spinners: stay visible but stop rotation when the user prefers reduced motion */

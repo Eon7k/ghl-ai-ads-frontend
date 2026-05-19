@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppNav from "@/components/AppNav";
 import LandingPageDesignCanvas from "@/components/LandingPageDesignCanvas";
+import LandingPageEditorInspector, {
+  type LandingEditorZone,
+} from "@/components/LandingPageEditorInspector";
 import { ExpansionProductGate } from "@/components/ExpansionProductGate";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -51,11 +54,23 @@ function parseGalleryImages(raw: unknown): LandingGalleryImage[] | undefined {
   return rows.length ? rows : undefined;
 }
 
+function safeThemeEmbedMaxWidth(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const s = raw.trim().slice(0, 48);
+  if (!s) return undefined;
+  if (/[<>'"`]|url\(|expression|javascript|\\0/i.test(s)) return undefined;
+  return s;
+}
+
 function normalizeTheme(raw: unknown): LandingPageTheme | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const t = raw as Record<string, unknown>;
   const corner =
     t.cornerRadius === "rounded" || t.cornerRadius === "square" || t.cornerRadius === "pill" ? t.cornerRadius : undefined;
+  const embedCardRadius =
+    t.formEmbedCardRadius === "rounded" || t.formEmbedCardRadius === "square" || t.formEmbedCardRadius === "pill"
+      ? t.formEmbedCardRadius
+      : undefined;
   const out: LandingPageTheme = {};
   if (typeof t.preset === "string") out.preset = t.preset;
   if (typeof t.primaryHex === "string") out.primaryHex = t.primaryHex;
@@ -66,6 +81,27 @@ function normalizeTheme(raw: unknown): LandingPageTheme | undefined {
   if (typeof t.bodyFontPreset === "string") out.bodyFontPreset = t.bodyFontPreset;
   if (typeof t.headingFontCss === "string") out.headingFontCss = t.headingFontCss;
   if (typeof t.bodyFontCss === "string") out.bodyFontCss = t.bodyFontCss;
+
+  if (typeof t.heroOverlayOpacity === "number" && Number.isFinite(t.heroOverlayOpacity)) {
+    out.heroOverlayOpacity = Math.min(0.95, Math.max(0, t.heroOverlayOpacity));
+  }
+
+  const ew = safeThemeEmbedMaxWidth(t.formEmbedMaxWidth);
+  if (ew) out.formEmbedMaxWidth = ew;
+
+  if (typeof t.formEmbedIframeMinHeightPx === "number" && Number.isFinite(t.formEmbedIframeMinHeightPx)) {
+    out.formEmbedIframeMinHeightPx = Math.min(960, Math.max(120, Math.round(t.formEmbedIframeMinHeightPx)));
+  }
+  if (typeof t.formEmbedIframeMaxHeightPx === "number" && Number.isFinite(t.formEmbedIframeMaxHeightPx)) {
+    out.formEmbedIframeMaxHeightPx = Math.min(1200, Math.max(200, Math.round(t.formEmbedIframeMaxHeightPx)));
+  }
+  if (typeof t.formEmbedOuterPaddingPx === "number" && Number.isFinite(t.formEmbedOuterPaddingPx)) {
+    out.formEmbedOuterPaddingPx = Math.min(96, Math.max(0, Math.round(t.formEmbedOuterPaddingPx)));
+  }
+  if (typeof t.formEmbedCardBgHex === "string") out.formEmbedCardBgHex = t.formEmbedCardBgHex;
+  if (typeof t.formEmbedCardBorderHex === "string") out.formEmbedCardBorderHex = t.formEmbedCardBorderHex;
+  if (embedCardRadius) out.formEmbedCardRadius = embedCardRadius;
+
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -173,6 +209,22 @@ function LandingPageEditorPageInner() {
   const [detailLoading, setDetailLoading] = useState(true);
   const loadGenRef = useRef(0);
   const [editorTab, setEditorTab] = useState<"design" | "settings">("design");
+  const [editorZone, setEditorZone] = useState<LandingEditorZone>(null);
+
+  const scrollToZoneId = useCallback((id: string) => {
+    const el = typeof document !== "undefined" ? document.getElementById(id) : null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  }, []);
+
+  const patchTheme = useCallback((patch: Partial<LandingPageTheme>) => {
+    setPageData((prev) => ({ ...prev, theme: { ...(prev.theme ?? {}), ...patch } }));
+  }, []);
+
+  function onInspectorJumpLook() {
+    scrollToZoneId("lp-zone-look-feel");
+  }
 
   const load = useCallback(async () => {
     if (!id || !user) return;
@@ -515,8 +567,8 @@ function LandingPageEditorPageInner() {
         </div>
 
         {editorTab === "design" ? (
-          <div className="mt-8 space-y-6">
-            <section className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/80 to-white p-5 shadow-sm">
+          <div className="mt-8 flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,1fr)_min(20rem)] xl:items-start xl:gap-8 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <section className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/80 to-white p-5 shadow-sm xl:col-span-2">
               <h2 className="text-sm font-semibold text-zinc-900">Targeted AI changes</h2>
               <p className="mt-1 text-xs text-zinc-600">
                 Ask for specific edits only—fonts, palette, hero copy, funnel sections, nav/footer links, or gallery images. Your form embed stays as-is unless you change it manually.
@@ -548,18 +600,30 @@ function LandingPageEditorPageInner() {
               )}
             </section>
 
-            <LandingPageDesignCanvas
-              pageData={pageData}
-              updateField={updateField}
-              patchFunnelStep={patchFunnelStep}
-              removeFunnelStep={removeFunnelStep}
-              addFunnelStep={addFunnelStep}
-              setStepBullets={setStepBullets}
-              patchFaq={patchFaq}
-              removeFaq={removeFaq}
-              addFaq={addFaq}
-              setTrustSignalsFromLines={setTrustSignalsFromLines}
-              patchPageData={setPageData}
+            <div className="min-w-0 xl:space-y-0">
+              <LandingPageDesignCanvas
+                pageData={pageData}
+                updateField={updateField}
+                patchFunnelStep={patchFunnelStep}
+                removeFunnelStep={removeFunnelStep}
+                addFunnelStep={addFunnelStep}
+                setStepBullets={setStepBullets}
+                patchFaq={patchFaq}
+                removeFaq={removeFaq}
+                addFaq={addFaq}
+                setTrustSignalsFromLines={setTrustSignalsFromLines}
+                patchPageData={setPageData}
+                editorZone={editorZone}
+                setEditorZone={setEditorZone}
+              />
+            </div>
+            <LandingPageEditorInspector
+              zone={editorZone}
+              onClearZone={() => setEditorZone(null)}
+              onJumpToLook={onInspectorJumpLook}
+              theme={pageData.theme ?? {}}
+              patchTheme={patchTheme}
+              scrollToZoneId={scrollToZoneId}
             />
           </div>
         ) : (
