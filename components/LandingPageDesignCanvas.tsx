@@ -1,6 +1,6 @@
 "use client";
 
-import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
+import type { Dispatch, MouseEvent, SetStateAction, SyntheticEvent } from "react";
 import { useMemo } from "react";
 import type { LandingEditorZone } from "@/components/LandingPageEditorInspector";
 import LandingEmbedResizeHandle from "@/components/LandingEmbedResizeHandle";
@@ -98,6 +98,26 @@ function editableSurfaceClick(ev: SyntheticEvent, zone: LandingEditorZone, setZo
 
 function zoneRing(active: boolean) {
   return active ? "ring-2 ring-violet-400/75 ring-offset-2 ring-offset-white" : "";
+}
+
+/** In-page anchors (e.g. #landing-book) scroll within the design preview instead of reloading. */
+function handleLandingDesignAnchoredNav(ev: MouseEvent<HTMLDivElement>) {
+  if (!(ev.target instanceof Element)) return;
+  const a = ev.target.closest("a[href]");
+  if (!(a instanceof HTMLAnchorElement)) return;
+  const href = (a.getAttribute("href") ?? "").trim();
+  if (!href.startsWith("#") || href === "#") return;
+  const frag = href.slice(1);
+  if (!/^[a-zA-Z][\w.-]{0,240}$/.test(frag)) return;
+  let target: HTMLElement | null = null;
+  try {
+    target = ev.currentTarget.querySelector(`#${CSS.escape(frag)}`);
+  } catch {
+    return;
+  }
+  if (!target || !(target instanceof HTMLElement)) return;
+  ev.preventDefault();
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 /** Visitor-style landing layout with inline editable fields (no separate “code view”). */
@@ -259,6 +279,7 @@ export default function LandingPageDesignCanvas({
     <div
       className="landing-design-root rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/60 ring-1 ring-black/5"
       style={{ ...landingDesignRootVars(theme), fontFamily: resolveBodyFont(theme) }}
+      onClick={handleLandingDesignAnchoredNav}
     >
       <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-center">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Design preview — click Save to persist changes</p>
@@ -560,7 +581,7 @@ export default function LandingPageDesignCanvas({
                 value={pageData.ctaUrl ?? ""}
                 onChange={(e) => updateField("ctaUrl", e.target.value)}
                 className={`border border-white/20 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-400/30 ${ctaCorners}`}
-                placeholder="https://… or /thank-you"
+                placeholder="Primary CTA destination — https://…, /thank-you, or #landing-book / #landing-form"
               />
             </label>
           </div>
@@ -729,7 +750,10 @@ export default function LandingPageDesignCanvas({
                       Section buttons
                     </p>
                     <p className={`mt-1 text-xs leading-snug ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
-                      Add labelled links for this panel (book calendar, WhatsApp, jump to embed). Matches hero look — tweak style per button.
+                      Link to elsewhere (https) — or scroll to the embed on{" "}
+                      <span className="font-mono">this</span> page with{" "}
+                      <span className="font-mono">#landing-book</span> (whole lead/booking band) or{" "}
+                      <span className="font-mono">#landing-form</span> (the form/calendar iframe card).
                     </p>
                   </div>
                   <button
@@ -747,7 +771,9 @@ export default function LandingPageDesignCanvas({
 
                 {!step.buttons?.length ? (
                   <p className={`mt-4 text-xs ${bleed ? "text-zinc-400" : "text-zinc-400"}`}>
-                    Optional — e.g. <span className="font-mono">Book a demo</span> → your scheduling URL (https).
+                    Optional — e.g. paste <span className="font-mono">https://…</span> for an external site, or{" "}
+                    <span className="font-mono">#landing-book</span> / <span className="font-mono">#landing-form</span>{" "}
+                    to jump down to your on-page scheduler or embedded form when visitors click Save and view the funnel.
                   </p>
                 ) : (
                   <div className="mt-4 grid gap-3">
@@ -777,14 +803,48 @@ export default function LandingPageDesignCanvas({
                           Link URL
                           <input
                             value={btn.href}
-                            onChange={(e) => patchSectionButton(index, bi, { href: e.target.value })}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const patch: Partial<LandingStepButton> = { href: v };
+                              if (v.trim().startsWith("#")) patch.newTab = false;
+                              patchSectionButton(index, bi, patch);
+                            }}
                             className={
                               bleed
                                 ? "mt-1 w-full rounded border border-white/25 bg-black/35 px-2 py-2 font-mono text-xs text-white placeholder:text-zinc-500 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
                                 : "mt-1 w-full rounded border border-zinc-300 px-2 py-2 font-mono text-xs placeholder:text-zinc-400 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/20"
                             }
-                            placeholder="https://calendly.com/… or #book"
+                            placeholder="#landing-book or https://…"
                           />
+                          <div className={`mt-2 flex flex-wrap items-center gap-2 ${bleed ? "text-zinc-400" : "text-zinc-500"}`}>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide">Scroll to embed</span>
+                            <button
+                              type="button"
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                                bleed
+                                  ? "border-white/30 bg-white/5 text-zinc-200 hover:bg-white/10"
+                                  : "border-zinc-200 bg-white text-zinc-700 hover:border-violet-300"
+                              }`}
+                              onClick={() =>
+                                patchSectionButton(index, bi, { href: "#landing-book", newTab: false })
+                              }
+                            >
+                              #landing-book
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                                bleed
+                                  ? "border-white/30 bg-white/5 text-zinc-200 hover:bg-white/10"
+                                  : "border-zinc-200 bg-white text-zinc-700 hover:border-violet-300"
+                              }`}
+                              onClick={() =>
+                                patchSectionButton(index, bi, { href: "#landing-form", newTab: false })
+                              }
+                            >
+                              #landing-form
+                            </button>
+                          </div>
                         </label>
                         <label className={`text-[10px] font-medium uppercase lg:col-span-2 ${bleed ? "text-zinc-400" : "text-zinc-600"}`}>
                           Style
@@ -817,6 +877,7 @@ export default function LandingPageDesignCanvas({
                             type="checkbox"
                             className={`h-4 w-4 rounded border-zinc-500 ${bleed ? "border-white/40 bg-transparent" : ""}`}
                             checked={!!btn.newTab}
+                            disabled={(btn.href || "").trim().startsWith("#")}
                             onChange={(e) => patchSectionButton(index, bi, { newTab: e.target.checked })}
                           />
                           New tab
@@ -857,12 +918,8 @@ export default function LandingPageDesignCanvas({
                             <a
                               key={`preview-btn-${pi}-${btn.label.slice(0, 8)}`}
                               href={hr}
-                              onClick={(e) => {
-                                // Keep editing flow in-page (avoid leaving the funnel editor accidental navigation).
-                                e.preventDefault();
-                              }}
-                              target={btn.newTab ? "_blank" : undefined}
-                              rel={btn.newTab ? "noopener noreferrer" : undefined}
+                              target={hr.startsWith("#") ? undefined : btn.newTab ? "_blank" : undefined}
+                              rel={hr.startsWith("#") ? undefined : btn.newTab ? "noopener noreferrer" : undefined}
                               className={landingSectionBtnPreviewClass(btn.variant, bleed, ctaCorners)}
                             >
                               {btn.label.trim()}
@@ -1086,12 +1143,13 @@ export default function LandingPageDesignCanvas({
         </div>
       </section>
 
-      {/* Lead form */}
+      {/* Lead form / scheduling embed scroll targets */}
       <section
+        id="landing-book"
         className={
           bleed
-            ? "relative z-0 overflow-hidden border-t border-white/10 px-6 py-14 text-white md:px-12"
-            : "border-t border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-14 md:px-12"
+            ? "scroll-mt-24 relative z-0 overflow-hidden border-t border-white/10 px-6 py-14 text-white md:px-12"
+            : "scroll-mt-24 border-t border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-14 md:px-12"
         }
       >
         {bleed ? <LandingHeroBackdropStack theme={theme} /> : null}
@@ -1113,6 +1171,7 @@ export default function LandingPageDesignCanvas({
           </p>
           {(pageData.formEmbedHtml ?? "").trim() ? (
             <div
+              id="landing-form"
               className={`mt-8 shadow-inner ${embedCorners}`}
               style={{
                 padding: embedOuterPadPx,
@@ -1144,6 +1203,7 @@ export default function LandingPageDesignCanvas({
             </div>
           ) : (
             <div
+              id="landing-form"
               className={
                 bleed
                   ? "mt-8 rounded-2xl border-2 border-dashed border-white/25 bg-black/35 px-8 py-16 text-center"

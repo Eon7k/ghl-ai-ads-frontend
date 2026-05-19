@@ -89,10 +89,10 @@ function parseLandingStepButtons(raw: unknown): LandingStepButton[] | undefined 
             ? String(r.link)
             : "";
     const label = labelRaw.trim().slice(0, 140);
-    const href = hrefRaw.trim().slice(0, 2048);
-    if (!href && !label) continue;
-    const row: LandingStepButton = { label: label || "Button", href: href || "/" };
-    if (r.newTab === true || r.openNewTab === true) row.newTab = true;
+    const hr = hrefRaw.trim().slice(0, 2048);
+    if (!hr && !label) continue;
+    const row: LandingStepButton = { label: label || "Button", href: hr || "/" };
+    if (!hr.startsWith("#") && (r.newTab === true || r.openNewTab === true)) row.newTab = true;
     const vr = typeof r.variant === "string" ? r.variant.trim().toLowerCase() : "";
     const sr = typeof r.style === "string" ? r.style.trim().toLowerCase() : "";
     const cand = vr || sr;
