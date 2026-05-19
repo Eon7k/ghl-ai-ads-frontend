@@ -102,6 +102,25 @@ function normalizeTheme(raw: unknown): LandingPageTheme | undefined {
   if (typeof t.formEmbedCardBorderHex === "string") out.formEmbedCardBorderHex = t.formEmbedCardBorderHex;
   if (embedCardRadius) out.formEmbedCardRadius = embedCardRadius;
 
+  if (typeof t.contentColumnMaxWidthPx === "number" && Number.isFinite(t.contentColumnMaxWidthPx)) {
+    out.contentColumnMaxWidthPx = Math.min(1200, Math.max(300, Math.round(t.contentColumnMaxWidthPx)));
+  }
+  if (typeof t.heroPaddingYPx === "number" && Number.isFinite(t.heroPaddingYPx)) {
+    out.heroPaddingYPx = Math.min(240, Math.max(32, Math.round(t.heroPaddingYPx)));
+  }
+  if (typeof t.funnelSectionPaddingYPx === "number" && Number.isFinite(t.funnelSectionPaddingYPx)) {
+    out.funnelSectionPaddingYPx = Math.min(160, Math.max(16, Math.round(t.funnelSectionPaddingYPx)));
+  }
+  if (typeof t.galleryCardImageHeightPx === "number" && Number.isFinite(t.galleryCardImageHeightPx)) {
+    out.galleryCardImageHeightPx = Math.min(420, Math.max(72, Math.round(t.galleryCardImageHeightPx)));
+  }
+  if (typeof t.faqSectionPaddingYPx === "number" && Number.isFinite(t.faqSectionPaddingYPx)) {
+    out.faqSectionPaddingYPx = Math.min(200, Math.max(24, Math.round(t.faqSectionPaddingYPx)));
+  }
+  if (typeof t.previewRootFontSizePx === "number" && Number.isFinite(t.previewRootFontSizePx)) {
+    out.previewRootFontSizePx = Math.min(23, Math.max(12, Math.round(t.previewRootFontSizePx)));
+  }
+
   return Object.keys(out).length ? out : undefined;
 }
 

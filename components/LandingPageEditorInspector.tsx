@@ -86,9 +86,9 @@ export default function LandingPageEditorInspector({
 
       {!zone ? (
         <p className="mt-3 text-xs leading-relaxed text-zinc-600">
-          Tip: <strong className="font-medium text-zinc-800">Click an empty part of a section</strong> (not a text field) or{" "}
-          <strong className="font-medium text-zinc-800">focus any field</strong> in that block to open its settings here. Use{" "}
-          <span className="font-medium">Colours / fonts</span> for site-wide palette and typography.
+          Tip: <strong className="font-medium text-zinc-800">Violet stripes</strong> on blocks resize spacing, typography, gallery photo height, embed height &amp; column width,
+          FAQ padding, and main column width on the hero. Or click empty chrome / focus fields to inspect a zone. Use{" "}
+          <span className="font-medium">Colours / fonts</span> for palette and font stacks. Save when done.
         </p>
       ) : null}
 
@@ -197,6 +197,9 @@ export default function LandingPageEditorInspector({
 
       {zone === "embed" && (
         <div className="mt-4 space-y-4 border-t border-zinc-100 pt-4">
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            Resize the live preview quickly by dragging the horizontal bar directly under the embed in the canvas (or edit the pixel fields below).
+          </p>
           <p className="text-xs font-medium text-zinc-800">Embed frame</p>
           <label className="block text-[11px] text-zinc-600">
             Column max width

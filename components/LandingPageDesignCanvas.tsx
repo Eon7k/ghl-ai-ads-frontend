@@ -3,11 +3,20 @@
 import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import { useMemo } from "react";
 import type { LandingEditorZone } from "@/components/LandingPageEditorInspector";
+import LandingEmbedResizeHandle from "@/components/LandingEmbedResizeHandle";
+import LandingResizeBar from "@/components/LandingResizeBar";
 import type { LandingFunnelStep, LandingPageData, LandingGalleryImage, LandingNavLinkRow, LandingPageTheme } from "@/lib/api";
 import {
   cornerRoundingClass,
+  embedColumnWidthPx,
+  landingContentColumnStyle,
   landingDesignRootVars,
   landingEmbedIframeVars,
+  landingFaqSpacing,
+  landingFunnelSectionSpacing,
+  landingGalleryThumbStyle,
+  landingHeroSpacing,
+  landingUsesCustomContentColumn,
   normalizeHex,
   resolveBodyFont,
   resolveHeadingFont,
@@ -45,6 +54,7 @@ export type LandingPageDesignCanvasProps = {
 function editableSurfaceClick(ev: SyntheticEvent, zone: LandingEditorZone, setZone: Dispatch<SetStateAction<LandingEditorZone>>) {
   const t = ev.target;
   if (!(t instanceof HTMLElement)) return;
+  if (t.closest('[role="separator"]')) return;
   if (t.closest('input:not([type="checkbox"]):not([type="radio"]), textarea, select, button, a, summary'))
     return;
   setZone(zone);
@@ -93,6 +103,14 @@ export default function LandingPageDesignCanvas({
   const embedCorners = cornerRoundingClass(theme.formEmbedCardRadius ?? theme.cornerRadius);
   const embedMaxW = theme.formEmbedMaxWidth?.trim() || "36rem";
   const embedOuterPadPx = theme.formEmbedOuterPaddingPx ?? 24;
+  const colSx = landingContentColumnStyle(theme);
+  const colMaxCustom = landingUsesCustomContentColumn(theme);
+  const heroSp = landingHeroSpacing(theme);
+  const funnelSp = landingFunnelSectionSpacing(theme);
+  const faqSp = landingFaqSpacing(theme);
+  /** Default hero column matches prior max-w-3xl (~768px) when untouched. */
+  const proseWrap = `${colMaxCustom ? "" : "max-w-3xl"}`;
+  const galleryWrap = `${colMaxCustom ? "" : "max-w-4xl"}`;
 
   const patchTheme = (patch: Partial<LandingPageTheme>) =>
     patchPageData((prev) => ({
@@ -175,7 +193,7 @@ export default function LandingPageDesignCanvas({
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Design preview — click Save to persist changes</p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
           A funnel step with key <code className="rounded bg-zinc-200/80 px-1 py-0.5 font-mono text-[10px] text-zinc-700">hero</code> matches
-          the headline area above and is not repeated in the sections list.
+          the headline area above and is not repeated in the sections list. Drag violet bars on blocks to resize width, heights, spacing, and typography.
         </p>
       </div>
 
@@ -287,6 +305,19 @@ export default function LandingPageDesignCanvas({
               className="mt-1 w-full rounded-md border border-zinc-300 px-2 py-2 font-mono text-xs"
             />
           </label>
+          <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/80 pt-4 sm:col-span-2 lg:col-span-3">
+            <p className="mb-3 px-2 text-[11px] font-medium text-zinc-700">Whole preview text size — drag vertically</p>
+            <LandingResizeBar
+              axis="y"
+              layout="horizontalStrip"
+              ariaLabel="Resize funnel preview typography"
+              title="Pull to enlarge or shrink all text proportionally"
+              getValue={() => theme.previewRootFontSizePx ?? 16}
+              clamp={[12, 23]}
+              apply={(n) => patchTheme({ previewRootFontSizePx: n })}
+              onBegin={() => setEditorZone("look")}
+            />
+          </div>
         </div>
       </details>
 
@@ -296,7 +327,7 @@ export default function LandingPageDesignCanvas({
         onFocusCapture={() => setEditorZone("nav")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "nav", setEditorZone)}
       >
-        <div className="mx-auto flex max-w-4xl flex-col gap-2">
+        <div className={`mx-auto flex w-full flex-col gap-2 ${galleryWrap}`} style={colSx}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Top navigation links</span>
             <button
@@ -351,7 +382,8 @@ export default function LandingPageDesignCanvas({
       {/* Hero */}
       <section
         id="lp-zone-hero"
-        className={`relative overflow-hidden px-6 py-14 text-white md:px-12 md:py-20 ${zoneRing(editorZone === "hero")}`}
+        className={`relative overflow-hidden px-6 text-white md:px-12 ${heroSp.className} ${zoneRing(editorZone === "hero")}`}
+        style={heroSp.padStyle}
         onFocusCapture={() => setEditorZone("hero")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "hero", setEditorZone)}
       >
@@ -380,7 +412,10 @@ export default function LandingPageDesignCanvas({
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.16),transparent_58%)]" />
           </>
         )}
-        <div className="relative mx-auto max-w-3xl" style={{ fontFamily: resolveBodyFont(theme) }}>
+        <div
+          className={`relative mx-auto w-full ${proseWrap} pr-10`}
+          style={{ ...colSx, fontFamily: resolveBodyFont(theme) }}
+        >
           {(navLinks.length > 0 && navLinks.some((n) => n.label.trim())) ? (
             <nav className="mb-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-white/10 pb-4 text-sm">
               {navLinks
@@ -473,6 +508,27 @@ export default function LandingPageDesignCanvas({
               placeholder="e.g. Form sits below proof section"
             />
           </label>
+          <LandingResizeBar
+            axis="y"
+            layout="horizontalStrip"
+            ariaLabel="Resize hero vertical padding"
+            title="Adjust hero top/bottom space"
+            getValue={() => theme.heroPaddingYPx ?? 72}
+            clamp={[32, 240]}
+            apply={(n) => patchTheme({ heroPaddingYPx: n })}
+            onBegin={() => setEditorZone("hero")}
+          />
+          <LandingResizeBar
+            axis="x"
+            layout="verticalThumb"
+            ariaLabel="Resize main content column width"
+            title="Wide or narrow column (hero, funnel, trust, FAQ…)"
+            className="absolute right-0 top-16 z-30 h-[min(360px,calc(100%-80px))] rounded-l-md rounded-r-none"
+            getValue={() => theme.contentColumnMaxWidthPx ?? 768}
+            clamp={[320, 1200]}
+            apply={(n) => patchTheme({ contentColumnMaxWidthPx: n })}
+            onBegin={() => setEditorZone("look")}
+          />
         </div>
       </section>
 
@@ -483,11 +539,12 @@ export default function LandingPageDesignCanvas({
           <section
             key={`${step.key ?? "step"}-${index}`}
             id={`lp-zone-section-${index}`}
-            className={`border-t border-zinc-100 px-6 py-12 md:px-12 ${zebra ? "bg-white" : "bg-zinc-50/90"} ${zoneRing(editorZone === `section-${index}`)}`}
+            className={`border-t border-zinc-100 px-6 md:px-12 ${funnelSp.className} ${zebra ? "bg-white" : "bg-zinc-50/90"} ${zoneRing(editorZone === `section-${index}`)}`}
+            style={funnelSp.padStyle}
             onFocusCapture={() => setEditorZone(`section-${index}`)}
             onPointerDownCapture={(e) => editableSurfaceClick(e, `section-${index}` as LandingEditorZone, setEditorZone)}
           >
-            <div className="mx-auto max-w-3xl">
+            <div className={`relative mx-auto w-full ${proseWrap}`} style={colSx}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <span className="rounded-md bg-violet-100 px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide text-violet-800">
                   {(step.key ?? "").trim() || `section-${visualRank + 1}`}
@@ -541,6 +598,16 @@ export default function LandingPageDesignCanvas({
                 />
               </div>
             </div>
+            <LandingResizeBar
+              axis="y"
+              layout="horizontalStrip"
+              ariaLabel="Resize all funnel sections vertical padding"
+              title="Adds space above/below body copy blocks (all funnel sections together)"
+              getValue={() => theme.funnelSectionPaddingYPx ?? 48}
+              clamp={[16, 160]}
+              apply={(n) => patchTheme({ funnelSectionPaddingYPx: n })}
+              onBegin={() => setEditorZone(`section-${index}` as LandingEditorZone)}
+            />
           </section>
         );
       })}
@@ -549,7 +616,8 @@ export default function LandingPageDesignCanvas({
         <button
           type="button"
           onClick={addFunnelStep}
-          className="mx-auto flex max-w-3xl rounded-xl border-2 border-dashed border-zinc-300 px-6 py-4 text-sm font-medium text-zinc-600 hover:border-violet-400 hover:bg-white hover:text-violet-900"
+          style={colSx}
+          className={`mx-auto flex w-full ${proseWrap} rounded-xl border-2 border-dashed border-zinc-300 px-6 py-4 text-sm font-medium text-zinc-600 hover:border-violet-400 hover:bg-white hover:text-violet-900`}
         >
           + Add funnel section
         </button>
@@ -562,7 +630,7 @@ export default function LandingPageDesignCanvas({
         onFocusCapture={() => setEditorZone("gallery")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "gallery", setEditorZone)}
       >
-        <div className="mx-auto max-w-4xl">
+        <div className={`mx-auto w-full ${galleryWrap}`} style={colSx}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Image gallery</h3>
             <button type="button" onClick={addGallery} className="text-xs font-medium text-violet-700 hover:underline">
@@ -577,10 +645,17 @@ export default function LandingPageDesignCanvas({
               {galleryImages.map((img, i) => (
                 <div key={`gal-${i}`} className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 shadow-sm">
                   {img.url.trim() ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img.url} alt={img.alt || ""} className="h-40 w-full object-cover" />
+                    <div className="w-full shrink-0 overflow-hidden" style={landingGalleryThumbStyle(theme)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={img.alt || ""} className="h-full w-full object-cover" />
+                    </div>
                   ) : (
-                    <div className="flex h-40 items-center justify-center text-xs text-zinc-400">Paste image URL</div>
+                    <div
+                      className="flex w-full shrink-0 items-center justify-center text-xs text-zinc-400"
+                      style={landingGalleryThumbStyle(theme)}
+                    >
+                      Paste image URL
+                    </div>
                   )}
                   <div className="space-y-2 p-3">
                     <input
@@ -609,6 +684,17 @@ export default function LandingPageDesignCanvas({
               ))}
             </div>
           )}
+          <LandingResizeBar
+            axis="y"
+            layout="horizontalStrip"
+            ariaLabel="Resize gallery thumbnail height"
+            title="Stretch how tall gallery images appear"
+            getValue={() => theme.galleryCardImageHeightPx ?? 160}
+            clamp={[88, 420]}
+            apply={(n) => patchTheme({ galleryCardImageHeightPx: n })}
+            className={galleryImages.length > 0 ? "mt-6" : "mt-4"}
+            onBegin={() => setEditorZone("gallery")}
+          />
         </div>
       </section>
 
@@ -619,7 +705,7 @@ export default function LandingPageDesignCanvas({
         onFocusCapture={() => setEditorZone("trust")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "trust", setEditorZone)}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className={`mx-auto w-full ${proseWrap}`} style={colSx}>
           <h3 className="text-center text-sm font-semibold uppercase tracking-wide text-zinc-500">Trust & credibility</h3>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {(pageData.trustSignals ?? []).length === 0 ? (
@@ -663,7 +749,7 @@ export default function LandingPageDesignCanvas({
       <section className="border-t border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-14 md:px-12">
         <div
           id="lp-zone-lead-form"
-          className={`mx-auto w-full ${editorZone === "embed" ? "rounded-3xl ring-2 ring-violet-400/75 ring-offset-4 ring-offset-transparent" : ""}`}
+          className={`relative mx-auto w-full pr-12 ${editorZone === "embed" ? "rounded-3xl ring-2 ring-violet-400/75 ring-offset-4 ring-offset-transparent" : ""}`}
           style={{ maxWidth: embedMaxW }}
           onFocusCapture={() => setEditorZone("embed")}
           onPointerDownCapture={(e) => editableSurfaceClick(e, "embed", setEditorZone)}
@@ -694,6 +780,14 @@ export default function LandingPageDesignCanvas({
                 {/* eslint-disable-next-line react/no-danger */}
                 <div dangerouslySetInnerHTML={{ __html: pageData.formEmbedHtml ?? "" }} />
               </div>
+              <LandingEmbedResizeHandle
+                theme={theme}
+                patchTheme={patchTheme}
+                onBeginResize={() => setEditorZone("embed")}
+              />
+              <p className="mt-2 text-center text-[10px] text-zinc-400">
+                Drag the striped bar under the iframe for height; use the grip on the right for column width — then Save.
+              </p>
             </div>
           ) : (
             <div className="mt-8 rounded-2xl border-2 border-dashed border-zinc-200 bg-white px-8 py-16 text-center">
@@ -713,6 +807,18 @@ export default function LandingPageDesignCanvas({
               placeholder='<iframe src="https://..." ...></iframe>'
             />
           </details>
+          <LandingResizeBar
+            axis="x"
+            layout="verticalThumb"
+            ariaLabel="Resize lead-form column width"
+            title="Narrow or widen embed column — switches to px"
+            className="absolute right-0 top-24 z-30 h-[min(280px,45vh)] rounded-l-md rounded-r-none opacity-95"
+            disabled={!(pageData.formEmbedHtml ?? "").trim()}
+            getValue={() => embedColumnWidthPx(theme)}
+            clamp={[280, 980]}
+            apply={(n) => patchTheme({ formEmbedMaxWidth: `${n}px` })}
+            onBegin={() => setEditorZone("embed")}
+          />
         </div>
       </section>
 
@@ -723,7 +829,7 @@ export default function LandingPageDesignCanvas({
         onFocusCapture={() => setEditorZone("footer")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "footer", setEditorZone)}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className={`mx-auto w-full ${proseWrap}`} style={colSx}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Footer / legal links</span>
             <button type="button" onClick={addFooter} className="text-xs font-medium text-violet-700 hover:underline">
@@ -790,11 +896,12 @@ export default function LandingPageDesignCanvas({
       {/* FAQ */}
       <section
         id="lp-zone-faq"
-        className={`border-t border-zinc-200 bg-white px-6 py-14 md:px-12 ${zoneRing(editorZone === "faq")}`}
+        className={`border-t border-zinc-200 bg-white px-6 md:px-12 ${faqSp.className} ${zoneRing(editorZone === "faq")}`}
+        style={faqSp.padStyle}
         onFocusCapture={() => setEditorZone("faq")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "faq", setEditorZone)}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className={`mx-auto w-full ${proseWrap}`} style={colSx}>
           <h3 className="text-center text-sm font-semibold uppercase tracking-wide text-zinc-500">Questions</h3>
           <div className="mt-10 space-y-4">
             {(pageData.faq ?? []).length === 0 ? (
@@ -835,6 +942,17 @@ export default function LandingPageDesignCanvas({
               + Add FAQ
             </button>
           </div>
+          <LandingResizeBar
+            axis="y"
+            layout="horizontalStrip"
+            ariaLabel="Resize FAQ block vertical padding"
+            title="Tight or spacious FAQ zone"
+            getValue={() => theme.faqSectionPaddingYPx ?? 56}
+            clamp={[24, 200]}
+            apply={(n) => patchTheme({ faqSectionPaddingYPx: n })}
+            className="mt-4"
+            onBegin={() => setEditorZone("faq")}
+          />
         </div>
       </section>
 
@@ -845,7 +963,7 @@ export default function LandingPageDesignCanvas({
         onFocusCapture={() => setEditorZone("seo")}
         onPointerDownCapture={(e) => editableSurfaceClick(e, "seo", setEditorZone)}
       >
-        <div className="mx-auto max-w-3xl space-y-10">
+        <div className={`mx-auto w-full ${proseWrap} space-y-10`} style={colSx}>
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">After submit</h3>
             <textarea

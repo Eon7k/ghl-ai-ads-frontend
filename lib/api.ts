@@ -783,6 +783,18 @@ export type LandingPageTheme = {
   formEmbedCardBorderHex?: string;
   /** When set, overrides `cornerRadius` for the embed card only. */
   formEmbedCardRadius?: "rounded" | "square" | "pill";
+  /** Main content column width in px (hero, funnel, trust, FAQ, etc.). Drag the right-edge handle on the hero. */
+  contentColumnMaxWidthPx?: number;
+  /** Hero vertical padding (px); when omitted, preset responsive Tailwind padding is used. */
+  heroPaddingYPx?: number;
+  /** Vertical padding for funnel rows (excluding the hero keyed step). */
+  funnelSectionPaddingYPx?: number;
+  /** Gallery image frame height (px). */
+  galleryCardImageHeightPx?: number;
+  /** FAQ vertical padding (px); when omitted, default Tailwind spacing is used. */
+  faqSectionPaddingYPx?: number;
+  /** Root font size for the design preview (px). Drag in Look & feel. */
+  previewRootFontSizePx?: number;
 };
 
 /** Stored JSON for landing page content (hero, funnel steps, optional form embed). */
